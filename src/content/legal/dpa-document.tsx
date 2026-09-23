@@ -259,7 +259,7 @@ export function DpaDocument() {
             ["Frequency", "Continuous, for the duration of the subscription"],
             [
               "Storage location",
-              "EEA — Supabase AWS eu-west-1 (Ireland); Vercel dub1 (Dublin); Railway EU West; see Annex III",
+              "EEA — Supabase AWS eu-west-1 (Ireland); Vercel dub1 (Dublin); LiveKit Cloud EU (Frankfurt); see Annex III",
             ],
           ]}
         />

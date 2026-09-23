@@ -18,7 +18,7 @@ npx tsx scripts/rehearse-kavanaghs-demo.ts --simulate-five-part --app-url http:/
 ## Before Garreth arrives
 
 1. `npm run dev -- -p 3001` (code-base-1 dashboard + voice webhooks)
-2. Voice worker deployed on Railway (code-base-2) with latest intake changes
+2. Voice worker deployed on LiveKit Cloud (code-base-2) with latest intake changes
 3. `npx tsx scripts/regenerate-kavanaghs-prompt.ts` — SuperValu + Real Rewards in compiled prompt
 4. Confirm `notification_phone` = your test mobile (SMS on complaint ticket)
 5. National offers synced (`retail_weekly_offers` — 2000+ rows)

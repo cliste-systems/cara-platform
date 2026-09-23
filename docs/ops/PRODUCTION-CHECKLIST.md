@@ -2,7 +2,7 @@
 
 ## Before deploy
 
-- [ ] **Billing alerts** configured — see [INFRASTRUCTURE-COSTS.md](./INFRASTRUCTURE-COSTS.md) (Vercel spend cap, Supabase usage, Railway limit)
+- [ ] **Billing alerts** configured — see [INFRASTRUCTURE-COSTS.md](./INFRASTRUCTURE-COSTS.md) (Vercel spend cap, Supabase usage, LiveKit Cloud)
 - [ ] Migrations `060`–`064` applied to production Supabase (064 revokes legacy anon storefront access)
 - [ ] `SENTRY_DSN` set; alert rules configured
 - [ ] `CRON_SECRET`, Stripe, **Resend** (signup confirmation email), **Turnstile** keys set on Vercel

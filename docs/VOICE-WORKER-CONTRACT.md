@@ -96,7 +96,7 @@ Art 50, and Hello Cara's DPA commitments.
 2. **Call recording** — Twilio call recording OFF; LiveKit egress ON after spoken disclosure;
    MP3 uploaded to Supabase `call-recordings/{organization_id}/{call_log_id}.mp3`;
    retained **30 days** then deleted by cron and GDPR erasure.
-3. **EU routing** — Deploy worker in Railway EU West; prefer EU endpoints for
+3. **EU routing** — Deploy the voice worker on LiveKit Cloud Agents in **`eu-central`** (Frankfurt); prefer EU endpoints for
    ElevenLabs (`api.eu.residency.elevenlabs.io`) and OpenRouter (`eu.openrouter.ai`)
    when available. See `SUB_PROCESSOR_EU_MIGRATION_NOTES` in
    `src/lib/sub-processors.data.ts`.

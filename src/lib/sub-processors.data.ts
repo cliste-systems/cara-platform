@@ -1,5 +1,5 @@
 /** Sub-processor list version — bump when SUB_PROCESSORS changes; triggers customer email notice. */
-export const SUB_PROCESSOR_LIST_VERSION = "2026-09-15";
+export const SUB_PROCESSOR_LIST_VERSION = "2026-09-23b";
 
 /** Sub-processor registry — update here; legal pages import this source. */
 
@@ -37,12 +37,14 @@ export const SUB_PROCESSORS: SubProcessor[] = [
     group: "eea-hosting",
   },
   {
-    name: "Railway (Railway Corp.)",
-    purpose: "Hosting for the AI voice agent worker.",
-    data: "Server logs, call-handling metadata (not stored transcripts).",
-    location: "EEA — Railway EU West.",
-    transferMechanism: "EU hosting; SCCs available if configuration changes.",
-    url: "https://railway.app/legal/privacy",
+    name: "LiveKit Cloud (LiveKit, Inc.)",
+    purpose: "Realtime voice infrastructure and AI agent worker hosting.",
+    data: "Call audio streams, agent observability (traces/logs when enabled), call-handling metadata.",
+    location:
+      "EEA — agent compute eu-central (Frankfurt); project data region EU (Frankfurt); SIP EU endpoint.",
+    transferMechanism:
+      "EU project data region + eu-central agent hosting; inference region restriction enabled.",
+    url: "https://livekit.io/privacy",
     group: "eea-hosting",
   },
   {

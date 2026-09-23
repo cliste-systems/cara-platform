@@ -13,7 +13,7 @@ Based on [`scripts/kavanaghs-five-part-demo-script.md`](../../../scripts/kavanag
 ### Environment
 
 - [ ] Dashboard running (production or rehearsed demo org — Kavanaghs Donegal Town)
-- [ ] Voice worker live on Railway with latest retail intake
+- [ ] Voice worker live on LiveKit Cloud with latest retail intake
 - [ ] `npx tsx scripts/regenerate-kavanaghs-prompt.ts` if using Kavanaghs demo org
 - [ ] National weekly offers synced if showing live offer quote (Part 3)
 - [ ] `notification_phone` set for SMS demo (Part 5) or skip SMS and show ticket only

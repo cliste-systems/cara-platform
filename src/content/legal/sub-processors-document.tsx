@@ -45,7 +45,8 @@ export function SubProcessorsDocument({
           transcripts, contacts, action-inbox items) is stored in the{" "}
           <strong>EEA</strong> — Supabase on AWS <strong>eu-west-1 (Ireland)</strong>.
           The dashboard APIs run on Vercel in <strong>dub1 (Dublin)</strong> and the
-          voice worker on <strong>Railway EU West</strong>.
+          voice agent on <strong>LiveKit Cloud</strong> (EU SIP and agent runtime in
+          Frankfurt).
         </p>
         <p>
           <strong>LiveKit Cloud</strong> receives inbound Irish calls on an{" "}

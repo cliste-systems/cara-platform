@@ -1,6 +1,6 @@
 # Infrastructure costs & billing alerts
 
-Platform costs (excluding per-call Twilio/ElevenLabs usage) for Cliste: Vercel, Supabase, Railway (voice worker), Resend, Sentry, Cloudflare.
+Platform costs (excluding per-call Twilio/ElevenLabs usage) for Cliste: Vercel, Supabase, LiveKit Cloud (voice worker + realtime), Resend, Sentry, Cloudflare.
 
 ## Billing alerts (set in each provider console)
 
@@ -19,11 +19,11 @@ These cannot be configured in-repo. Complete once per environment (production).
 3. Watch **Database egress** and **API requests** — these rise with dashboard traffic before storage does.
 4. Suggested alert threshold: **€50/month** overage on Pro at pilot scale.
 
-### Railway (voice worker — `cliste-code-base-2`)
+### LiveKit Cloud (voice worker — `cliste-code-base-2`)
 
-1. [Railway dashboard](https://railway.app) → Project → **Settings** → **Usage**
-2. Set a **hard spend limit** or email alert (suggested: **€50/month** at pilot).
-3. Review whether the worker can scale down when idle (fewer replicas off-peak).
+1. [LiveKit Cloud dashboard](https://cloud.livekit.io) → Project → **Billing** / **Usage**
+2. Production agent runs in **`eu-central`** (Frankfurt) on the Ship plan — warm 24/7.
+3. Set usage alerts alongside agent compute and inference minutes.
 
 ### Secondary services
 
@@ -46,7 +46,7 @@ After pilot traffic:
 
 **Platform fixed + variable spend (internal ops)**
 
-Track Cliste’s own vendor bills (Cursor, ChatGPT, Vercel, Supabase, Railway, etc.) at **`/admin/payments/platform-spend`**. Enter manual subscription amounts and billing days; click **Refresh API data** for OpenRouter and Railway MTD usage. See [`ENV.md`](ENV.md) for `OPENROUTER_MANAGEMENT_KEY`, `RAILWAY_API_TOKEN`, and `RAILWAY_WORKSPACE_ID`.
+Track Cliste’s own vendor bills (Cursor, ChatGPT, Vercel, Supabase, LiveKit, etc.) at **`/admin/payments/platform-spend`**. Enter manual subscription amounts and billing days; click **Refresh API data** for OpenRouter MTD usage. See [`ENV.md`](ENV.md) for `OPENROUTER_MANAGEMENT_KEY`.
 
 **Healthy pilot signals**
 
@@ -73,4 +73,4 @@ Cost data is stored on `call_logs.cost_estimate` (JSON from the voice worker). I
 
 ## Typical fixed platform burn (order of magnitude)
 
-At pilot (5–20 paying salons): **~€150–400/month** fixed (Vercel Pro + Supabase Pro + Railway + Sentry/Cloudflare/Resend). Variable costs scale with **call minutes** (metered to customers) and **active dashboard sessions** (Supabase egress).
+At pilot (5–20 paying salons): **~€150–400/month** fixed (Vercel Pro + Supabase Pro + LiveKit Ship + Sentry/Cloudflare/Resend). Variable costs scale with **call minutes** (metered to customers) and **active dashboard sessions** (Supabase egress).

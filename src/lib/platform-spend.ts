@@ -1,6 +1,6 @@
 export type PlatformBillingCycle = "monthly" | "annual" | "usage";
 export type PlatformCostSource = "manual" | "api";
-export type PlatformApiProvider = "openrouter" | "railway";
+export type PlatformApiProvider = "openrouter";
 
 export type PlatformVendorCostRow = {
   id: string;

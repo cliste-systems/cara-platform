@@ -234,7 +234,7 @@ export async function enrichCallTestDiagnostics(input: {
         level: "error",
         tag: "inferred_llm_or_tts_outage",
         message:
-          "Check OpenAI billing (429 credit_balance_exhausted) and ELEVENLABS_API_KEY on Railway.",
+          "Check OpenAI billing (429 credit_balance_exhausted) and ELEVENLABS_API_KEY on the LiveKit agent.",
         data: { source: "server_inferred" },
       },
     );

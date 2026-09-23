@@ -134,9 +134,9 @@ export function PrivacyNoticeDocument() {
         <p>
           Your business and caller records are stored in the{" "}
           <strong>EEA</strong> (Ireland). Dashboard hosting runs in{" "}
-          <strong>Dublin (dub1)</strong>, and the voice worker in{" "}
-          <strong>Railway EU West</strong>. Live calls use{" "}
-          <strong>LiveKit Cloud</strong> (EU SIP for inbound calls). Some processing
+          <strong>Dublin (dub1)</strong>, and the voice agent on{" "}
+          <strong>LiveKit Cloud</strong> (EU SIP and agent runtime in Frankfurt).
+          Some processing
           — mainly{" "}
           <strong>text-to-speech and LLM routing</strong> (ElevenLabs, OpenRouter)
           and transactional email — may still use US-based sub-processors under the

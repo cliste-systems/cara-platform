@@ -3,7 +3,7 @@
 **Purpose:** Verify production voice pipeline meets GDPR, EU AI Act Art 50, and Irish
 transparency expectations. Run before go-live on each DID and quarterly thereafter.
 
-**Last updated:** 2026-09-15
+**Last updated:** 2026-09-23
 
 ---
 
@@ -30,9 +30,11 @@ transparency expectations. Run before go-live on each DID and quarterly thereaft
 
 | Vendor | Target configuration | Verified |
 | ------ | -------------------- | -------- |
-| Railway voice worker | EU West region | [ ] |
-| LiveKit SIP | `*.eu.sip.livekit.cloud` (Frankfurt) | [ ] |
-| LiveKit WebRTC | Protocol region pinning (Scale+) | [ ] |
+| LiveKit Cloud agent | `eu-central` (Frankfurt compute) | [ ] |
+| LiveKit project data region | **EU (Frankfurt)** at project creation — observability/analytics | [ ] |
+| LiveKit SIP | `{project_id}.eu.sip.livekit.cloud` on Twilio TwiML | [ ] |
+| LiveKit inference | Inference region restriction enabled | [ ] |
+| LiveKit WebRTC | Protocol region pinning `eu` (Scale+, via support) | [ ] |
 | ElevenLabs TTS | `api.eu.residency.elevenlabs.io` + Zero Retention (Enterprise) | [ ] |
 | OpenRouter LLM | `https://eu.openrouter.ai` (Enterprise) | [ ] |
 | Resend | Verify `hellocara.ie` domain + DNS | [ ] |

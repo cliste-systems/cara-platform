@@ -22,21 +22,6 @@ type OpenRouterAnalyticsResponse = {
   error?: { message?: string };
 };
 
-type RailwayBillingResponse = {
-  data?: {
-    workspace?: {
-      customer?: {
-        currentUsage?: number;
-        subscriptions?: Array<{
-          nextInvoiceCurrentTotal?: number;
-          nextInvoiceDate?: string | null;
-        }>;
-      };
-    };
-  };
-  errors?: Array<{ message?: string }>;
-};
-
 function monthStartIso(reference = new Date()): string {
   const start = new Date(
     Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth(), 1),
@@ -117,93 +102,6 @@ export async function syncOpenRouterPlatformSpend(): Promise<PlatformSpendSyncRe
   }
 }
 
-export async function syncRailwayPlatformSpend(): Promise<PlatformSpendSyncResult> {
-  const syncedAt = nowIso();
-  const token = process.env.RAILWAY_API_TOKEN?.trim();
-  const workspaceId = process.env.RAILWAY_WORKSPACE_ID?.trim();
-
-  if (!token || !workspaceId) {
-    return {
-      vendorKey: "railway",
-      ok: false,
-      amountCents: null,
-      syncedAt,
-      error: "Set RAILWAY_API_TOKEN and RAILWAY_WORKSPACE_ID to sync Railway spend.",
-    };
-  }
-
-  try {
-    const res = await fetch("https://backboard.railway.com/graphql/v2", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        query: `
-          query PlatformSpend($workspaceId: String!) {
-            workspace(workspaceId: $workspaceId) {
-              customer {
-                currentUsage
-                subscriptions {
-                  nextInvoiceCurrentTotal
-                  nextInvoiceDate
-                }
-              }
-            }
-          }
-        `,
-        variables: { workspaceId },
-      }),
-      cache: "no-store",
-    });
-
-    const payload = (await res.json()) as RailwayBillingResponse;
-    if (!res.ok || payload.errors?.length) {
-      throw new Error(
-        payload.errors?.[0]?.message ??
-          `Railway GraphQL failed (${res.status}).`,
-      );
-    }
-
-    const customer = payload.data?.workspace?.customer;
-    const subscription = customer?.subscriptions?.[0];
-    const invoiceTotalCents = subscription?.nextInvoiceCurrentTotal;
-    const currentUsageUsd = customer?.currentUsage;
-
-    let amountCents: number | null = null;
-    let detail = "";
-
-    if (typeof invoiceTotalCents === "number" && invoiceTotalCents > 0) {
-      amountCents = usdToEurCents(invoiceTotalCents / 100);
-      detail = `$${(invoiceTotalCents / 100).toFixed(2)} next invoice`;
-    } else if (typeof currentUsageUsd === "number") {
-      amountCents = usdToEurCents(currentUsageUsd);
-      detail = `$${currentUsageUsd.toFixed(2)} current period`;
-    } else {
-      amountCents = 0;
-      detail = "No usage reported";
-    }
-
-    return {
-      vendorKey: "railway",
-      ok: true,
-      amountCents,
-      syncedAt,
-      error: null,
-      detail,
-    };
-  } catch (err) {
-    return {
-      vendorKey: "railway",
-      ok: false,
-      amountCents: null,
-      syncedAt,
-      error: err instanceof Error ? err.message : "Railway sync failed.",
-    };
-  }
-}
-
 export async function syncAllPlatformSpendProviders(): Promise<PlatformSpendSyncResult[]> {
-  return Promise.all([syncOpenRouterPlatformSpend(), syncRailwayPlatformSpend()]);
+  return Promise.all([syncOpenRouterPlatformSpend()]);
 }

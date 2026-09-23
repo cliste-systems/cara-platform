@@ -50,7 +50,7 @@ Designate an **Incident Lead** (default: privacy lead).
   (`docs/runbooks/rotate-secrets.md` if it exists; otherwise rotate
   in the relevant provider console + redeploy).
 - If the cause is a code bug exposing data cross-tenant: roll back the
-  offending deploy via Vercel / Railway, or fast-forward a hotfix
+  offending deploy via Vercel / LiveKit agent rollback, or fast-forward a hotfix
   flag.
 - If a sub-processor is the source: open a ticket with their security
   team and capture their reference number.

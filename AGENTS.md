@@ -16,7 +16,7 @@ See [docs/VERTICALS.md](docs/VERTICALS.md) for how to add a new business vertica
 
 # Act via tools — don’t ask
 
-Use MCP, CLIs (`vercel`, `supabase`, `gh`, Railway), and project scripts to complete infra and ops work. **Do not ask the user** to run SQL, open dashboards, or paste commands you can run yourself.
+Use MCP, CLIs (`vercel`, `supabase`, `gh`, `lk`), and project scripts to complete infra and ops work. **Do not ask the user** to run SQL, open dashboards, or paste commands you can run yourself.
 
 # Supabase access
 

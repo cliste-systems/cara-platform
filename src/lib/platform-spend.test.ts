@@ -58,8 +58,8 @@ describe("platform-spend", () => {
 
   it("uses synced amount for usage-based vendors", () => {
     const usage = row({
-      vendor_key: "railway",
-      display_name: "Railway",
+      vendor_key: "openrouter",
+      display_name: "OpenRouter",
       billing_cycle: "usage",
       source: "api",
       last_synced_amount_cents: 4500,

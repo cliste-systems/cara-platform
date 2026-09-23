@@ -142,7 +142,7 @@ have exclusive jurisdiction.
 | Processor              | Cliste Systems, Ireland                                     |
 | Processor contact      | privacy@hellocara.ie                                    |
 | Frequency              | Continuous, for the duration of the subscription            |
-| Storage location       | EEA — Supabase AWS eu-west-1 (Ireland); Vercel dub1 (Dublin); Railway EU West; see Annex III |
+| Storage location       | EEA — Supabase AWS eu-west-1 (Ireland); Vercel dub1 (Dublin); LiveKit Cloud EU (Frankfurt); see Annex III |
 
 ## Annex II — Technical & organisational measures
 
@@ -169,10 +169,9 @@ is signed:
 
 - Supabase — EEA (AWS eu-west-1, Ireland); primary database
 - Vercel — EEA (dub1 Dublin); dashboard & APIs
-- Railway — EEA (EU West); voice worker
+- LiveKit Cloud (LiveKit, Inc.) — EU (Frankfurt); voice agent runtime, EU SIP for inbound; WebRTC global until protocol pinning; DPF / SCCs
 - Stripe Payments Europe Ltd (Ireland)
 - Twilio Ireland (Ireland; SIP/SMS may route globally)
-- LiveKit Inc. (EU SIP Frankfurt for inbound; WebRTC global until protocol pinning; DPF / SCCs)
 - ElevenLabs Inc. (US; EU residency on Enterprise — DPF / SCCs; transient TTS)
 - OpenRouter Inc. (US; EU in-region routing on Enterprise — SCCs; LLM routing)
 - Resend (US global API — SCCs)

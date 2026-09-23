@@ -93,7 +93,7 @@ export default async function PlatformSpendPage() {
 
       <AdminSectionCard
         title="Vendors"
-        description="Edit manual amounts and billing days. Click Refresh API data for OpenRouter and Railway."
+        description="Edit manual amounts and billing days. Click Refresh API data for OpenRouter."
         padded
       >
         <PlatformSpendVendorTable rows={rows} />

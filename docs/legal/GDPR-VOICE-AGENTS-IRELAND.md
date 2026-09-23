@@ -150,7 +150,7 @@ For **inbound** booking calls, the salon (controller) typically relies on:
 
 ## 7. International transfers
 
-Cliste uses **EEA hosting** for primary data (Supabase Ireland), dashboard compute (Vercel dub1), and the voice worker (Railway EU West). **LiveKit Cloud** uses global nearest-region routing (EU edges for Irish callers; US possible without EU pinning). **ElevenLabs** and **OpenRouter** process in the **United States** — see `/legal/sub-processors`.
+Cliste uses **EEA hosting** for primary data (Supabase Ireland), dashboard compute (Vercel dub1), and the voice agent (LiveKit Cloud, EU Frankfurt). **LiveKit Cloud** uses EU SIP for inbound Irish calls; WebRTC media may route globally until protocol region pinning is enabled. **ElevenLabs** and **OpenRouter** process in the **United States** — see `/legal/sub-processors`.
 
 | Mechanism | Use when |
 | --------- | -------- |
@@ -222,7 +222,7 @@ Cliste uses **EEA hosting** for primary data (Supabase Ireland), dashboard compu
 
 | Priority | Gap | Risk | Suggested fix |
 | -------- | --- | ---- | ------------- |
-| **P0** | AI **disclosure** lives in voice worker (Railway), not verified in this repo | EU AI Act / transparency failure | Enforce first-turn script in worker; add monitoring/logging |
+| **P0** | AI **disclosure** lives in voice worker (LiveKit agent), not verified in this repo | EU AI Act / transparency failure | Enforce first-turn script in worker; add monitoring/logging |
 | **P0** | Confirm **Twilio/LiveKit recording OFF** on all DIDs | Unlawful retention / interception perception | DPIA checklist item — operational verification |
 | **P1** | `exportCustomerData` **omits** some fields in edge cases | Incomplete Art 15 access | Verify export includes transcripts while within retention |
 | **P1** | Sub-processor change email | DPA §7 commitment | Cron at `/api/cron/sub-processor-notify` (implemented) |
@@ -236,7 +236,7 @@ Cliste uses **EEA hosting** for primary data (Supabase Ireland), dashboard compu
 sequenceDiagram
   participant Caller
   participant Twilio as Twilio SIP
-  participant Worker as Voice worker Railway EU
+  participant Worker as Voice worker LiveKit EU
   participant LLM as OpenRouter
   participant TTS as ElevenLabs US
   participant LK as LiveKit Cloud
