@@ -2,8 +2,9 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CaraKnowledgeEventRow } from "@/lib/cara-knowledge-events";
 import { rowToTemporalUpdate, type TemporalUpdateRecord } from "@/lib/cara-knowledge-temporal";
+import { ADMIN_SIM_CALLER_E164 } from "@/lib/admin-demo-call-lines";
+import { ADMIN_DEMO_ROOM_PREFIX } from "@/lib/engineer-test-call";
 import {
-  customerCallFilters,
   customerTrainingFilters, CUSTOMER_TRAINING_JOINS,
   customerKnowledgeEventFilters, CUSTOMER_KNOWLEDGE_EVENT_JOINS,
   customerTemporalFilters, CUSTOMER_TEMPORAL_JOINS,
@@ -74,10 +75,15 @@ export type CustomerKnowledgeCallFact = { id: string; created_at: string; durati
 export async function loadCustomerKnowledgeCallLinks(
   supabase: SupabaseClient, organizationId: string, since: string,
 ): Promise<CustomerKnowledgeCallLink[]> {
-  const { data, error } = await customerCallFilters(supabase.from("call_logs")
-    .select("id, ai_summary, created_at"))
-    .filter("organization_id", "eq", organizationId).gte("created_at", since)
-    .order("created_at", { ascending: false }).limit(100);
+  // Keep these small projections direct: passing their inferred builders into a
+  // generic wrapper exceeds TypeScript's instantiation budget in this module.
+  const { data, error } = await supabase.from("call_logs")
+    .select("id, ai_summary, created_at")
+    .eq("organization_id", organizationId)
+    .eq("is_test_call", false).eq("engineer_test_call", false)
+    .neq("caller_number", ADMIN_SIM_CALLER_E164)
+    .or(`room_name.is.null,room_name.not.like.${ADMIN_DEMO_ROOM_PREFIX}*`)
+    .gte("created_at", since).order("created_at", { ascending: false }).limit(100);
   if (error) throw new Error(`Could not load training call links: ${error.message}`);
   return records(data).map((row) => ({
     id: String(row.id), created_at: String(row.created_at), ai_summary: nullableText(row.ai_summary),
@@ -88,9 +94,13 @@ export async function loadCustomerKnowledgeCallFacts(
   supabase: SupabaseClient, organizationId: string, ids: string[],
 ): Promise<CustomerKnowledgeCallFact[]> {
   if (ids.length === 0) return [];
-  const { data, error } = await customerCallFilters(supabase.from("call_logs")
-    .select("id, created_at, duration_seconds, caller_number"))
-    .filter("organization_id", "eq", organizationId).filter("id", "in", inValues(ids));
+  const { data, error } = await supabase.from("call_logs")
+    .select("id, created_at, duration_seconds, caller_number")
+    .eq("organization_id", organizationId)
+    .eq("is_test_call", false).eq("engineer_test_call", false)
+    .neq("caller_number", ADMIN_SIM_CALLER_E164)
+    .or(`room_name.is.null,room_name.not.like.${ADMIN_DEMO_ROOM_PREFIX}*`)
+    .in("id", ids);
   if (error) throw new Error(`Could not load training call details: ${error.message}`);
   return records(data).map((row) => ({
     id: String(row.id), created_at: String(row.created_at),
