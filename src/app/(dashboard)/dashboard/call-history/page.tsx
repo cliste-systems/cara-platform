@@ -25,6 +25,11 @@ import { requireDashboardSession } from "@/lib/dashboard-session";
 import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-cache";
 import { normalizeBlockedCallerE164 } from "@/lib/blocked-callers";
 import { buildCallsPageHref } from "@/lib/calls-page-href";
+import {
+  customerCallFilters,
+  customerTicketFilters,
+  ENGINEER_CALL_FILTER,
+} from "@/lib/dashboard-customer-data";
 
 import {
   ENGINEER_TEST_CALL_CALLER_LABEL,
@@ -70,6 +75,7 @@ type CallLogListRow = {
   caller_data_erased_by_label?: string | null;
   caller_data_erased_reason?: string | null;
   engineer_test_call?: boolean | null;
+  room_name?: string | null;
 };
 
 type CallLogMetricsRow = {
@@ -96,6 +102,9 @@ type CallLinkRow = {
   post_call_status?: string | null;
 };
 
+const CALL_LIST_COLUMNS =
+  "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, call_resolution, created_at, post_call_status, audio_storage_path, caller_data_erased_at, caller_data_erased_by_label, caller_data_erased_reason, engineer_test_call, room_name";
+
 function parsePageParam(raw: string | undefined): number {
   const n = Number.parseInt(String(raw ?? "1"), 10);
   return Number.isFinite(n) && n >= 1 ? n : 1;
@@ -121,8 +130,7 @@ function toListItem(
     followUpSummary: followUp?.summary,
     outcome,
   });
-  const summaryForCategory =
-    followUp?.summary?.trim() || mapped.aiSummary?.trim() || "";
+  const summaryForCategory = followUp?.summary?.trim() || mapped.aiSummary?.trim() || "";
   const actionCategory: ActionCategory | null =
     attentionLevel !== "routine" && summaryForCategory
       ? classifyActionCategory(summaryForCategory)
@@ -193,7 +201,6 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
   const initialSelectedCallId =
     typeof sp.call === "string" && sp.call.trim() ? sp.call.trim() : null;
   const requestedPage = parsePageParam(sp.page);
-
   const { supabase, organizationId } = await requireDashboardSession();
 
   let deepLinkedCreatedAt: string | null = null;
@@ -205,45 +212,36 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
       .eq("organization_id", organizationId)
       .eq("is_test_call", false)
       .maybeSingle();
-
     deepLinkedCreatedAt = String(deepLinkedCall?.created_at ?? "").trim() || null;
   }
 
   if (sp.range && !sp.date) {
-    redirect(
-      buildCallsPageHref({
-        callLogId: initialSelectedCallId,
-        callCreatedAt: deepLinkedCreatedAt,
-        page: requestedPage > 1 ? requestedPage : undefined,
-      }),
-    );
+    redirect(buildCallsPageHref({
+      callLogId: initialSelectedCallId,
+      callCreatedAt: deepLinkedCreatedAt,
+      page: requestedPage > 1 ? requestedPage : undefined,
+    }));
   }
-
   if (initialSelectedCallId && deepLinkedCreatedAt && !sp.date) {
     const neededDate = callsPageDateForTimestamp(deepLinkedCreatedAt, now);
     if (neededDate !== selectedDateParam) {
-      redirect(
-        buildCallsPageHref({
-          callLogId: initialSelectedCallId,
-          callCreatedAt: deepLinkedCreatedAt,
-          page: requestedPage > 1 ? requestedPage : undefined,
-        }),
-      );
+      redirect(buildCallsPageHref({
+        callLogId: initialSelectedCallId,
+        callCreatedAt: deepLinkedCreatedAt,
+        page: requestedPage > 1 ? requestedPage : undefined,
+      }));
     }
   }
 
   const orgRow = await getCachedDashboardOrganizationRow();
   const businessName = String(orgRow?.name ?? "").trim();
-
   const { lowerInclusive, upperExclusive } = getCallsPageDayBoundsIso(selectedDate);
 
   function applyDayFilters<T extends {
     gte: (col: string, val: string) => T;
     lt: (col: string, val: string) => T;
   }>(query: T): T {
-    return query
-      .gte("created_at", lowerInclusive)
-      .lt("created_at", upperExclusive);
+    return query.gte("created_at", lowerInclusive).lt("created_at", upperExclusive);
   }
 
   const listFrom = (requestedPage - 1) * CALL_HISTORY_PAGE_SIZE;
@@ -253,64 +251,48 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
     { count: totalCount, error: countError },
     { data: metricsData, error: metricsError },
     { data: pageData, error: listError },
-    { data: linkRows },
-    { data: ticketRows },
+    { data: linkRows, error: linksError },
+    { data: ticketRows, error: ticketsError },
     { data: blockedRows },
+    { data: engineerRows, error: engineerError },
   ] = await Promise.all([
-    applyDayFilters(
-      supabase
-        .from("call_logs")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", organizationId)
-        .eq("is_test_call", false),
-    ),
-    applyDayFilters(
-      supabase
-        .from("call_logs")
-        .select("outcome, duration_seconds")
-        .eq("organization_id", organizationId)
-        .eq("is_test_call", false)
-        .eq("engineer_test_call", false),
-    ),
-    applyDayFilters(
-      supabase
-        .from("call_logs")
-        .select(
-          "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, call_resolution, created_at, post_call_status, audio_storage_path, caller_data_erased_at, caller_data_erased_by_label, caller_data_erased_reason, engineer_test_call",
-        )
-        .eq("organization_id", organizationId)
-        .eq("is_test_call", false)
-        .order("created_at", { ascending: false })
-        .range(listFrom, listTo),
-    ),
-    applyDayFilters(
-      supabase
-        .from("call_logs")
-        .select("id, caller_number, created_at, outcome, ai_summary, call_resolution, post_call_status, engineer_test_call")
-        .eq("organization_id", organizationId)
-        .eq("is_test_call", false)
-        .eq("engineer_test_call", false),
-    ),
-    supabase
-      .from("action_tickets")
-      .select("id, caller_number, caller_name, summary, status, created_at")
+    applyDayFilters(customerCallFilters(
+      supabase.from("call_logs").select("id", { count: "exact", head: true }),
+    ).eq("organization_id", organizationId)),
+    applyDayFilters(customerCallFilters(
+      supabase.from("call_logs").select("outcome, duration_seconds"),
+    ).eq("organization_id", organizationId)),
+    applyDayFilters(customerCallFilters(
+      supabase.from("call_logs").select(CALL_LIST_COLUMNS),
+    ).eq("organization_id", organizationId))
+      .order("created_at", { ascending: false })
+      .range(listFrom, listTo),
+    applyDayFilters(customerCallFilters(
+      supabase.from("call_logs").select(
+        "id, caller_number, created_at, outcome, ai_summary, call_resolution, post_call_status",
+      ),
+    ).eq("organization_id", organizationId)),
+    customerTicketFilters(supabase.from("action_tickets").select(
+      "id, caller_number, caller_name, summary, status, created_at",
+    ))
       .eq("organization_id", organizationId)
       .eq("status", "open")
       .order("created_at", { ascending: false })
       .limit(CALL_HISTORY_OPEN_TICKET_LIMIT),
-    supabase
-      .from("blocked_callers")
-      .select("caller_e164")
+    supabase.from("blocked_callers").select("caller_e164")
       .eq("organization_id", organizationId),
+    // A separate informational row; it never occupies a customer page slot.
+    applyDayFilters(supabase.from("call_logs").select(CALL_LIST_COLUMNS)
+      .eq("organization_id", organizationId)
+      .eq("is_test_call", false)
+      .or(ENGINEER_CALL_FILTER))
+      .order("created_at", { ascending: false })
+      .limit(1),
   ]);
 
-  const error = countError ?? metricsError ?? listError;
-
+  const error = countError ?? metricsError ?? listError ?? linksError ?? ticketsError ?? engineerError;
   const tickets = (ticketRows ?? []) as TicketDbRow[];
-  const followUpByCallId = assignOpenTicketsToCalls(
-    (linkRows ?? []) as CallLinkRow[],
-    tickets,
-  );
+  const followUpByCallId = assignOpenTicketsToCalls((linkRows ?? []) as CallLinkRow[], tickets);
   const needsAttentionToday = (linkRows ?? []).filter((row) => {
     const followUp = followUpByCallId.get(row.id) ?? null;
     return resolveCallHistoryNeedsAttention({
@@ -323,94 +305,76 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
     });
   }).length;
 
+  // These totals are CUSTOMER totals, not the length of the visible mixed list.
   const total = totalCount ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / CALL_HISTORY_PAGE_SIZE));
   const page = Math.min(requestedPage, totalPages);
-
+  if (!error && page !== requestedPage) {
+    const params = new URLSearchParams({ date: selectedDateParam, page: String(page) });
+    if (initialSelectedCallId) params.set("call", initialSelectedCallId);
+    redirect(`/dashboard/calls?${params.toString()}`);
+  }
   const metrics = buildCallHistoryMetricsFromSummaryRows(
     (metricsData ?? []) as CallLogMetricsRow[],
     needsAttentionToday,
   );
-  if (total > 0) {
-    metrics.totalCalls = total;
-  }
+  metrics.totalCalls = total;
 
   const blockedCallerE164s = (blockedRows ?? []).map(
     (row) => String((row as { caller_e164: string }).caller_e164),
   );
   const blockedSet = new Set(blockedCallerE164s);
-
+  const visibleRows = [
+    ...((pageData ?? []) as CallLogListRow[]),
+    ...(page === 1 ? ((engineerRows ?? []) as CallLogListRow[]) : []),
+  ].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
   let calls = !error
-    ? ((pageData ?? []) as CallLogListRow[]).map((row) =>
-        toListItem(row, followUpByCallId, businessName, blockedSet),
-      )
+    ? visibleRows.map((row) => toListItem(row, followUpByCallId, businessName, blockedSet))
     : [];
 
-  if (
-    initialSelectedCallId &&
-    !calls.some((call) => call.id === initialSelectedCallId)
-  ) {
-    const { data: deepLinkedRow } = await supabase
-      .from("call_logs")
-      .select(
-        "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, call_resolution, created_at, post_call_status, audio_storage_path, caller_data_erased_at, caller_data_erased_by_label, caller_data_erased_reason, engineer_test_call",
-      )
+  if (initialSelectedCallId && !calls.some((call) => call.id === initialSelectedCallId)) {
+    const { data: deepLinkedRow } = await supabase.from("call_logs")
+      .select(CALL_LIST_COLUMNS)
       .eq("id", initialSelectedCallId)
       .eq("organization_id", organizationId)
       .eq("is_test_call", false)
       .maybeSingle();
-
     if (deepLinkedRow) {
       const deepLinkedCall = toListItem(
-        deepLinkedRow as CallLogListRow,
-        followUpByCallId,
-        businessName,
-        blockedSet,
+        deepLinkedRow as CallLogListRow, followUpByCallId, businessName, blockedSet,
       );
       calls = [
         deepLinkedCall,
-        ...calls.filter((call) => call.id !== deepLinkedCall.id),
+        ...calls.filter((call) => call.id !== deepLinkedCall.id &&
+          !(deepLinkedCall.engineerTestCall && call.engineerTestCall)),
       ];
     }
   }
 
-  const collapsed = collapseEngineerTestCallsForList(calls);
-  calls = collapsed.calls;
-  if (collapsed.hiddenEngineerTestCount > 0 && metrics.totalCalls > 0) {
-    metrics.totalCalls = Math.max(
-      1,
-      metrics.totalCalls - collapsed.hiddenEngineerTestCount,
-    );
-  }
+  calls = collapseEngineerTestCallsForList(calls).calls;
 
   return (
     <div className={DASHBOARD_PAGE_SHELL_FILL_WHITE} data-dashboard-fill>
       <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
-      <CallHistoryPageSections animateKey={`${selectedDateParam}-${page}`}>
-        {error ? (
-          <p className="shrink-0 text-[13px] text-red-700">
-            Could not load calls: {error.message}
-          </p>
-        ) : (
-          <CallHistoryPageContent
-            className="min-h-0 flex-1"
-            greetingSubline={greetingSubline}
-            metrics={metrics}
-            calls={calls}
-            organizationId={organizationId}
-            initialSelectedCallId={initialSelectedCallId}
-            blockedCallerE164s={blockedCallerE164s}
-            businessName={businessName}
-            pagination={{
-              page,
-              pageSize: CALL_HISTORY_PAGE_SIZE,
-              totalCount: total,
-              totalPages,
-              selectedDate: selectedDateParam,
-            }}
-          />
-        )}
-      </CallHistoryPageSections>
+        <CallHistoryPageSections animateKey={`${selectedDateParam}-${page}`}>
+          {error ? (
+            <p className="shrink-0 text-[13px] text-red-700">
+              Could not load calls: {error.message}
+            </p>
+          ) : (
+            <CallHistoryPageContent
+              className="min-h-0 flex-1"
+              greetingSubline={greetingSubline}
+              metrics={metrics}
+              calls={calls}
+              organizationId={organizationId}
+              initialSelectedCallId={initialSelectedCallId}
+              blockedCallerE164s={blockedCallerE164s}
+              businessName={businessName}
+              pagination={{ page, pageSize: CALL_HISTORY_PAGE_SIZE, totalCount: total, totalPages, selectedDate: selectedDateParam }}
+            />
+          )}
+        </CallHistoryPageSections>
       </div>
     </div>
   );

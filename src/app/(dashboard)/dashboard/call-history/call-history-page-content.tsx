@@ -4,11 +4,11 @@ import { useMemo } from "react";
 import { Phone } from "lucide-react";
 
 import { ClistePageHeader } from "@/components/dashboard/cliste-page-header";
+import { resolveCustomerCallHistoryMetrics } from "@/lib/customer-call-history-metrics";
 
 import { DashboardHeaderDateControls } from "../dashboard-header-date-controls";
 import {
   callHistorySummarySegments,
-  resolveLiveCallHistoryMetrics,
   type CallHistoryListItem,
   type CallHistoryMetrics,
 } from "./call-history-helpers";
@@ -42,7 +42,7 @@ export function CallHistoryPageContent({
 }: CallHistoryPageContentProps) {
   const liveMetrics = useMemo(
     () =>
-      resolveLiveCallHistoryMetrics({
+      resolveCustomerCallHistoryMetrics({
         calls,
         serverMetrics: metrics,
         totalCount: pagination.totalCount,
