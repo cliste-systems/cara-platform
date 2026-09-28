@@ -22,6 +22,7 @@ import {
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { createCallRecordingSignedUrl } from "@/lib/call-recordings-server";
 import { isEngineerTestCallRow, ENGINEER_TEST_CALL_CALLER_LABEL } from "@/lib/engineer-test-call";
+import { customerCallFilters, customerTicketFilters } from "@/lib/dashboard-customer-data";
 import { resolveCallLogIdForTicket } from "@/lib/resolve-ticket-call-log";
 import type { PostCallStatus } from "@/lib/post-call-processing-types";
 
@@ -95,19 +96,18 @@ export async function fetchCallerHistoryInsight(input: {
 
   const [{ data: callRows }, { data: ticketRows }, { data: blockedRow }, { data: abuseRow }] =
     await Promise.all([
-    supabase
+    customerCallFilters(supabase
       .from("call_logs")
       .select(
         "id, caller_name, outcome, ai_summary, duration_seconds, created_at, post_call_status, caller_data_erased_at",
-      )
+      ))
       .eq("organization_id", organizationId)
       .eq("caller_number", callerE164)
-      .eq("engineer_test_call", false)
       .order("created_at", { ascending: false })
       .limit(CALLER_HISTORY_CALL_LIMIT),
-    supabase
+    customerTicketFilters(supabase
       .from("action_tickets")
-      .select("status, summary, department_slug")
+      .select("status, summary, department_slug"))
       .eq("organization_id", organizationId)
       .eq("caller_number", callerE164)
       .order("created_at", { ascending: false })
@@ -188,12 +188,12 @@ export async function fetchCallRecordingPlaybackUrl(
   const { supabase, organizationId } = await requireDashboardSession();
   const { data, error } = await supabase
     .from("call_logs")
-    .select("audio_storage_path, engineer_test_call")
+    .select("audio_storage_path, engineer_test_call, caller_number, room_name, is_test_call")
     .eq("id", id)
     .eq("organization_id", organizationId)
     .maybeSingle();
 
-  if (error || isEngineerTestCallRow(data ?? {})) {
+  if (error || data?.is_test_call || isEngineerTestCallRow(data ?? {})) {
     return { ok: false, message: "Recording not available for this call." };
   }
 
@@ -270,13 +270,13 @@ async function loadCallDetailRow(callId: string): Promise<CallDetailDialogPayloa
   const { data, error } = await supabase
     .from("call_logs")
     .select(
-      "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, transcript, transcript_review, created_at, post_call_status, audio_storage_path, engineer_test_call",
+      "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, transcript, transcript_review, created_at, post_call_status, audio_storage_path, engineer_test_call, room_name, is_test_call",
     )
     .eq("id", id)
     .eq("organization_id", organizationId)
     .maybeSingle();
 
-  if (error || !data) return null;
+  if (error || !data || data.is_test_call) return null;
 
   const engineerTestCall = isEngineerTestCallRow(data);
 
