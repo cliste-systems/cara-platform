@@ -1,5 +1,5 @@
 import "server-only";
-import type { PostgrestSingleResponse, SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CaraKnowledgeEventRow } from "@/lib/cara-knowledge-events";
 import { rowToTemporalUpdate, type TemporalUpdateRecord } from "@/lib/cara-knowledge-temporal";
 import {
@@ -9,16 +9,34 @@ import {
   customerTemporalFilters, CUSTOMER_TEMPORAL_JOINS,
 } from "@/lib/dashboard-customer-data";
 
-/** Keep recursive embed inference inside this boundary; decode raw training fields in the caller. */
+/** Validate the database boundary instead of recursively overriding embed types. */
+function records(value: unknown): Record<string, unknown>[] {
+  if (value == null) return [];
+  if (!Array.isArray(value)) throw new Error("Invalid knowledge query response.");
+  return value.map((row: unknown) => {
+    if (row === null || typeof row !== "object" || Array.isArray(row)) {
+      throw new Error("Invalid knowledge query row.");
+    }
+    return row as Record<string, unknown>;
+  });
+}
+function nullableText(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+function inValues(values: string[]): string {
+  return `(${values.map((value) => JSON.stringify(value)).join(",")})`;
+}
+
 export async function loadCustomerTrainingRows(
   supabase: SupabaseClient, organizationId: string, statuses?: string[], limit = 200,
-): Promise<PostgrestSingleResponse<Record<string, unknown>[]>> {
+): Promise<{ data: Record<string, unknown>[] | null; error: { message: string } | null }> {
   const columns: string = `*,${CUSTOMER_TRAINING_JOINS}`;
-  let query = customerTrainingFilters(supabase.from("cara_training_items").select(columns))
-    .eq("organization_id", organizationId);
-  if (statuses) query = query.in("status", statuses);
-  return await query.order("updated_at", { ascending: false }).limit(limit)
-    .overrideTypes<Record<string, unknown>[], { merge: false }>();
+  const query = customerTrainingFilters(supabase.from("cara_training_items").select(columns));
+  query.filter("organization_id", "eq", organizationId);
+  if (statuses) query.filter("status", "in", inValues(statuses));
+  const response = await query.order("updated_at", { ascending: false }).limit(limit);
+  if (response.error) return { data: null, error: { message: response.error.message } };
+  return { data: records(response.data), error: null };
 }
 
 export async function loadCustomerKnowledgeEvents(
@@ -26,10 +44,18 @@ export async function loadCustomerKnowledgeEvents(
 ): Promise<CaraKnowledgeEventRow[]> {
   const columns: string = `*,${CUSTOMER_KNOWLEDGE_EVENT_JOINS}`;
   const { data, error } = await customerKnowledgeEventFilters(supabase.from("cara_knowledge_events").select(columns))
-    .eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(limit)
-    .overrideTypes<CaraKnowledgeEventRow[], { merge: false }>();
+    .filter("organization_id", "eq", organizationId).order("created_at", { ascending: false }).limit(limit);
   if (error) throw new Error(`Could not load knowledge history: ${error.message}`);
-  return data ?? [];
+  return records(data).map((row) => ({
+    id: String(row.id), organization_id: String(row.organization_id),
+    event_type: row.event_type as CaraKnowledgeEventRow["event_type"],
+    category: nullableText(row.category), title: String(row.title ?? ""),
+    payload: row.payload && typeof row.payload === "object" && !Array.isArray(row.payload)
+      ? row.payload as Record<string, unknown> : null,
+    source: String(row.source ?? ""), actor_id: nullableText(row.actor_id),
+    call_log_id: nullableText(row.call_log_id), training_item_id: nullableText(row.training_item_id),
+    created_at: String(row.created_at),
+  }));
 }
 
 export async function loadCustomerTemporalUpdates(
@@ -37,10 +63,9 @@ export async function loadCustomerTemporalUpdates(
 ): Promise<TemporalUpdateRecord[]> {
   const columns: string = `*,${CUSTOMER_TEMPORAL_JOINS}`;
   const { data, error } = await customerTemporalFilters(supabase.from("cara_knowledge_temporal_updates").select(columns))
-    .eq("organization_id", organizationId).order("effective_at", { ascending: false }).limit(200)
-    .overrideTypes<Record<string, unknown>[], { merge: false }>();
+    .filter("organization_id", "eq", organizationId).order("effective_at", { ascending: false }).limit(200);
   if (error) throw new Error(`Could not load temporary updates: ${error.message}`);
-  return (data ?? []).map(rowToTemporalUpdate);
+  return records(data).map(rowToTemporalUpdate);
 }
 
 export type CustomerKnowledgeCallLink = { id: string; ai_summary: string | null; created_at: string };
@@ -51,13 +76,11 @@ export async function loadCustomerKnowledgeCallLinks(
 ): Promise<CustomerKnowledgeCallLink[]> {
   const { data, error } = await customerCallFilters(supabase.from("call_logs")
     .select("id, ai_summary, created_at"))
-    .eq("organization_id", organizationId).gte("created_at", since)
+    .filter("organization_id", "eq", organizationId).gte("created_at", since)
     .order("created_at", { ascending: false }).limit(100);
   if (error) throw new Error(`Could not load training call links: ${error.message}`);
-  return (data ?? []).map((row) => ({
-    id: String(row.id),
-    created_at: String(row.created_at),
-    ai_summary: typeof row.ai_summary === "string" ? row.ai_summary : null,
+  return records(data).map((row) => ({
+    id: String(row.id), created_at: String(row.created_at), ai_summary: nullableText(row.ai_summary),
   }));
 }
 
@@ -67,11 +90,10 @@ export async function loadCustomerKnowledgeCallFacts(
   if (ids.length === 0) return [];
   const { data, error } = await customerCallFilters(supabase.from("call_logs")
     .select("id, created_at, duration_seconds, caller_number"))
-    .eq("organization_id", organizationId).in("id", ids);
+    .filter("organization_id", "eq", organizationId).filter("id", "in", inValues(ids));
   if (error) throw new Error(`Could not load training call details: ${error.message}`);
-  return (data ?? []).map((row) => ({
-    id: String(row.id),
-    created_at: String(row.created_at),
+  return records(data).map((row) => ({
+    id: String(row.id), created_at: String(row.created_at),
     duration_seconds: Math.max(0, Number(row.duration_seconds) || 0),
     caller_number: String(row.caller_number ?? ""),
   }));
