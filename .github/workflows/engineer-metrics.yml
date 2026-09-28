@@ -1,0 +1,43 @@
+name: Engineer dashboard regression
+
+on:
+  pull_request:
+    branches: [local-dev]
+    paths:
+      - 'src/lib/dashboard-*'
+      - 'src/lib/customer-call-history-metrics.ts'
+      - 'src/lib/engineer-dashboard-metrics.test.ts'
+      - 'src/lib/calls-incoming-placeholder*'
+      - 'src/lib/use-home-live-incoming-calls.ts'
+      - 'src/lib/load-customer-knowledge-sources.ts'
+      - 'src/components/dashboard-live-refresh.tsx'
+      - 'src/app/(dashboard)/dashboard/**'
+      - 'scripts/check-dashboard-metrics-regression.mjs'
+      - '.github/workflows/engineer-metrics.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          npm ci --ignore-scripts
+      - name: Engineer dashboard focused tests
+        run: npx tsx --test --test-reporter=spec src/lib/engineer-dashboard-metrics.test.ts src/lib/dashboard-customer-events.test.ts src/lib/dashboard-activity-feed.test.ts
+      - name: Compare full tests and types against local-dev
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/check-dashboard-metrics-regression.mjs

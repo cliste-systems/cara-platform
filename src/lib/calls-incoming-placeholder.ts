@@ -1,4 +1,5 @@
 import type { DashboardIncomingCallDetail } from "@/lib/dashboard-live-events";
+import { isEngineerTestCallerNumber } from "@/lib/engineer-test-call";
 
 export type CallsIncomingPlaceholder = {
   phase: "in_progress" | "loading";
@@ -9,10 +10,7 @@ export type CallsIncomingPlaceholder = {
 };
 
 export function incomingCallPlaceholderKey(
-  placeholder: Pick<
-    CallsIncomingPlaceholder,
-    "callLogId" | "usageRecordId" | "startedAt"
-  >,
+  placeholder: Pick<CallsIncomingPlaceholder, "callLogId" | "usageRecordId" | "startedAt">,
 ): string {
   if (placeholder.callLogId) return `call-${placeholder.callLogId}`;
   if (placeholder.usageRecordId) return `usage-${placeholder.usageRecordId}`;
@@ -23,95 +21,66 @@ export function upsertIncomingCallPlaceholder(
   current: CallsIncomingPlaceholder[],
   detail: DashboardIncomingCallDetail,
 ): CallsIncomingPlaceholder[] {
-  const map = new Map(
-    current.map((placeholder) => [
-      incomingCallPlaceholderKey(placeholder),
-      placeholder,
-    ]),
-  );
-
-  const linked =
-    (detail.callLogId
-      ? current.find((placeholder) => placeholder.callLogId === detail.callLogId)
-      : null) ??
-    (detail.startedAt
-      ? current.find((placeholder) => {
-          if (placeholder.callLogId) return false;
-          const delta = Math.abs(
-            new Date(placeholder.startedAt).getTime() -
-              new Date(detail.startedAt!).getTime(),
-          );
-          return delta <= 5_000;
-        })
-      : null);
-
+  const customers = current.filter((row) => !isEngineerTestCallerNumber(row.callerNumber));
+  if (isEngineerTestCallerNumber(detail.callerNumber)) return customers;
+  const linked = (detail.callLogId ? customers.find((row) => row.callLogId === detail.callLogId) : null)
+    ?? (detail.usageRecordId ? customers.find((row) => row.usageRecordId === detail.usageRecordId) : null)
+    ?? (detail.startedAt && detail.callerNumber ? customers.find((row) => {
+      if (row.callLogId || row.callerNumber !== detail.callerNumber) return false;
+      return Math.abs(Date.parse(row.startedAt) - Date.parse(detail.startedAt!)) <= 5_000;
+    }) : null);
+  const map = new Map(customers.map((row) => [incomingCallPlaceholderKey(row), row]));
+  // Replace the in-progress entry rather than retaining a second Loading copy.
+  if (linked) map.delete(incomingCallPlaceholderKey(linked));
   const merged = mergeIncomingCallEvent(linked ?? null, detail);
   map.set(incomingCallPlaceholderKey(merged), merged);
-
-  return [...map.values()].sort(
-    (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
-  );
+  return [...map.values()].sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));
 }
 
 export function filterActiveIncomingCallPlaceholders(
   placeholders: CallsIncomingPlaceholder[],
-  calls: ReadonlyArray<{ id: string; createdAt: string }>,
+  calls: ReadonlyArray<{ id: string; createdAt: string; engineerTestCall?: boolean }>,
 ): CallsIncomingPlaceholder[] {
-  return placeholders.filter(
-    (placeholder) => !shouldClearCallsIncomingPlaceholder(placeholder, calls),
-  );
+  return placeholders.filter((row) => !shouldClearCallsIncomingPlaceholder(row, calls));
 }
 
-/** Hide the placeholder when viewing past days or paginated history. */
 export function shouldShowCallsIncomingPlaceholder(options: {
   viewingToday: boolean;
   page: number;
   placeholder: CallsIncomingPlaceholder | null;
 }): boolean {
-  return (
-    options.placeholder != null && options.viewingToday && options.page <= 1
-  );
+  return options.placeholder != null && !isEngineerTestCallerNumber(options.placeholder.callerNumber)
+    && options.viewingToday && options.page <= 1;
 }
 
-/** Clear once the refreshed server list includes the new call. */
+/** Only customer rows can complete a customer placeholder. */
 export function shouldClearCallsIncomingPlaceholder(
   placeholder: CallsIncomingPlaceholder,
-  calls: ReadonlyArray<{ id: string; createdAt: string }>,
+  calls: ReadonlyArray<{ id: string; createdAt: string; engineerTestCall?: boolean }>,
 ): boolean {
-  if (placeholder.callLogId) {
-    return calls.some((call) => call.id === placeholder.callLogId);
-  }
-
-  const startedMs = new Date(placeholder.startedAt).getTime();
-  if (Number.isNaN(startedMs)) return false;
-
-  return calls.some(
-    (call) => new Date(call.createdAt).getTime() >= startedMs - 5_000,
-  );
+  if (isEngineerTestCallerNumber(placeholder.callerNumber)) return true;
+  const customers = calls.filter((row) => !row.engineerTestCall);
+  if (placeholder.callLogId) return customers.some((row) => row.id === placeholder.callLogId);
+  const startedMs = Date.parse(placeholder.startedAt);
+  if (!Number.isFinite(startedMs)) return true;
+  return customers.some((row) => Date.parse(row.createdAt) >= startedMs - 5_000);
 }
 
 export function mergeIncomingCallEvent(
   current: CallsIncomingPlaceholder | null,
   event: DashboardIncomingCallDetail,
 ): CallsIncomingPlaceholder {
-  const startedAt =
-    event.startedAt ?? current?.startedAt ?? new Date().toISOString();
-
+  const startedAt = event.startedAt ?? current?.startedAt ?? new Date().toISOString();
   if (event.phase === "loading") {
     return {
-      phase: "loading",
-      callerNumber: event.callerNumber ?? current?.callerNumber ?? null,
+      phase: "loading", callerNumber: event.callerNumber ?? current?.callerNumber ?? null,
       callLogId: event.callLogId ?? current?.callLogId ?? null,
-      usageRecordId: current?.usageRecordId ?? event.usageRecordId ?? null,
-      startedAt,
+      usageRecordId: current?.usageRecordId ?? event.usageRecordId ?? null, startedAt,
     };
   }
-
   return {
-    phase: "in_progress",
-    callerNumber: event.callerNumber ?? current?.callerNumber ?? null,
+    phase: "in_progress", callerNumber: event.callerNumber ?? current?.callerNumber ?? null,
     callLogId: current?.callLogId ?? null,
-    usageRecordId: event.usageRecordId ?? current?.usageRecordId ?? null,
-    startedAt,
+    usageRecordId: event.usageRecordId ?? current?.usageRecordId ?? null, startedAt,
   };
 }

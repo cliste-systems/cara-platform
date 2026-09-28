@@ -1,47 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-
 import {
   filterActiveIncomingCallPlaceholders,
   type CallsIncomingPlaceholder,
   upsertIncomingCallPlaceholder,
 } from "@/lib/calls-incoming-placeholder";
-import {
-  DASHBOARD_INCOMING_CALL_EVENT,
-  type DashboardIncomingCallDetail,
-} from "@/lib/dashboard-live-events";
+import { DASHBOARD_INCOMING_CALL_EVENT, type DashboardIncomingCallDetail } from "@/lib/dashboard-live-events";
+import { customerUsageFilters } from "@/lib/dashboard-customer-data";
+import { customerIncomingCallDetail } from "@/lib/dashboard-customer-events";
+import { isEngineerTestCallerNumber } from "@/lib/engineer-test-call";
 import { createClient } from "@/utils/supabase/client";
 
 const MAX_LIVE_CALLS = 5;
 const PLACEHOLDER_TIMEOUT_MS = 120_000;
-
-function readStringField(row: Record<string, unknown>, key: string): string | null {
-  const value = row[key];
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function incomingDetailFromUsageRecord(
-  row: Record<string, unknown>,
-): DashboardIncomingCallDetail {
-  return {
-    phase: "in_progress",
-    callerNumber: readStringField(row, "caller_number"),
-    startedAt: readStringField(row, "started_at") ?? new Date().toISOString(),
-    usageRecordId: readStringField(row, "id"),
-  };
-}
-
-function incomingDetailFromCallLog(
-  row: Record<string, unknown>,
-): DashboardIncomingCallDetail {
-  return {
-    phase: "loading",
-    callLogId: readStringField(row, "id"),
-    callerNumber: readStringField(row, "caller_number"),
-    startedAt: readStringField(row, "created_at") ?? new Date().toISOString(),
-  };
-}
 
 type UseHomeLiveIncomingCallsOptions = {
   organizationId: string;
@@ -52,150 +24,92 @@ export function useHomeLiveIncomingCalls({
   organizationId,
   activityCalls,
 }: UseHomeLiveIncomingCallsOptions): CallsIncomingPlaceholder[] {
-  const [placeholders, setPlaceholders] = useState<CallsIncomingPlaceholder[]>([]);
-
+  // Bind pending UI to the tenant that produced it, including async restore results.
+  const [state, setState] = useState<{ organizationId: string; rows: CallsIncomingPlaceholder[] }>({
+    organizationId, rows: [],
+  });
   const applyIncomingDetail = useCallback((detail: DashboardIncomingCallDetail) => {
-    if (!detail.phase) return;
-    setPlaceholders((current) =>
-      upsertIncomingCallPlaceholder(current, detail).slice(0, MAX_LIVE_CALLS),
-    );
-  }, []);
-
-  useEffect(() => {
-    const onIncomingCall = (event: Event) => {
-      const detail = (event as CustomEvent<DashboardIncomingCallDetail>).detail;
-      applyIncomingDetail(detail);
-    };
-
-    window.addEventListener(DASHBOARD_INCOMING_CALL_EVENT, onIncomingCall);
-    return () => {
-      window.removeEventListener(DASHBOARD_INCOMING_CALL_EVENT, onIncomingCall);
-    };
-  }, [applyIncomingDetail]);
-
-  useEffect(() => {
-    if (!organizationId.trim()) {
-      setPlaceholders([]);
-      return;
-    }
-
-    let cancelled = false;
-    void (async () => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("usage_records")
-        .select("id, caller_number, started_at")
-        .eq("organization_id", organizationId)
-        .is("ended_at", null)
-        .order("started_at", { ascending: false })
-        .limit(MAX_LIVE_CALLS);
-
-      if (cancelled || !data?.length) return;
-
-      setPlaceholders((current) => {
-        let next = current;
-        for (const row of data) {
-          const detail = incomingDetailFromUsageRecord(row as Record<string, unknown>);
-          next = upsertIncomingCallPlaceholder(next, detail);
-        }
-        return next.slice(0, MAX_LIVE_CALLS);
-      });
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    if (!organizationId.trim() || !detail?.phase || isEngineerTestCallerNumber(detail.callerNumber)) return;
+    setState((current) => ({
+      organizationId,
+      rows: upsertIncomingCallPlaceholder(current.organizationId === organizationId ? current.rows : [], detail)
+        .slice(0, MAX_LIVE_CALLS),
+    }));
   }, [organizationId]);
 
   useEffect(() => {
-    setPlaceholders((current) =>
-      filterActiveIncomingCallPlaceholders(current, activityCalls).slice(
-        0,
-        MAX_LIVE_CALLS,
-      ),
-    );
-  }, [activityCalls]);
+    const onIncomingCall = (event: Event) => {
+      applyIncomingDetail((event as CustomEvent<DashboardIncomingCallDetail>).detail);
+    };
+    window.addEventListener(DASHBOARD_INCOMING_CALL_EVENT, onIncomingCall);
+    return () => window.removeEventListener(DASHBOARD_INCOMING_CALL_EVENT, onIncomingCall);
+  }, [applyIncomingDetail]);
 
   useEffect(() => {
     if (!organizationId.trim()) return;
+    let cancelled = false;
+    void (async () => {
+      const supabase = createClient();
+      const { data } = await customerUsageFilters(supabase.from("usage_records")
+        .select("id, caller_number, started_at, room_name, call_sid, sync_skip_reason, ended_at"))
+        .eq("organization_id", organizationId).is("ended_at", null)
+        .order("started_at", { ascending: false }).limit(MAX_LIVE_CALLS);
+      if (cancelled || !data?.length) return;
+      for (const row of data) {
+        const detail = customerIncomingCallDetail(row, "usage");
+        if (detail) applyIncomingDetail(detail);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [organizationId, applyIncomingDetail]);
 
+  useEffect(() => {
+    if (!organizationId.trim()) return;
     const supabase = createClient();
     const filter = `organization_id=eq.${organizationId}`;
-
-    const channel = supabase
-      .channel(`home-live-calls-${organizationId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "usage_records",
-          filter,
-        },
-        (payload) => {
-          applyIncomingDetail(incomingDetailFromUsageRecord(payload.new));
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "usage_records",
-          filter,
-        },
-        (payload) => {
-          const endedAt = readStringField(payload.new as Record<string, unknown>, "ended_at");
-          if (!endedAt) return;
-
-          const usageRecordId = readStringField(payload.new as Record<string, unknown>, "id");
-          const startedAt = readStringField(payload.new as Record<string, unknown>, "started_at");
-          setPlaceholders((current) =>
-            current.filter((placeholder) => {
-              if (usageRecordId && placeholder.usageRecordId === usageRecordId) {
-                return false;
-              }
-              if (startedAt && placeholder.startedAt === startedAt && !placeholder.callLogId) {
-                return false;
-              }
-              return true;
-            }),
-          );
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "call_logs",
-          filter,
-        },
-        (payload) => {
-          applyIncomingDetail(incomingDetailFromCallLog(payload.new));
-        },
-      )
+    const channel = supabase.channel(`home-live-calls-${organizationId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "usage_records", filter }, (payload) => {
+        const detail = customerIncomingCallDetail(payload.new, "usage");
+        if (detail) applyIncomingDetail(detail);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "usage_records", filter }, (payload) => {
+        if (customerIncomingCallDetail(payload.new, "usage")) return;
+        const id = typeof payload.new.id === "string" ? payload.new.id : null;
+        // Ended or subsequently classified as test: remove only this pending call.
+        if (!id) return;
+        setState((current) => current.organizationId !== organizationId ? current : {
+          organizationId,
+          rows: current.rows.filter((row) => row.usageRecordId !== id),
+        });
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "call_logs", filter }, (payload) => {
+        const detail = customerIncomingCallDetail(payload.new, "call_log");
+        if (detail) applyIncomingDetail(detail);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "call_logs", filter }, (payload) => {
+        if (customerIncomingCallDetail(payload.new, "call_log")) return;
+        const id = typeof payload.new.id === "string" ? payload.new.id : null;
+        if (!id) return;
+        setState((current) => current.organizationId !== organizationId ? current : {
+          organizationId,
+          rows: current.rows.filter((row) => row.callLogId !== id),
+        });
+      })
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { void supabase.removeChannel(channel); };
   }, [applyIncomingDetail, organizationId]);
 
   useEffect(() => {
-    if (placeholders.length === 0) return;
-
+    if (state.organizationId !== organizationId || state.rows.length === 0) return;
+    const nextExpiry = Math.min(...state.rows.map((row) => Date.parse(row.startedAt) + PLACEHOLDER_TIMEOUT_MS));
     const timeout = window.setTimeout(() => {
-      setPlaceholders((current) => {
-        const cutoff = Date.now() - PLACEHOLDER_TIMEOUT_MS;
-        return current.filter(
-          (placeholder) => new Date(placeholder.startedAt).getTime() >= cutoff,
-        );
-      });
-    }, PLACEHOLDER_TIMEOUT_MS);
-
+      const cutoff = Date.now() - PLACEHOLDER_TIMEOUT_MS;
+      setState((current) => ({ ...current, rows: current.rows.filter((row) => Date.parse(row.startedAt) > cutoff) }));
+    }, Math.max(0, nextExpiry - Date.now()));
     return () => window.clearTimeout(timeout);
-  }, [placeholders]);
+  }, [state, organizationId]);
 
-  return placeholders;
+  return state.organizationId === organizationId
+    ? filterActiveIncomingCallPlaceholders(state.rows, activityCalls).slice(0, MAX_LIVE_CALLS)
+    : [];
 }

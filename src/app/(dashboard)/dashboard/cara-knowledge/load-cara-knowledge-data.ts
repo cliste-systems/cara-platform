@@ -8,7 +8,7 @@ import {
   mergeTemporalUpdatesIntoKnowledgeIndex,
   type CaraKnowledgeIndex,
 } from "@/lib/cara-knowledge-index";
-import { loadTemporalUpdatesForOrg } from "@/lib/cara-knowledge-temporal-store";
+import { loadCustomerTemporalUpdates, loadCustomerTrainingRows } from "@/lib/load-customer-knowledge-sources";
 import {
   resolveBusinessTimezone,
   resolveTemporalLifecycle,
@@ -25,11 +25,7 @@ import { mergeDevelopmentTrainingDemos } from "@/lib/cara-training-demo-items";
 import { enrichTrainingItemsWithCallFacts, enrichTrainingItemsWithCallLinks } from "@/lib/cara-training-call-link";
 import { isOpenTrainingStatus } from "@/app/(dashboard)/dashboard/cara-training/cara-training-helpers";
 import { parseCaraTrainingPatch, type CaraTrainingItemRow } from "@/lib/cara-training-types";
-import {
-  customerCallFilters,
-  customerTrainingFilters,
-  CUSTOMER_TRAINING_JOINS,
-} from "@/lib/dashboard-customer-data";
+import { customerCallFilters } from "@/lib/dashboard-customer-data";
 import { loadCaraKnowledgeHistory, type CaraKnowledgeHistoryItem } from "./load-cara-knowledge-history";
 
 export type CaraKnowledgePageData = {
@@ -69,18 +65,16 @@ export async function loadCaraKnowledgePageData(): Promise<CaraKnowledgePageData
     supabase.from("organizations").select(
       "name, niche, updated_at, business_hours, agent_faqs, agent_services_departments, agent_services_not_offered, agent_business_rules, business_knowledge_summary, raw_business_description, agent_opening_hours, agent_service_area, agent_base_town",
     ).eq("id", organizationId).maybeSingle(),
-    customerTrainingFilters(supabase.from("cara_training_items").select(`*, ${CUSTOMER_TRAINING_JOINS}`))
-      .eq("organization_id", organizationId)
-      .order("updated_at", { ascending: false }).limit(200),
+    loadCustomerTrainingRows(supabase, organizationId),
     loadCaraKnowledgeHistory(),
-    loadTemporalUpdatesForOrg(supabase, organizationId),
+    loadCustomerTemporalUpdates(supabase, organizationId),
     supabase.from("store_departments").select("name, active")
       .eq("organization_id", organizationId).order("sort_order", { ascending: true }),
   ]);
   if (trainingError) console.error("[cara-knowledge] load training items", trainingError.message);
   if (orgError) console.error("[cara-knowledge] load organization", orgError.message);
 
-  const items = (rows ?? []).map((row) => rowToTrainingItemRow(row as Record<string, unknown>));
+  const items = (rows ?? []).map(rowToTrainingItemRow);
   const openItems = items.filter((item) => CARA_TRAINING_OPEN_STATUSES.includes(item.status));
   const appliedItems = items.filter((item) => item.status === "applied");
   const openItemsMissingCallLink = openItems.filter((item) => !item.call_log_id && item.source === "call_gap");

@@ -9,6 +9,7 @@ import {
   dispatchDashboardActivityEvent,
   dispatchDashboardIncomingCallEvent,
 } from "@/lib/dashboard-live-events";
+import { customerIncomingCallDetail } from "@/lib/dashboard-customer-events";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 
 const IS_DEV = process.env.NODE_ENV === "development";
@@ -60,21 +61,12 @@ function isRealtimeHealthyStatus(status: string): boolean {
   return status === "SUBSCRIBED";
 }
 
-function readStringField(row: Record<string, unknown>, key: string): string | null {
-  const value = row[key];
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
 function handleUsageRecordInsert(
   organizationId: string,
   payload: { new: Record<string, unknown> },
 ) {
-  const row = payload.new;
-  const detail = {
-    phase: "in_progress" as const,
-    callerNumber: readStringField(row, "caller_number"),
-    startedAt: readStringField(row, "started_at") ?? new Date().toISOString(),
-  };
+  const detail = customerIncomingCallDetail(payload.new, "usage");
+  if (!detail) return;
   mergeCallsIncomingPlaceholderSession(organizationId, detail);
   dispatchDashboardIncomingCallEvent(detail);
 }
@@ -83,13 +75,8 @@ function handleCallLogInsert(
   organizationId: string,
   payload: { new: Record<string, unknown> },
 ) {
-  const row = payload.new;
-  const detail = {
-    phase: "loading" as const,
-    callLogId: readStringField(row, "id"),
-    callerNumber: readStringField(row, "caller_number"),
-    startedAt: readStringField(row, "created_at") ?? new Date().toISOString(),
-  };
+  const detail = customerIncomingCallDetail(payload.new, "call_log");
+  if (!detail) return;
   mergeCallsIncomingPlaceholderSession(organizationId, detail);
   dispatchDashboardIncomingCallEvent(detail);
 }
