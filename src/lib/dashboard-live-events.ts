@@ -11,6 +11,8 @@ export type DashboardIncomingCallDetail = {
   callerNumber?: string | null;
   callLogId?: string | null;
   usageRecordId?: string | null;
+  /** Stable identity shared by the usage ledger and completed call log. */
+  callSid?: string | null;
   startedAt?: string;
 };
 

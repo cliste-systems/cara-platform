@@ -13,24 +13,21 @@ import {
   isEngineerTestCallRow,
 } from "@/lib/engineer-test-call";
 
-function isEngineerTestActivityCall(row: ActivityFeedSourceCall): boolean {
-  return isEngineerTestCallRow({
-    engineer_test_call: row.engineer_test_call,
-    caller_number: row.caller_number,
-  });
-}
-
-/** One HelloCara Engineer row in live activity (latest test, rest hidden). */
+/** One informational engineer entry, sorted with customer calls, never a counter. */
 function collapseEngineerTestCallsForLiveActivity(
   calls: ActivityFeedSourceCall[],
 ): ActivityFeedSourceCall[] {
-  const sorted = [...calls].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
-  const engineer = sorted.filter((row) => isEngineerTestActivityCall(row));
-  const rest = sorted.filter((row) => !isEngineerTestActivityCall(row));
-  if (engineer.length <= 1) return sorted;
-  return [engineer[0]!, ...rest];
+  const sorted = calls
+    .filter((row) => row.is_test_call !== true && Number.isFinite(Date.parse(row.created_at)))
+    .slice()
+    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  let hasEngineer = false;
+  return sorted.filter((row) => {
+    if (!isEngineerTestCallRow(row)) return true;
+    if (hasEngineer) return false;
+    hasEngineer = true;
+    return true;
+  });
 }
 
 export type ActivityFeedSourceCall = {
@@ -42,6 +39,8 @@ export type ActivityFeedSourceCall = {
   caller_data_erased_at?: string | null;
   ai_summary?: string | null;
   engineer_test_call?: boolean | null;
+  is_test_call?: boolean | null;
+  room_name?: string | null;
 };
 
 export type ActivityFeedSourceTicket = {
@@ -52,6 +51,7 @@ export type ActivityFeedSourceTicket = {
   caller_data_erased_at?: string | null;
   summary?: string | null;
   brief_summary?: string | null;
+  engineer_test_call?: boolean | null;
 };
 
 function ticketSummaryForBadge(row: ActivityFeedSourceTicket): string | null {
@@ -66,24 +66,11 @@ export function buildHomeLiveActivityFeed(input: {
 }): TimelineFeedRow[] {
   const limit = input.limit ?? 200;
   const formatTime = input.formatTime ?? formatDashboardFeedRelativeTime;
-
-  const collapsed = collapseEngineerTestCallsForLiveActivity(input.calls);
-  const engineerCount = input.calls.filter((row) =>
-    isEngineerTestActivityCall(row),
-  ).length;
-
-  return collapsed
+  return collapseEngineerTestCallsForLiveActivity(input.calls)
     .slice(0, limit)
     .map((row) => {
-      const engineerTestCall = isEngineerTestActivityCall(row);
-      const label = engineerTestCall
-        ? {
-            title: ENGINEER_TEST_CALL_LIST_LABEL,
-            subtitle:
-              engineerCount > 1
-                ? `${engineerCount} test calls today`
-                : ENGINEER_TEST_CALL_ROW_SUBTITLE,
-          }
+      const label = isEngineerTestCallRow(row)
+        ? { title: ENGINEER_TEST_CALL_LIST_LABEL, subtitle: ENGINEER_TEST_CALL_ROW_SUBTITLE }
         : callerLiveActivityLabel(row);
       return {
         id: `${row.id}-call`,
@@ -96,39 +83,35 @@ export function buildHomeLiveActivityFeed(input: {
     });
 }
 
-/** Full activity page — calls and inbox items with action labels. */
+/** Full activity page — customer work plus at most one informational test entry. */
 export function buildDashboardActivityFeed(input: {
   calls: ActivityFeedSourceCall[];
   tickets: ActivityFeedSourceTicket[];
   formatTime: (iso: string) => string;
   limit?: number;
 }): TimelineFeedRow[] {
-  const limit = input.limit ?? 200;
-
+  const limit = Math.max(0, input.limit ?? 200);
+  const collapsedCalls = collapseEngineerTestCallsForLiveActivity(input.calls);
+  const engineerIds = new Set(collapsedCalls.filter(isEngineerTestCallRow).map((row) => `${row.id}-call`));
   const rows: (TimelineFeedRow & { timestamp: number })[] = [
-    ...input.calls.map((row) => {
-      const action = row.engineer_test_call
+    ...collapsedCalls.map((row) => {
+      const engineer = isEngineerTestCallRow(row);
+      const action = engineer
         ? ENGINEER_TEST_CALL_BRAND
-        : formatActivityFeedBadge({
-            summary: row.ai_summary,
-            outcome: row.outcome,
-          });
+        : formatActivityFeedBadge({ summary: row.ai_summary, outcome: row.outcome });
       return {
         id: `${row.id}-call`,
-        title: row.engineer_test_call
-          ? ENGINEER_TEST_CALL_LIST_LABEL
-          : activityFeedCallerLabel(row),
+        title: engineer ? ENGINEER_TEST_CALL_LIST_LABEL : activityFeedCallerLabel(row),
+        ...(engineer ? { subtitle: ENGINEER_TEST_CALL_ROW_SUBTITLE } : {}),
         time: input.formatTime(row.created_at),
         href: `${DASHBOARD_ROUTES.calls}?call=${encodeURIComponent(row.id)}`,
         badge: action,
         isoDate: row.created_at,
-        timestamp: new Date(row.created_at).getTime(),
+        timestamp: Date.parse(row.created_at),
       };
     }),
-    ...input.tickets.map((row) => {
-      const action = formatActivityFeedBadge({
-        summary: ticketSummaryForBadge(row),
-      });
+    ...input.tickets.filter((row) => !isEngineerTestCallRow(row)).map((row) => {
+      const action = formatActivityFeedBadge({ summary: ticketSummaryForBadge(row) });
       return {
         id: `${row.id}-ticket`,
         title: activityFeedCallerLabel(row),
@@ -136,13 +119,15 @@ export function buildDashboardActivityFeed(input: {
         href: `${DASHBOARD_ROUTES.actionInbox}?ticket=${encodeURIComponent(row.id)}`,
         badge: action,
         isoDate: row.created_at,
-        timestamp: new Date(row.created_at).getTime(),
+        timestamp: Date.parse(row.created_at),
       };
     }),
-  ]
-    .filter((row) => Number.isFinite(row.timestamp))
-    .sort((a, b) => b.timestamp - a.timestamp)
-    .slice(0, limit);
+  ].filter((row) => Number.isFinite(row.timestamp)).sort((a, b) => b.timestamp - a.timestamp);
 
-  return rows.map(({ timestamp: _timestamp, ...row }) => row);
+  // The one test notice is additional information, not a customer feed slot.
+  // Apply the cap to customer calls/tickets first, then reinsert the notice.
+  const customers = rows.filter((row) => !engineerIds.has(row.id)).slice(0, limit);
+  const notice = rows.filter((row) => engineerIds.has(row.id)).slice(0, 1);
+  return [...customers, ...notice].sort((a, b) => b.timestamp - a.timestamp)
+    .map(({ timestamp: _timestamp, ...row }) => row);
 }

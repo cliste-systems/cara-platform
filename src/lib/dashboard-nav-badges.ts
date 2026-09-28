@@ -2,6 +2,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { getDashboardMetricRangeLowerBoundIso } from "@/lib/dashboard-metric-range";
+import {
+  customerCallFilters,
+  customerTrainingFilters,
+  CUSTOMER_TRAINING_JOINS,
+} from "@/lib/dashboard-customer-data";
 
 export {
   DASHBOARD_ACTION_INBOX_SEEN_COOKIE,
@@ -33,14 +38,18 @@ export async function fetchDashboardNavBadges(
   const callsTodaySince = getDashboardMetricRangeLowerBoundIso("today");
 
   const [callHistoryRes, trainingRes] = await Promise.all([
-    supabase
-      .from("call_logs")
-      .select("id", { count: "exact", head: true })
+    customerCallFilters(
+      supabase
+        .from("call_logs")
+        .select("id", { count: "exact", head: true }),
+    )
       .eq("organization_id", organizationId)
       .gte("created_at", callsTodaySince),
-    supabase
-      .from("cara_training_items")
-      .select("id", { count: "exact", head: true })
+    customerTrainingFilters(
+      supabase
+        .from("cara_training_items")
+        .select(`id,${CUSTOMER_TRAINING_JOINS}`, { count: "exact", head: true }),
+    )
       .eq("organization_id", organizationId)
       .in("status", ["awaiting_answer", "draft_ready"]),
   ]);
