@@ -1,5 +1,6 @@
 "use server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   inferCallIntent,
   mapCallLogToRow,
@@ -76,9 +77,21 @@ type CallRecordingRow = {
   room_name: string | null;
   is_test_call: boolean;
 };
-type CallDetailRow = CallRecordingRow & Omit<CallerHistoryCallRow, "caller_data_erased_at"> & {
+type CallDetailRow = {
+  id: string;
+  caller_number: string;
+  caller_name: string | null;
+  duration_seconds: number | null;
+  outcome: string | null;
+  ai_summary: string | null;
   transcript: string | null;
   transcript_review: string | null;
+  created_at: string;
+  post_call_status: string | null;
+  audio_storage_path: string | null;
+  engineer_test_call: boolean;
+  room_name: string | null;
+  is_test_call: boolean;
 };
 
 export async function fetchCallerHistoryInsight(input: {
@@ -157,7 +170,7 @@ export async function fetchCallerHistoryInsight(input: {
 }
 
 async function loadErasedCallerHistoryInsight(
-  supabase: Awaited<ReturnType<typeof requireDashboardSession>>["supabase"],
+  supabase: SupabaseClient,
   organizationId: string,
   currentCallId?: string,
 ): Promise<CallerHistoryInsight> {
@@ -176,11 +189,14 @@ async function loadErasedCallerHistoryInsight(
 export async function fetchCallRecordingPlaybackUrl(callLogId: string): Promise<CallRecordingPlaybackResult> {
   const id = callLogId.trim();
   if (!UUID_RE.test(id)) return { ok: false, message: "Recording not available for this call." };
-  const { supabase, organizationId } = await requireDashboardSession();
+  const session = await requireDashboardSession();
+  const supabase: SupabaseClient = session.supabase;
+  const { organizationId } = session;
   const columns: string = "audio_storage_path, engineer_test_call, caller_number, room_name, is_test_call";
-  const { data, error } = await supabase.from("call_logs").select(columns)
-    .eq("id", id).eq("organization_id", organizationId).maybeSingle()
-    .overrideTypes<CallRecordingRow | null, { merge: false }>();
+  const { data: rows, error } = await supabase.from("call_logs").select(columns)
+    .filter("id", "eq", id).filter("organization_id", "eq", organizationId).limit(1)
+    .overrideTypes<CallRecordingRow[], { merge: false }>();
+  const data = rows?.[0];
   if (error || data?.is_test_call || isEngineerTestCallRow(data ?? {})) {
     return { ok: false, message: "Recording not available for this call." };
   }
@@ -214,11 +230,16 @@ export async function fetchCallDetailForTicket(input: {
 async function loadCallDetailRow(callId: string): Promise<CallDetailDialogPayload | null> {
   const id = callId.trim();
   if (!UUID_RE.test(id)) return null;
-  const { supabase, organizationId } = await requireDashboardSession();
+  const session = await requireDashboardSession();
+  const supabase: SupabaseClient = session.supabase;
+  const { organizationId } = session;
   const columns: string = "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, transcript, transcript_review, created_at, post_call_status, audio_storage_path, engineer_test_call, room_name, is_test_call";
-  const { data, error } = await supabase.from("call_logs").select(columns)
-    .eq("id", id).eq("organization_id", organizationId).maybeSingle()
-    .overrideTypes<CallDetailRow | null, { merge: false }>();
+  // id is a primary key; an array projection avoids recursive nullable override
+  // inference while retaining identical tenant-scoped zero-or-one-row semantics.
+  const { data: rows, error } = await supabase.from("call_logs").select(columns)
+    .filter("id", "eq", id).filter("organization_id", "eq", organizationId).limit(1)
+    .overrideTypes<CallDetailRow[], { merge: false }>();
+  const data = rows?.[0];
   if (error || !data || data.is_test_call) return null;
   const engineerTestCall = isEngineerTestCallRow(data);
   const mapped = mapCallLogToRow({
