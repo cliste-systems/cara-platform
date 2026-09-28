@@ -90,10 +90,11 @@ export function buildDashboardActivityFeed(input: {
   formatTime: (iso: string) => string;
   limit?: number;
 }): TimelineFeedRow[] {
-  const limit = input.limit ?? 200;
-
+  const limit = Math.max(0, input.limit ?? 200);
+  const collapsedCalls = collapseEngineerTestCallsForLiveActivity(input.calls);
+  const engineerIds = new Set(collapsedCalls.filter(isEngineerTestCallRow).map((row) => `${row.id}-call`));
   const rows: (TimelineFeedRow & { timestamp: number })[] = [
-    ...collapseEngineerTestCallsForLiveActivity(input.calls).map((row) => {
+    ...collapsedCalls.map((row) => {
       const engineer = isEngineerTestCallRow(row);
       const action = engineer
         ? ENGINEER_TEST_CALL_BRAND
@@ -121,10 +122,12 @@ export function buildDashboardActivityFeed(input: {
         timestamp: Date.parse(row.created_at),
       };
     }),
-  ]
-    .filter((row) => Number.isFinite(row.timestamp))
-    .sort((a, b) => b.timestamp - a.timestamp)
-    .slice(0, limit);
+  ].filter((row) => Number.isFinite(row.timestamp)).sort((a, b) => b.timestamp - a.timestamp);
 
-  return rows.map(({ timestamp: _timestamp, ...row }) => row);
+  // The one test notice is additional information, not a customer feed slot.
+  // Apply the cap to customer calls/tickets first, then reinsert the notice.
+  const customers = rows.filter((row) => !engineerIds.has(row.id)).slice(0, limit);
+  const notice = rows.filter((row) => engineerIds.has(row.id)).slice(0, 1);
+  return [...customers, ...notice].sort((a, b) => b.timestamp - a.timestamp)
+    .map(({ timestamp: _timestamp, ...row }) => row);
 }
