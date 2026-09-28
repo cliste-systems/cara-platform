@@ -1,6 +1,7 @@
 // Diagnose existing failures separately; the original full CI remains unchanged.
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, symlinkSync, writeFileSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -20,16 +21,30 @@ const diagnostics = {};
 try {
   for (const [label, cwd] of [['base', base], ['head', root]]) {
     const suite = run('npm', ['test'], cwd);
-    const types = run('node', [join(root, 'node_modules/typescript/bin/tsc'), '--noEmit', '--pretty', 'false'], cwd);
+    const types = run('node', [join(root, 'node_modules/typescript/bin/tsc'), '--noEmit', '--pretty', 'false', '--incremental', 'false'], cwd);
     writeFileSync(join(root, `metrics-${label}-suite.log`), suite.output);
     writeFileSync(join(root, `metrics-${label}-types.log`), types.output);
+    const rawErrors = types.output.split('\n').filter(line => /error TS\d+/.test(line));
     diagnostics[label] = {
       suiteExit: suite.status,
       typecheckExit: types.status,
       tests: suite.output.split('\n').filter(line => /^# (tests|pass|fail|skipped) /.test(line)),
       failures: [...suite.output.matchAll(/^\s*not ok \d+ - (.+)$/gm)].map(match => match[1].replaceAll(base, '<repo>').replaceAll(root, '<repo>')),
-      typeErrors: types.output.split('\n').filter(line => /error TS\d+/.test(line)).map(line => line.replace(/\(\d+,\d+\)/g, '(line)').replaceAll(base, '<repo>').replaceAll(root, '<repo>')),
+      typeErrors: rawErrors.map(line => line.replace(/\(\d+,\d+\)/g, '(line)').replaceAll(base, '<repo>').replaceAll(root, '<repo>')),
     };
+    if (label === 'head') {
+      for (const error of rawErrors) {
+        const match = error.match(/^(src\/[^\n]+)\((\d+),(\d+)\): error TS2589/);
+        if (!match) continue;
+        const source = readFileSync(join(cwd, match[1]), 'utf8');
+        const line = Number(match[2]);
+        console.log('EXACT TYPE DIAGNOSTIC', JSON.stringify({
+          error, file: match[1], sha256: createHash('sha256').update(source).digest('hex'),
+          context: source.split('\n').slice(Math.max(0, line - 4), line + 3).map((text, index) => `${Math.max(1, line - 3) + index}: ${text}`),
+          checkout: run('git', ['rev-parse', 'HEAD'], cwd).output.trim(),
+        }, null, 2));
+      }
+    }
   }
   const addedFailures = diagnostics.head.failures.filter(value => !diagnostics.base.failures.includes(value));
   const addedTypes = diagnostics.head.typeErrors.filter(value => !diagnostics.base.typeErrors.includes(value));
