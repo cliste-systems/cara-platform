@@ -70,6 +70,11 @@ type CallerHistoryCallRow = {
   caller_data_erased_at: string | null;
 };
 type CallerHistoryTicketRow = { status: string; summary: string | null; department_slug: string | null };
+type CallErasureAuditRow = {
+  caller_data_erased_at: string | null;
+  caller_data_erased_by_label: string | null;
+  caller_data_erased_reason: string | null;
+};
 type CallRecordingRow = {
   audio_storage_path: string | null;
   engineer_test_call: boolean;
@@ -176,9 +181,11 @@ async function loadErasedCallerHistoryInsight(
 ): Promise<CallerHistoryInsight> {
   const callId = String(currentCallId ?? "").trim();
   if (!UUID_RE.test(callId)) return buildErasedCallerHistoryInsight(null);
-  const { data } = await supabase.from("call_logs")
-    .select("caller_data_erased_at, caller_data_erased_by_label, caller_data_erased_reason")
-    .eq("id", callId).eq("organization_id", organizationId).maybeSingle();
+  const columns: string = "caller_data_erased_at, caller_data_erased_by_label, caller_data_erased_reason";
+  const { data: rows } = await supabase.from("call_logs").select(columns)
+    .filter("id", "eq", callId).filter("organization_id", "eq", organizationId).limit(1)
+    .overrideTypes<CallErasureAuditRow[], { merge: false }>();
+  const data = rows?.[0];
   return buildErasedCallerHistoryInsight(pickCallerDataErasureAudit({
     callerDataErasedAt: data?.caller_data_erased_at ?? null,
     callerDataErasedByLabel: data?.caller_data_erased_by_label ?? null,
