@@ -49,23 +49,30 @@ export type CustomerKnowledgeCallFact = { id: string; created_at: string; durati
 export async function loadCustomerKnowledgeCallLinks(
   supabase: SupabaseClient, organizationId: string, since: string,
 ): Promise<CustomerKnowledgeCallLink[]> {
-  const columns: string = "id, ai_summary, created_at";
-  const { data, error } = await customerCallFilters(supabase.from("call_logs").select(columns))
+  const { data, error } = await customerCallFilters(supabase.from("call_logs")
+    .select("id, ai_summary, created_at"))
     .eq("organization_id", organizationId).gte("created_at", since)
-    .order("created_at", { ascending: false }).limit(100)
-    .overrideTypes<CustomerKnowledgeCallLink[], { merge: false }>();
+    .order("created_at", { ascending: false }).limit(100);
   if (error) throw new Error(`Could not load training call links: ${error.message}`);
-  return data ?? [];
+  return (data ?? []).map((row) => ({
+    id: String(row.id),
+    created_at: String(row.created_at),
+    ai_summary: typeof row.ai_summary === "string" ? row.ai_summary : null,
+  }));
 }
 
 export async function loadCustomerKnowledgeCallFacts(
   supabase: SupabaseClient, organizationId: string, ids: string[],
 ): Promise<CustomerKnowledgeCallFact[]> {
   if (ids.length === 0) return [];
-  const columns: string = "id, created_at, duration_seconds, caller_number";
-  const { data, error } = await customerCallFilters(supabase.from("call_logs").select(columns))
-    .eq("organization_id", organizationId).in("id", ids)
-    .overrideTypes<CustomerKnowledgeCallFact[], { merge: false }>();
+  const { data, error } = await customerCallFilters(supabase.from("call_logs")
+    .select("id, created_at, duration_seconds, caller_number"))
+    .eq("organization_id", organizationId).in("id", ids);
   if (error) throw new Error(`Could not load training call details: ${error.message}`);
-  return data ?? [];
+  return (data ?? []).map((row) => ({
+    id: String(row.id),
+    created_at: String(row.created_at),
+    duration_seconds: Math.max(0, Number(row.duration_seconds) || 0),
+    caller_number: String(row.caller_number ?? ""),
+  }));
 }
