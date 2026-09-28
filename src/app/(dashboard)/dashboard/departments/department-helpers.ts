@@ -65,9 +65,7 @@ export function resolveTicketDepartmentSlug(
   row: Pick<DepartmentTicketRow, "department_slug" | "summary">,
 ): RetailDepartmentSlug {
   const stored = String(row.department_slug ?? "").trim();
-  if (stored && isRetailDepartmentSlug(stored) && stored !== "general") {
-    return stored;
-  }
+  if (stored && isRetailDepartmentSlug(stored) && stored !== "general") return stored;
   return classifyActionDepartment({ summary: row.summary ?? "" });
 }
 
@@ -79,16 +77,11 @@ export function departmentTicketMatchesWorkspace(
   workspaceSlug: RetailDepartmentSlug,
 ): boolean {
   if (itemDepartmentSlug === workspaceSlug) return true;
-  if (workspaceSlug === "management" && itemDepartmentSlug === "general") {
-    return true;
-  }
+  if (workspaceSlug === "management" && itemDepartmentSlug === "general") return true;
   return false;
 }
 
-export function departmentTicketHref(
-  ticketId: string,
-  departmentSlug: RetailDepartmentSlug,
-): string {
+export function departmentTicketHref(ticketId: string, departmentSlug: RetailDepartmentSlug): string {
   const workspace = departmentWorkspaceSlug(departmentSlug);
   return `${DASHBOARD_ROUTES.department(workspace)}?ticket=${encodeURIComponent(ticketId)}`;
 }
@@ -104,13 +97,10 @@ export function toDepartmentInboxItem(
   const category = classifyActionCategory(row.summary);
   const deliveryStatus = (row.delivery_status as ActionTicketDeliveryStatus) ?? "confirmed";
   const callerNumber = row.caller_number?.trim() ?? "";
-  const callerDisplay = isErasedCallerNumber(callerNumber)
-    ? CALLER_DATA_ERASED_LABEL
-    : formatE164ForDisplay(callerNumber) || "";
+  const callerDisplay = isErasedCallerNumber(callerNumber) ? CALLER_DATA_ERASED_LABEL : formatE164ForDisplay(callerNumber) || "";
   const key = phoneKey(callerNumber);
   const client = key ? clientsByPhone.get(key) : undefined;
   const callLogName = key ? (callerNameByPhone.get(key) ?? null) : null;
-
   const callerName = isErasedCallerNumber(callerNumber)
     ? CALLER_DATA_ERASED_LABEL
     : resolveCallerDisplayName([row.caller_name, client?.name, callLogName], callerDisplay);
@@ -118,18 +108,14 @@ export function toDepartmentInboxItem(
   return {
     id: row.id,
     callLogId: callLink?.callLogId ?? (row.call_log_id ? String(row.call_log_id) : null),
-    callLogCreatedAt:
-      callLink?.callCreatedAt ??
-      (callLink?.callLogId || row.call_log_id ? row.created_at : null),
+    callLogCreatedAt: callLink?.callCreatedAt ?? (callLink?.callLogId || row.call_log_id ? row.created_at : null),
     callerNumber,
     callerDisplay,
     callerName,
     contactLabel: callerName,
     contactEmail: resolveContactEmail(client?.email, row.summary),
     summary: row.summary ?? "",
-    briefSummary:
-      row.brief_summary?.trim() ||
-      undefined,
+    briefSummary: row.brief_summary?.trim() || undefined,
     status: row.status === "resolved" ? "resolved" : "open",
     createdAt: row.created_at,
     createdAtLabel: formatActionDateTimeLabel(row.created_at),
@@ -149,45 +135,31 @@ function phoneKey(raw: string | null | undefined): string | null {
   return digits.length >= 6 ? digits : null;
 }
 
-export function buildDepartmentOverviewMetrics(
-  rows: DepartmentTicketRow[],
-): DepartmentOverviewMetrics {
-  const openRows = rows.filter((row) => row.status === "open");
+export function buildDepartmentOverviewMetrics(rows: DepartmentTicketRow[]): DepartmentOverviewMetrics {
+  const openRows = rows.filter((row) => row.status === "open" && !isEngineerTestCallRow(row));
   const counts = new Map<RetailDepartmentSlug, { open: number; urgent: number }>();
-
-  for (const dept of RETAIL_DEPARTMENTS) {
-    counts.set(dept.slug, { open: 0, urgent: 0 });
-  }
-
+  for (const dept of RETAIL_DEPARTMENTS) counts.set(dept.slug, { open: 0, urgent: 0 });
   let totalOpen = 0;
   let totalUrgent = 0;
-
   for (const row of openRows) {
     const slug = departmentWorkspaceSlug(resolveTicketDepartmentSlug(row));
     const bucket = counts.get(slug) ?? { open: 0, urgent: 0 };
     bucket.open += 1;
     totalOpen += 1;
-    if (classifyActionCategory(row.summary) === "urgent") {
-      bucket.urgent += 1;
-      totalUrgent += 1;
-    }
+    if (classifyActionCategory(row.summary) === "urgent") { bucket.urgent += 1; totalUrgent += 1; }
     counts.set(slug, bucket);
   }
-
-  const departments = RETAIL_DEPARTMENTS.filter((dept) => dept.slug !== "general").map(
-    (dept) => {
-      const bucket = counts.get(dept.slug) ?? { open: 0, urgent: 0 };
-      return {
-        slug: dept.slug,
-        label: dept.label,
-        shortLabel: dept.shortLabel,
-        href: DASHBOARD_ROUTES.department(dept.slug),
-        openCount: bucket.open,
-        urgentCount: bucket.urgent,
-      };
-    },
-  );
-
+  const departments = RETAIL_DEPARTMENTS.filter((dept) => dept.slug !== "general").map((dept) => {
+    const bucket = counts.get(dept.slug) ?? { open: 0, urgent: 0 };
+    return {
+      slug: dept.slug,
+      label: dept.label,
+      shortLabel: dept.shortLabel,
+      href: DASHBOARD_ROUTES.department(dept.slug),
+      openCount: bucket.open,
+      urgentCount: bucket.urgent,
+    };
+  });
   return { totalOpen, totalUrgent, departments };
 }
 
@@ -196,17 +168,13 @@ export function buildDepartmentInboxMetrics(items: ActionInboxItem[]): ActionInb
   let urgentCount = 0;
   let callbackCount = 0;
   let resolvedCount = 0;
-
   for (const item of items) {
-    if (item.status === "resolved") {
-      resolvedCount += 1;
-      continue;
-    }
+    if (isEngineerTestCallRow({ engineer_test_call: item.engineerTestCall, caller_number: item.callerNumber })) continue;
+    if (item.status === "resolved") { resolvedCount += 1; continue; }
     openCount += 1;
     if (item.category === "urgent") urgentCount += 1;
     if (item.category === "callback") callbackCount += 1;
   }
-
   return { openCount, urgentCount, callbackCount, resolvedCount };
 }
 

@@ -19,38 +19,14 @@ import {
   dispatchDashboardIncomingCallEvent,
   type DashboardIncomingCallDetail,
 } from "@/lib/dashboard-live-events";
+import { customerUsageFilters } from "@/lib/dashboard-customer-data";
+import { customerIncomingCallDetail } from "@/lib/dashboard-customer-events";
+import { isEngineerTestCallerNumber } from "@/lib/engineer-test-call";
 import { createClient } from "@/utils/supabase/client";
 
 const PLACEHOLDER_TIMEOUT_MS = 120_000;
 const CALLS_POLL_INTERVAL_MS = 10_000;
 const REFRESH_DEBOUNCE_MS = 400;
-
-function readStringField(row: Record<string, unknown>, key: string): string | null {
-  const value = row[key];
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function incomingDetailFromUsageRecord(
-  row: Record<string, unknown>,
-): DashboardIncomingCallDetail {
-  return {
-    phase: "in_progress",
-    callerNumber: readStringField(row, "caller_number"),
-    startedAt: readStringField(row, "started_at") ?? new Date().toISOString(),
-    usageRecordId: readStringField(row, "id"),
-  };
-}
-
-function incomingDetailFromCallLog(
-  row: Record<string, unknown>,
-): DashboardIncomingCallDetail {
-  return {
-    phase: "loading",
-    callLogId: readStringField(row, "id"),
-    callerNumber: readStringField(row, "caller_number"),
-    startedAt: readStringField(row, "created_at") ?? new Date().toISOString(),
-  };
-}
 
 type UseCallsLiveUpdatesOptions = {
   organizationId: string;
@@ -85,7 +61,7 @@ export function useCallsLiveUpdates({
 
   const applyIncomingDetail = useCallback(
     (detail: DashboardIncomingCallDetail) => {
-      if (!detail.phase) return;
+      if (!detail.phase || isEngineerTestCallerNumber(detail.callerNumber)) return;
       setPlaceholder((current) => {
         const merged = mergeIncomingCallEvent(current, detail);
         persistPlaceholder(merged);
@@ -151,9 +127,9 @@ export function useCallsLiveUpdates({
     let cancelled = false;
     void (async () => {
       const supabase = createClient();
-      const { data } = await supabase
+      const { data } = await customerUsageFilters(supabase
         .from("usage_records")
-        .select("caller_number, started_at")
+        .select("id, caller_number, started_at, room_name, call_sid, sync_skip_reason"))
         .eq("organization_id", organizationId)
         .is("ended_at", null)
         .order("started_at", { ascending: false })
@@ -161,13 +137,8 @@ export function useCallsLiveUpdates({
         .maybeSingle();
 
       if (cancelled || !data?.started_at) return;
-
-      handleIncomingDetail({
-        phase: "in_progress",
-        callerNumber:
-          typeof data.caller_number === "string" ? data.caller_number : null,
-        startedAt: String(data.started_at),
-      });
+      const detail = customerIncomingCallDetail(data, "usage");
+      if (detail) handleIncomingDetail(detail);
     })();
 
     return () => {
@@ -204,7 +175,8 @@ export function useCallsLiveUpdates({
           filter,
         },
         (payload) => {
-          const detail = incomingDetailFromUsageRecord(payload.new);
+          const detail = customerIncomingCallDetail(payload.new, "usage");
+          if (!detail) return;
           mergeCallsIncomingPlaceholderSession(organizationId, detail);
           dispatchDashboardIncomingCallEvent(detail);
           handleIncomingDetail(detail);
@@ -219,7 +191,12 @@ export function useCallsLiveUpdates({
           filter,
         },
         (payload) => {
-          const detail = incomingDetailFromCallLog(payload.new);
+          const detail = customerIncomingCallDetail(payload.new, "call_log");
+          if (!detail) {
+            // Refresh the single engineer notice without a customer-call banner.
+            scheduleRefresh();
+            return;
+          }
           mergeCallsIncomingPlaceholderSession(organizationId, detail);
           dispatchDashboardIncomingCallEvent(detail);
           handleIncomingDetail(detail);
@@ -270,7 +247,7 @@ export function useCallsLiveUpdates({
       }
       supabase.removeChannel(channel);
     };
-  }, [handleIncomingDetail, liveEnabled, organizationId]);
+  }, [handleIncomingDetail, liveEnabled, organizationId, scheduleRefresh]);
 
   useEffect(() => {
     if (!liveEnabled || !refreshList) return;

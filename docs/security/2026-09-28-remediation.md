@@ -19,6 +19,6 @@ Applied database migration versions:
 
 Rollback-only database tests cover owner/member/cross-tenant/storage permissions, 1,005 usage rows plus active/stale cases, room ownership, email duplicate/lease behavior and every quota. All passed and no test accounts or organizations remained. Authentication counter tests also passed with rollback. No test emails or calls were sent.
 
-Before upstream integration, the web suite passed 860 tests; the voice suite passed 369 tests plus 13 demo tests. Both type checks and production builds passed. Native Deno checks passed independently of the Next compiler. Final integration verification is recorded in Git and the delivery message.
+After upstream integration, the web suite passed 897 tests; the voice suite passed 369 tests plus 13 demo tests. Both type checks and production builds passed. Native Deno checks passed independently of the Next compiler. The catalogue scheduler merge preserves the already-activated durable scheduler instead of restoring its superseded weekly import jobs. The incoming metrics workflow also uses the audited lockfile without regenerating it.
 
 Deployment order: database first (done), updated web email endpoint, then voice worker. Pushing source alone is not proof that either application has deployed. Atomic call-admission reservation remains separate follow-up work; this change fixes the incomplete usage total and does not claim a strict concurrent-call spending cap.
