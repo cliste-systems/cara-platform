@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 /** Neutral admin pill for status-like values. */
 export const adminBadgeClass =
-  "inline-flex items-center rounded-md border border-gray-200 bg-white px-2 py-0.5 text-xs font-medium text-gray-700";
+  "inline-flex items-center rounded-md border border-[#d9e2dd] bg-[#f6faf7] px-2.5 py-1 text-xs font-semibold text-[#4d5f58]";
 
 /** Plain label — no pill box, easier to scan in dense tables. */
 export const adminTableLabelClass = "text-sm font-medium text-gray-800";

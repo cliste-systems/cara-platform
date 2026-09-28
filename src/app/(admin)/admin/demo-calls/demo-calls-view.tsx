@@ -65,10 +65,16 @@ function friendlyDemoCallError(err: unknown): string {
     if (err.name === "NotFoundError") {
       return "No microphone was found on this device.";
     }
+    if (err.name === "NotReadableError") {
+      return "Chrome could not open the microphone. Close other tabs or apps using the mic (Zoom, Meet, another demo tab), then try again.";
+    }
   }
   if (err instanceof Error) {
     if (err.message.includes("Client initiated disconnect")) {
       return "Call disconnected before it started. Check microphone permission and try again.";
+    }
+    if (/could not start audio source/i.test(err.message)) {
+      return "Chrome could not open the microphone. Close other tabs or apps using the mic (Zoom, Meet, another demo tab), then try again.";
     }
     return err.message;
   }
@@ -90,6 +96,30 @@ function ActiveCallPanel({
 }) {
   const room = useRoomContext();
   const connectionState = useConnectionState();
+  useEffect(() => {
+    let stopped = false;
+    const report = (ended = false) => {
+      if (!ended && (stopped || room.state !== ConnectionState.Connected)) return;
+      void fetch("/api/admin/demo-call/presence", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomName: session.roomName, ended }), keepalive: ended,
+      }).catch(() => { /* The next heartbeat retries transient failures. */ });
+    };
+    const connected = () => report();
+    const disconnected = () => { stopped = true; report(true); };
+    const leaving = () => report(true);
+    room.on(RoomEvent.Connected, connected);
+    room.on(RoomEvent.Reconnected, connected);
+    room.on(RoomEvent.Disconnected, disconnected);
+    window.addEventListener("pagehide", leaving);
+    report();
+    const heartbeat = window.setInterval(connected, 15000);
+    return () => {
+      stopped = true; window.clearInterval(heartbeat);
+      room.off(RoomEvent.Connected, connected);room.off(RoomEvent.Reconnected, connected);room.off(RoomEvent.Disconnected, disconnected);
+      window.removeEventListener("pagehide", leaving);
+    };
+  }, [room, session.roomName]);
   const [agentJoined, setAgentJoined] = useState(false);
   const [microphoneReady, setMicrophoneReady] = useState(false);
   const [workerMissing, setWorkerMissing] = useState(false);
@@ -97,6 +127,9 @@ function ActiveCallPanel({
   const [micRepublishing, setMicRepublishing] = useState(false);
   const workerWarnLoggedRef = useRef(false);
   const microphoneReadyRef = useRef(false);
+  const microphonePublishMsRef = useRef<number | null>(null);
+  const agentJoinMsRef = useRef<number | null>(null);
+  const agentDispatchRef = useRef(false);
   const micPublishGenerationRef = useRef(0);
   const logAppendRef = useRef(log.append);
   const logSetMetricsRef = useRef(log.setMetrics);
@@ -113,6 +146,7 @@ function ActiveCallPanel({
       setMicrophoneReady(true);
       setMicError(null);
       const ms = Date.now() - sessionStartedAt;
+      microphonePublishMsRef.current = ms;
       logSetMetricsRef.current((prev) => ({ ...prev, microphonePublishMs: ms }));
       logAppendRef.current("success", "microphone", detail, ms);
     },
@@ -121,7 +155,11 @@ function ActiveCallPanel({
 
   useEffect(() => {
     const syncParticipants = () => {
-      setAgentJoined(room.remoteParticipants.size > 0);
+      const joined = room.remoteParticipants.size > 0;
+      setAgentJoined(joined);
+      if (joined && agentJoinMsRef.current == null) {
+        agentJoinMsRef.current = Date.now() - sessionStartedAt;
+      }
     };
     syncParticipants();
     room.on(RoomEvent.ParticipantConnected, syncParticipants);
@@ -133,7 +171,7 @@ function ActiveCallPanel({
   }, [room]);
 
   useEffect(() => {
-    if (agentJoined || connectionState !== ConnectionState.Connected) {
+    if (agentJoined || connectionState !== ConnectionState.Connected || !microphoneReady) {
       setWorkerMissing(false);
       return;
     }
@@ -144,12 +182,12 @@ function ActiveCallPanel({
         logAppendRef.current(
           "warn",
           "worker",
-          "No voice worker joined this room. For local demo calls, run npm run dev:local from cliste-code-base-1 so the dashboard and local Cara worker start together.",
+          "No voice worker joined this room. For local demo calls, run npm run dev:local from cara-platform so the dashboard and local Cara worker start together.",
         );
       }
     }, 8_000);
     return () => window.clearTimeout(timer);
-  }, [agentJoined, connectionState]);
+  }, [agentJoined, connectionState, microphoneReady]);
 
   useEffect(() => {
     if (connectionState !== ConnectionState.Connected) return;
@@ -223,7 +261,7 @@ function ActiveCallPanel({
 
     const retryTimer = window.setTimeout(() => {
       void publishMicrophone();
-    }, 150);
+    }, 0);
 
     return () => {
       micPublishGenerationRef.current += 1;
@@ -234,6 +272,37 @@ function ActiveCallPanel({
       });
     };
   }, [connectionState, markMicrophoneReady, room]);
+
+  useEffect(() => {
+    if (!microphoneReady || agentDispatchRef.current) return;
+    agentDispatchRef.current = true;
+    logAppendRef.current(
+      "info",
+      "worker",
+      "Microphone live — dispatching Cara to the room",
+    );
+    void fetch("/api/admin/demo-call/dispatch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        roomName: session.roomName,
+        calledNumber: session.calledNumber,
+      }),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const data = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(data?.error ?? "Failed to dispatch voice worker.");
+        }
+        logAppendRef.current("success", "worker", "Cara dispatch requested");
+      })
+      .catch((err) => {
+        agentDispatchRef.current = false;
+        const message =
+          err instanceof Error ? err.message : "Failed to dispatch voice worker.";
+        logAppendRef.current("error", "worker", message);
+      });
+  }, [microphoneReady, session.calledNumber, session.roomName]);
 
   const republishMicrophone = useCallback(async () => {
     if (connectionState !== ConnectionState.Connected) return;
@@ -268,12 +337,25 @@ function ActiveCallPanel({
     }
   }, [connectionState, markMicrophoneReady, room]);
 
+  const micRepublishedForAgentRef = useRef(false);
+
+  useEffect(() => {
+    if (!agentJoined || !microphoneReady || micRepublishedForAgentRef.current) return;
+    micRepublishedForAgentRef.current = true;
+    logAppendRef.current(
+      "info",
+      "microphone",
+      "Cara joined — refreshing mic track so she can hear you",
+    );
+    void republishMicrophone();
+  }, [agentJoined, microphoneReady, republishMicrophone]);
+
   const statusLabel = useMemo(() => {
     if (connectionState === ConnectionState.Connecting) return "Connecting…";
     if (connectionState === ConnectionState.Reconnecting) return "Reconnecting…";
     if (connectionState === ConnectionState.Disconnected) return "Disconnected";
     if (!agentJoined) return "Waiting for Cara…";
-    if (!microphoneReady) return "Connecting microphone…";
+    if (!microphoneReady) return "Publishing microphone…";
     return "In call";
   }, [agentJoined, connectionState, microphoneReady]);
 
@@ -295,7 +377,7 @@ function ActiveCallPanel({
           <p className="mt-1 text-amber-800">
             Local demo calls need the full local stack. Stop this server and run{" "}
             <code className="font-mono text-xs">npm run dev:local</code> from{" "}
-            <code className="font-mono text-xs">cliste-code-base-1</code>.
+            <code className="font-mono text-xs">cara-platform</code>.
           </p>
         </div>
       ) : null}
@@ -466,11 +548,14 @@ export function DemoCallsView({ lines }: DemoCallsViewProps) {
       setPhase("error");
       setError(friendlyDemoCallError(err));
       engineeringLog.append("error", "browser", friendlyDemoCallError(err));
+      // #region agent log
+      fetch('http://127.0.0.1:7662/ingest/95496c05-1739-4e32-b7be-319b56b1c5b5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0f50f3'},body:JSON.stringify({sessionId:'0f50f3',runId:'mic',hypothesisId:'A',location:'demo-calls-view.tsx:startCall',message:'mic_blocked_before_room',data:{name:err instanceof DOMException?err.name:err instanceof Error?err.name:'unknown',msg:err instanceof Error?err.message.slice(0,160):String(err)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       return;
     }
 
     try {
-      engineeringLog.append("info", "dashboard", "Creating LiveKit room + agent dispatch");
+      engineeringLog.append("info", "dashboard", "Creating LiveKit room");
       const res = await fetch("/api/admin/demo-call/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -508,7 +593,13 @@ export function DemoCallsView({ lines }: DemoCallsViewProps) {
       sessionStartedAt != null ? endedAt - sessionStartedAt : undefined,
     );
     setPhase("ended");
-    if (roomName) pollCallLog(roomName);
+    if (roomName) {
+      void fetch("/api/admin/demo-call/presence", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomName, ended: true }), keepalive: true,
+      }).catch(() => {});
+      pollCallLog(roomName);
+    }
   }, [engineeringLog, pollCallLog, session?.roomName, sessionStartedAt]);
 
   const reset = () => {
@@ -525,7 +616,7 @@ export function DemoCallsView({ lines }: DemoCallsViewProps) {
   const pickerDisabled =
     phase === "connecting" || phase === "in_call" || phase === "ended";
 
-  const showLinePicker = phase === "idle";
+  const showLinePicker = phase === "idle" || phase === "error";
 
   return (
     <div className="flex flex-col gap-6">
@@ -537,7 +628,7 @@ export function DemoCallsView({ lines }: DemoCallsViewProps) {
           >
             <div className="flex items-center gap-2 p-5 text-sm text-gray-600">
               <Loader2 className="size-4 animate-spin" aria-hidden />
-              Creating LiveKit room and dispatching voice worker…
+              Creating LiveKit room — your mic publishes first, then Cara joins…
             </div>
           </AdminSectionCard>
           <DemoCallEngineeringLogPanel
@@ -653,11 +744,7 @@ export function DemoCallsView({ lines }: DemoCallsViewProps) {
               onClick={startCall}
               className={adminPrimaryButtonClass}
             >
-              {phase === "connecting" ? (
-                <Loader2 className="size-3.5 animate-spin" aria-hidden />
-              ) : (
-                <Phone className="size-3.5" aria-hidden />
-              )}
+              <Phone className="size-3.5" aria-hidden />
               Start demo call
             </button>
           }

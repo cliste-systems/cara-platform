@@ -254,7 +254,7 @@ function TextRehearsalRoomPanel({
       if (workerLive || workerWarnLogged.current) return;
       workerWarnLogged.current = true;
       const message = agentJoinedRef.current
-        ? "Worker joined but text rehearsal is not active — run npm run dev:text-rehearsal in cliste-code-base-1 (or npm run dev in cliste-code-base-2), or redeploy with CARA_TEXT_REHEARSAL=1."
+        ? "Worker joined but text rehearsal is not active — run npm run dev:text-rehearsal in cara-platform (or npm run dev in cara-voice-platform), or redeploy with CARA_TEXT_REHEARSAL=1."
         : "No voice worker in this room — local dev often loses dispatches to the LiveKit Cloud agent when both use LIVEKIT_AGENT_NAME=cliste-retail-node. Set LIVEKIT_AGENT_NAME=cliste-voice-local in cb1 .env.local and cb2 .env, restart both, then start a new session.";
       log.append("warn", "worker", message);
     }, 10_000);

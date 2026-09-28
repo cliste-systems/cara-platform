@@ -18,6 +18,7 @@ import {
   VOICE_ASSISTANT_DEFAULT_NAME,
 } from "../src/lib/voice-greeting";
 import { createAdminClient } from "../src/utils/supabase/admin";
+import { readTestSeedCredentials } from "../src/lib/test-seed-credentials";
 
 const SALON_NAME = "Bloom Beauty Studio";
 const OWNER_FIRST = "Sarah";
@@ -89,9 +90,7 @@ async function assignPoolPhone(
 }
 
 async function main() {
-  const suffix = randomBytes(3).toString("hex");
-  const email = `bloom-beauty-${suffix}@cliste.test`;
-  const password = `BloomSalon${suffix.slice(0, 4)}!`;
+  const { email, password } = readTestSeedCredentials();
   const slug = await uniqueSlug(createAdminClient(), slugify(SALON_NAME));
   const admin = createAdminClient();
   const now = new Date().toISOString();
@@ -270,7 +269,7 @@ async function main() {
   console.log("\n✓ Salon demo account ready\n");
   console.log(`  Sign in:  http://localhost:3001/authenticate`);
   console.log(`  Email:    ${email}`);
-  console.log(`  Password: ${password}`);
+  console.log("  Password: use the unique value supplied through CLISTE_SEED_PASSWORD.");
   console.log(`  Salon:    ${SALON_NAME} (niche: beauty / Salon & Beauty)`);
   console.log(`  Org ID:   ${organizationId}`);
   if (assignedPhone) {

@@ -21,7 +21,7 @@ import {
 } from "@/lib/business-knowledge-save";
 import {
   ONBOARDING_STEPS,
-  requireOnboardingSession,
+  requireOnboardingAdminSession,
 } from "@/lib/onboarding-session";
 import { regenerateCaraCustomPrompt } from "@/lib/cara-prompt-from-org";
 import { formatWeekScheduleForAgent } from "@/lib/agent-knowledge-format";
@@ -311,7 +311,7 @@ export type EnsureOnboardingUiCopyPayload = {
 export async function ensureOnboardingUiCopy(
   payload: EnsureOnboardingUiCopyPayload,
 ): Promise<GenerateOnboardingUiCopyResult> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
   const admin = createAdminClient();
   const { data: org } = await admin
     .from("organizations")
@@ -353,7 +353,7 @@ export async function ensureOnboardingUiCopy(
 export async function saveTrainCaraProgress(
   payload: TrainCaraPayload,
 ): Promise<TrainCaraSaveResult> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
   return persistTrainCara(session.organizationId, payload, { strictRoutes: false });
 }
 
@@ -364,7 +364,7 @@ export type ExtractOfferingsResult =
 export async function extractServiceOfferingsForTrainCara(
   rawParagraph: string,
 ): Promise<ExtractOfferingsResult> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
   const admin = createAdminClient();
   const raw = rawParagraph.trim();
 
@@ -397,7 +397,7 @@ export async function extractServiceOfferingsForTrainCara(
 }
 
 export async function skipTrainCaraStep(): Promise<TrainCaraSaveResult | never> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
   const admin = createAdminClient();
 
   const { data: org, error: loadError } = await admin
@@ -449,7 +449,7 @@ export async function completeTrainCaraStep(
   _: unknown,
   payload: TrainCaraPayload,
 ): Promise<TrainCaraSaveResult | never> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
   const admin = createAdminClient();
   const { data: org } = await admin
     .from("organizations")
@@ -504,7 +504,7 @@ export async function persistTrainCaraServicesStep(
     extractOfferings?: boolean;
   },
 ): Promise<TrainCaraSaveResult & { offerings?: string }> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
   const admin = createAdminClient();
   let servicesOffered = String(payload.servicesOffered ?? "").trim();
   let servicesOfferedRaw = String(payload.servicesOfferedRaw ?? "").trim();

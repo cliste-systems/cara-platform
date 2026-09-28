@@ -5,12 +5,12 @@ import {
   buildRetailWeeklyOffersPromptSection,
   assessSyncedOffersFreshness,
   formatWeeklyOfferQuote,
-  inferWeeklyOfferChannelFromQuery,
   inferWeeklyOfferFulfilmentFromQuery,
   inferWeeklyOfferServiceAreaFromQuery,
   inferWeeklyOffersListIntent,
   inferRewardsPricePointFromQuery,
   isRetailOfferWeekActive,
+  loadRetailWeeklyOffersForBanner,
   isRetailOfferPriceSemanticallyValid,
   resolveWeeklyOfferSearchFilters,
   searchRetailWeeklyOffers,
@@ -51,7 +51,7 @@ function mockOfferRow(
     offer_week_start: activeWeek.start,
     offer_week_end: activeWeek.end,
     source_url: null,
-    synced_at: "2026-09-10T06:00:00.000Z",
+    synced_at: new Date().toISOString(),
     ...partial,
   };
 }
@@ -1093,6 +1093,222 @@ describe("retail weekly offers search", () => {
     );
     assert.equal(matches.length, 1);
     assert.match(matches[0]?.productName ?? "", /Horgans Sliced Corned Beef/i);
-    assert.match(matches[0]?.quoteText ?? "", /deli counter/i);
+    assert.match(matches[0]?.quoteText ?? "", /pre-pack deli/i);
   });
+});
+
+describe("complete current offer browse regressions", () => {
+  const offer = (id: string, area: RetailWeeklyOfferRow["service_area"], fulfilment: RetailWeeklyOfferRow["fulfilment"], department: string = area) => mockOfferRow({
+    id, product_name: id, service_area: area, fulfilment, department,
+    current_price_eur: 4, search_text: `${id} ${department}`, discount_label: "Only €4",
+  });
+
+  it("answers the real meat counter phrasing and plain meat offers", () => {
+    const rows = [offer("Counter beef", "butcher", "counter"), offer("Prepack chicken", "butcher", "prepack"), offer("Tea", "grocery", "prepack")];
+    const broad = searchSyncedWeeklyOffersInRows(rows, "are there any meat offers");
+    assert.deepEqual(new Set(broad.map((row) => row.productName)), new Set(["Counter beef", "Prepack chicken"]));
+    const counter = searchSyncedWeeklyOffersInRows(rows, "is there any meat offers in the meat counter this week");
+    assert.deepEqual(counter.map((row) => row.productName), ["Counter beef"]);
+  });
+
+  it("rejects future and expired dates at Dublin midnight boundaries", () => {
+    const row = { offer_week_start: "2026-09-24", offer_week_end: "2026-09-30" };
+    assert.equal(isRetailOfferWeekActive(row, new Date("2026-09-23T22:59:59Z")), false);
+    assert.equal(isRetailOfferWeekActive(row, new Date("2026-09-23T23:00:00Z")), true);
+    assert.equal(isRetailOfferWeekActive(row, new Date("2026-09-30T22:59:59Z")), true);
+    assert.equal(isRetailOfferWeekActive(row, new Date("2026-09-30T23:00:00Z")), false);
+  });
+
+  it("includes all service areas even with many earlier bakery departments", () => {
+    const rows = Array.from({ length: 30 }, (_, i) => offer(`Bread ${i}`, "bakery", "counter", `Bakery ${i}`));
+    for (const area of ["butcher", "deli", "fish", "produce", "grocery", "dairy", "off_licence"] as const) rows.push(offer(area, area, "prepack"));
+    const matches = searchSyncedWeeklyOffersInRows(rows, "weekly offers");
+    assert.equal(new Set(matches.map((row) => row.serviceArea)).size, 8);
+  });
+
+  it("fills the result window when one meat fulfilment has fewer offers", () => {
+    const rows = Array.from({ length: 20 }, (_, i) => offer(`Counter ${i}`, "butcher", "counter"));
+    rows.push(offer("Prepack chicken", "butcher", "prepack"));
+    const matches = searchSyncedWeeklyOffersInRows(rows, "meat offers");
+    assert.equal(matches.length, 16);
+    assert.ok(matches.some((row) => row.fulfilment === "prepack"));
+  });
+
+  it("keeps household and frozen browsing within their real category", () => {
+    const rows = [offer("Tea", "grocery", "prepack", "Tea"), offer("Detergent", "grocery", "prepack", "Household"), offer("Frozen Pizza", "grocery", "prepack", "Frozen Foods")];
+    assert.deepEqual(searchSyncedWeeklyOffersInRows(rows, "household offers").map((row) => row.productName), ["Detergent"]);
+    assert.deepEqual(searchSyncedWeeklyOffersInRows(rows, "frozen offers").map((row) => row.productName), ["Frozen Pizza"]);
+  });
+
+  it("keeps dairy and produce available when excluding meat", () => {
+    const rows = [offer("Beef", "butcher", "counter"), offer("Milk", "dairy", "prepack"), offer("Apples", "produce", "prepack")];
+    assert.deepEqual(new Set(searchSyncedWeeklyOffersInRows(rows, "offers apart from meat").map((row) => row.productName)), new Set(["Milk", "Apples"]));
+  });
+
+  it("does not substitute unrelated products in a requested multibuy or campaign", () => {
+    const rows = [
+      { ...offer("Strawberries", "produce", "prepack"), discount_label: "3 for €10" },
+      { ...offer("Apples", "produce", "prepack"), discount_label: "2 for €5" },
+      { ...offer("Carrots", "produce", "prepack"), discount_label: "Super 7 Only €4" },
+    ];
+    assert.deepEqual(searchSyncedWeeklyOffersInRows(rows, "three for ten euro").map((row) => row.productName), ["Strawberries"]);
+    assert.deepEqual(searchSyncedWeeklyOffersInRows(rows, "Super 7 offers").map((row) => row.productName), ["Carrots"]);
+    assert.deepEqual(searchSyncedWeeklyOffersInRows(rows, "3 for 12 offers"), []);
+    assert.equal(searchSyncedWeeklyOffersInRows(rows, "multibuys").length, 2);
+  });
+
+  it("loads later departments after an invalid row in the first full database page", async () => {
+    const rows = Array.from({ length: 1001 }, (_, i) => offer(`Product ${i}`, "grocery", "prepack"));
+    rows[0]!.offer_week_end = "2020-01-01";
+    rows[1000] = offer("Late meat offer", "butcher", "counter");
+    const loaded = await loadRetailWeeklyOffersForBanner(mockSupabaseRows(rows) as never, "supervalu");
+    assert.equal(loaded.length, 1000);
+    assert.ok(loaded.some((row) => row.product_name === "Late meat offer"));
+  });
+});
+
+it("keeps verified multibuys without inventing an individual price", async () => {
+  const row = mockOfferRow({ id: "bundle", product_name: "Mixed Berries", search_text: "mixed berries", current_price_eur: null, discount_label: "3 for €10", service_area: "produce", fulfilment: "prepack" });
+  assert.equal(isRetailOfferPriceSemanticallyValid(row), true);
+  assert.equal(isRetailOfferPriceSemanticallyValid({ ...row, discount_label: "Only €10" }), false);
+  const matches = await searchRetailWeeklyOffers(mockSupabaseRows([row]) as never, "supervalu", "three for ten euro");
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0]?.currentPriceEur, null);
+  assert.match(matches[0]?.quoteText ?? "", /three for ten euro/i);
+  assert.doesNotMatch(matches[0]?.quoteText ?? "", /single price|zero|now null/i);
+});
+
+it("keeps section phrasing from becoming a required product name", () => {
+  const rows = [
+    mockOfferRow({ id: "milk", product_name: "Milk", search_text: "milk dairy", service_area: "dairy", fulfilment: "prepack", current_price_eur: 2 }),
+    mockOfferRow({ id: "wine", product_name: "Wine", search_text: "wine", service_area: "off_licence", fulfilment: "prepack", is_alcohol: true, current_price_eur: 9 }),
+    mockOfferRow({ id: "tea", product_name: "Tea", search_text: "tea grocery", service_area: "grocery", fulfilment: "prepack", current_price_eur: 3 }),
+  ];
+  assert.deepEqual(searchSyncedWeeklyOffersInRows(rows, "any offers on the dairy wall").map((row) => row.productName), ["Milk"]);
+  assert.deepEqual(searchSyncedWeeklyOffersInRows(rows, "off licence offers").map((row) => row.productName), ["Wine"]);
+  assert.deepEqual(searchSyncedWeeklyOffersInRows(rows, "offers in the back store").map((row) => row.productName), ["Tea"]);
+  assert.deepEqual(searchSyncedWeeklyOffersInRows(rows, "frozen offers"), []);
+});
+
+describe("non-price promotion mechanics", () => {
+  function promotion(id: string, label: string, current: number | null = null) {
+    return mockOfferRow({ id, product_name: id, search_text: id.toLowerCase(), service_area: "grocery", fulfilment: "prepack", department: "Cereals", current_price_eur: current, discount_label: label });
+  }
+
+  it("retains BOGOF, buy-get-free, mix-and-match and generic multibuy with no agreed single price", async () => {
+    for (const label of ["BOGOF", "Buy One Get One Free", "Buy 2 Get 1 Free", "Mix & Match", "Multibuy"]) {
+      const row = promotion("Cereal", label);
+      assert.equal(isRetailOfferPriceSemanticallyValid(row), true, label);
+      const matches = await searchRetailWeeklyOffers(mockSupabaseRows([row]) as never, "supervalu", "cereal offers");
+      assert.equal(matches.length, 1, label);
+      assert.equal(matches[0]?.currentPriceEur, null);
+      assert.doesNotMatch(matches[0]?.quoteText ?? "", /zero euro|single price|now null|now zero/i);
+    }
+    assert.equal(isRetailOfferPriceSemanticallyValid(promotion("Unverified", "Special offer")), false);
+  });
+
+  it("keeps a requested buy-one-get-one-free separate from other multibuys", () => {
+    const rows = [promotion("Cereal A", "BOGOF"), promotion("Cereal B", "3 for €10"), promotion("Cereal C", "Buy 1 Get 1 Half Price")];
+    const matches = searchSyncedWeeklyOffersInRows(rows, "buy-one-get-one-free offers");
+    assert.deepEqual(matches.map((row) => row.productName), ["Cereal A"]);
+    assert.match(matches[0]?.quoteText ?? "", /buy one get one free/i);
+    assert.equal(searchSyncedWeeklyOffersInRows(rows, "multibuys").length, 3);
+  });
+
+  it("quotes exact mix-and-match terms while keeping ordinary bundles out of that query", () => {
+    const rows = [promotion("Cereal A", "Mix & Match 3 for €10"), promotion("Cereal B", "2 for €5")];
+    const matches = searchSyncedWeeklyOffersInRows(rows, "mix and match offers");
+    assert.deepEqual(matches.map((row) => row.productName), ["Cereal A"]);
+    assert.match(matches[0]?.quoteText ?? "", /mix and match:? three for ten euro/i);
+  });
+
+  it("preserves points as points, never interpreting their count as a euro price", () => {
+    const rows = [promotion("Cereal A", "Earn 100 Extra Real Rewards Points", 4), promotion("Cereal B", "Rewards Price Only €3", 3)];
+    assert.equal(inferRewardsPricePointFromQuery("100 Real Rewards points offers"), null);
+    const matches = searchSyncedWeeklyOffersInRows(rows, "Real Rewards points offers");
+    assert.deepEqual(matches.map((row) => row.productName), ["Cereal A"]);
+    assert.match(matches[0]?.quoteText ?? "", /100 Extra Real Rewards Points/i);
+    assert.match(matches[0]?.quoteText ?? "", /Now four euro/i);
+    assert.doesNotMatch(matches[0]?.quoteText ?? "", /hundred euro|100 euro/i);
+  });
+});
+
+it("matches the current produce campaign from source membership, never name or price guesses", () => {
+  const row = (id: string, label: string, sourceUrl: string | null = null) => mockOfferRow({ id, product_name: id, search_text: id.toLowerCase(), service_area: "produce", fulfilment: "prepack", department: "Fresh Produce", current_price_eur: 1, discount_label: label, source_url: sourceUrl });
+  const rows = [
+    { ...row("Campaign Carrots", "Only €1", "https://supervalu.ie/super-stars-fruit-veg"), campaign_names: ["Super Fresh 5 F&V - WK39"] },
+    row("Super Fresh 5 Unrelated Product Name", "Only €1"),
+    row("Unrelated Cheap Produce", "Only €1"),
+    row("Different Campaign", "Super 7 Only €1"),
+  ];
+  for (const query of ["Super Fresh five offers", "SuperFresh5", "Super Stars produce offers"]) {
+    assert.deepEqual(searchSyncedWeeklyOffersInRows(rows, query).map((match) => match.productName), ["Campaign Carrots"], query);
+  }
+  assert.deepEqual(searchSyncedWeeklyOffersInRows(rows, "Super 7 offers").map((match) => match.productName), ["Different Campaign"]);
+  assert.deepEqual(searchSyncedWeeklyOffersInRows(rows.slice(0, 3), "Super 7 offers"), []);
+});
+
+it("preserves pack, coupon and purchase-limit conditions when speaking a numeric multibuy", () => {
+  const quote = formatWeeklyOfferQuote({ productName: "Selected Berries", serviceArea: "produce", fulfilment: "prepack", currentPriceEur: null,
+    discountLabel: "3 for €10. Selected 500g packs. Activate coupon before paying. Limit per product 4.",
+  });
+  assert.match(quote, /three for ten euro/i);
+  assert.match(quote, /Selected 500g packs/);
+  assert.match(quote, /Activate coupon before paying/);
+  assert.match(quote, /Limit per product 4/);
+  assert.doesNotMatch(quote, /Single price|Now null|zero euro/i);
+});
+
+it("uses verified campaign membership independently of the actual product promotion price", () => {
+  const member = mockOfferRow({ id: "member", product_name: "Selected Peppers", search_text: "selected peppers", department: "Produce", service_area: "produce", fulfilment: "prepack",
+    campaign_names: ["Super Fresh 5"], current_price_eur: 2.5, discount_label: "Rewards Price Only €2.50. Activate coupon before paying.",
+  });
+  const lookalike = { ...member, id: "other", product_name: "Other Peppers", campaign_names: [] };
+  const matches = searchSyncedWeeklyOffersInRows([member, lookalike], "Super Stars produce offers");
+  assert.deepEqual(matches.map((match) => match.productName), ["Selected Peppers"]);
+  assert.equal(matches[0]?.currentPriceEur, 2.5);
+  assert.match(matches[0]?.quoteText ?? "", /two euro fifty/);
+  assert.match(matches[0]?.quoteText ?? "", /Activate coupon before paying/);
+  assert.deepEqual(searchSyncedWeeklyOffersInRows([member], "Super 7 offers"), []);
+});
+
+it("retains conditions following an Only price instead of discarding them as price repetition", () => {
+  const quote = formatWeeklyOfferQuote({ productName: "Selected Apples", serviceArea: "produce", fulfilment: "prepack", currentPriceEur: 1.5, wasPriceEur: 2,
+    discountLabel: "Only €1.50. Selected 500g packs. Activate coupon before paying.",
+  });
+  assert.match(quote, /Selected 500g packs/);
+  assert.match(quote, /Activate coupon before paying/);
+  assert.match(quote, /Now one euro fifty/);
+});
+
+it("does not treat a shared Super Stars page as Super Fresh 5 SKU eligibility", () => {
+  const shared = mockOfferRow({ id: "other-widget", product_name: "Other Widget Produce", search_text: "other widget produce", department: "Produce", service_area: "produce", fulfilment: "prepack",
+    current_price_eur: 1, discount_label: "Only €1", source_url: "https://supervalu.ie/super-stars-fruit-veg", campaign_names: ["Super Stars Fruit & Veg2"],
+  });
+  const verified = { ...shared, id: "fresh-five", product_name: "Fresh Five Carrots", campaign_names: ["Super Fresh 5 F&V - WK39"] };
+  const pageOnly = { ...shared, id: "page-only", campaign_names: [] };
+  const unverifiedLabel = { ...pageOnly, id: "unverified-label", discount_label: "Super Fresh 5 Only €1" };
+  for (const query of ["Super Fresh 5", "Super Stars produce offers"]) {
+    assert.deepEqual(searchSyncedWeeklyOffersInRows([shared, verified, pageOnly, unverifiedLabel], query).map((match) => match.productName), ["Fresh Five Carrots"]);
+  }
+  assert.deepEqual(searchSyncedWeeklyOffersInRows([shared, pageOnly], "Super Fresh 5"), []);
+});
+
+ it("keeps explicit each prices for counter products with comparison prices per kilogram", () => {
+   const quote = formatWeeklyOfferQuote({ productName: "Marinated Pork Steak (600 g)", serviceArea: "butcher", fulfilment: "counter", currentPriceEur: 5, wasPriceEur: 8.49, sellBy: "each", priceUnitType: "each", pricePerUnit: "€8.33/kg" });
+   assert.doesNotMatch(quote, /Now five euro per kilo/);
+   assert.match(quote, /Now five euro\./);
+ });
+
+it("scopes dairy, baby and wine offer browses to their departments", () => {
+  const rows = [
+    ["wine", "Red Blend", "Australia", "Grocery/Wine, Beer & Spirits/Wine/Red Wine/Australia", "off_licence"],
+    ["beer", "Lager", "Lager", "Grocery/Wine, Beer & Spirits/Beer/Lager", "off_licence"],
+    ["baby", "Nappies", "Size 1", "Grocery/Baby/Nappies/Size 1", "grocery"],
+    ["potato", "Baby Potatoes", "Butcher", "Grocery/Meat/Butcher", "butcher"],
+    ["dairy", "Yogurt", "Yogurt", "Grocery/Dairy/Yogurt", "dairy"],
+  ].map(([id, product_name, department, category_breadcrumb, service_area]) => mockOfferRow({id, product_name, department, category_breadcrumb, service_area: service_area as RetailWeeklyOfferRow["service_area"], fulfilment: "prepack", offer_channel: "grocery", is_alcohol: service_area === "off_licence", current_price_eur: 2, discount_label: "Only €2", search_text: product_name}));
+  for (const department of ["wine", "baby", "dairy"]) {
+    assert.deepEqual(searchSyncedWeeklyOffersInRows(rows, `${department} offers`).map(x => x.productName), [rows.find(x => x.id === department)!.product_name]);
+  }
 });

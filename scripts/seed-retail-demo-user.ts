@@ -18,6 +18,7 @@ import {
   VOICE_ASSISTANT_DEFAULT_NAME,
 } from "../src/lib/voice-greeting";
 import { createAdminClient } from "../src/utils/supabase/admin";
+import { readTestSeedCredentials } from "../src/lib/test-seed-credentials";
 
 const SHOP_NAME = "Murphy's SuperValu";
 const OWNER_NAME = "Pat Murphy";
@@ -25,8 +26,7 @@ const ADDRESS = "Main Street, Killarney, Co. Kerry";
 const EIRCODE = "V93 X7P2";
 const OWNER_PHONE = "+353871234567";
 const PLAN_TIER = "starter" as const;
-const EMAIL = "shop@cliste.test";
-const PASSWORD = "ShopCara2026!";
+const { email: EMAIL, password: PASSWORD } = readTestSeedCredentials();
 
 function slugify(raw: string): string {
   return raw
@@ -304,7 +304,7 @@ async function main() {
   console.log("  Sign in:  http://localhost:3001/authenticate");
   console.log("  Dashboard: http://localhost:3001/dashboard");
   console.log(`  Email:    ${email}`);
-  console.log(`  Password: ${password}`);
+  console.log("  Password: use the unique value supplied through CLISTE_SEED_PASSWORD.");
   console.log(`  Shop:     ${SHOP_NAME} (niche: retail)`);
   console.log(`  Org ID:   ${organizationId}`);
   if (assignedPhone) {

@@ -32,7 +32,7 @@ function CompletenessRail({ checks }: { checks: AdminCaraTrainingSectionCheck[] 
   return (
     <nav
       aria-label="Training completeness"
-      className="sticky top-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+      className="sticky top-4 rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] p-5 shadow-[0_1px_0_rgba(17,24,29,0.05),0_14px_34px_-28px_rgba(17,24,29,0.32)]"
     >
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
         Completeness
@@ -93,7 +93,7 @@ export function CaraTrainingShell({ initial }: Props) {
   );
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_240px]">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_260px]">
       <div className="space-y-6">
         <CaraTrainingFeedLegend />
         <IdentityVoiceSection data={data} onChange={patch} onSaved={refreshPrompt} />
@@ -110,7 +110,7 @@ export function CaraTrainingShell({ initial }: Props) {
         <ReviewPublishSection data={data} onChange={patch} onSaved={refreshPrompt} />
       </div>
 
-      <aside className="hidden lg:block">
+      <aside className="hidden xl:block">
         <CompletenessRail checks={data.sectionChecks} />
       </aside>
     </div>

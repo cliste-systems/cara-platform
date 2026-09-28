@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 
-import { adminCustomerPath, adminPhonePoolPath } from "@/lib/admin-route-paths";
+import { adminPhonePoolPath } from "@/lib/admin-route-paths";
 
 import { AdminBadge, adminTableMutedClass } from "@/components/admin/admin-badge";
 import { AdminListCard } from "@/components/admin/admin-list-card";
@@ -254,13 +254,7 @@ export function DemoCallLinePicker({
                         aria-hidden
                       />
                       <div>
-                        <Link
-                          href={adminCustomerPath(line.orgId)}
-                          className={cn(adminTextLinkClass, "text-gray-900")}
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          {line.orgName}
-                        </Link>
+                        <span className="font-medium text-gray-900">{line.orgName}</span>
                         {line.orgSlug ? (
                           <span className="mt-0.5 block font-mono text-xs text-gray-400">
                             {line.orgSlug}

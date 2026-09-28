@@ -1,27 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatInTimeZone } from "date-fns-tz";
 
-import {
-  fetchSupervaluFullStoreOffers,
-  fetchSupervaluMeatPilotOffers,
-  countOffersByServiceArea,
-} from "@/lib/supervalu-offers-fetch";
-import {
-  currentSupervaluOfferWeek,
-} from "@/lib/supervalu-offers-normalize";
-import {
-  persistSupervaluNationalOffers,
-  toSupervaluOffersSyncResult,
-} from "@/lib/supervalu-offers-persist";
-import {
-  buildSupervaluOffersSnapshot,
-  persistSupervaluOffersSnapshot,
-} from "@/lib/supervalu-offers-snapshot";
-import { SUPERVALU_SERVICE_AREA_MIN_COUNTS } from "@/lib/supervalu-promo-category-map";
-import {
-  SUPERVALU_MIN_FULL_STORE_OFFER_COUNT,
-  type SupervaluOffersSyncResult,
-} from "@/lib/supervalu-offers-types";
+import { currentSupervaluOfferWeek } from "@/lib/supervalu-offers-normalize";
+import { SUPERVALU_MIN_FULL_STORE_OFFER_COUNT, type SupervaluOffersSyncResult } from "@/lib/supervalu-offers-types";
 
 export {
   currentSupervaluOfferWeek,
@@ -78,99 +59,24 @@ export function shouldSkipThursdayOffersSync(
   return syncedDay === today;
 }
 
-function skippedSyncResult(
-  reason: string,
-  meta: SupervaluOfferSyncMeta,
-): SupervaluOffersSyncResult {
-  return {
-    ok: true,
-    syncBatchId: reason,
-    offerCount: meta.offerCount,
-    organizationsUpdated: 0,
-    offerWeekStart: meta.offerWeekStart ?? "",
-    offerWeekEnd: meta.offerWeekEnd ?? "",
-    syncedAt: meta.syncedAt ?? new Date().toISOString(),
-  };
-}
-
+/** Dispatch the durable multi-store crawler. A single shop is never a national source. */
 export async function syncSupervaluNationalOffers(
   supabase: SupabaseClient,
   options?: SyncSupervaluNationalOffersOptions,
 ): Promise<SupervaluOffersSyncResult> {
+  if (options?.meatPilotOnly || options?.storeId) {
+    return { ok: false, message: "National refresh requires the configured multi-store source set; single-store and meat-only publication is disabled." };
+  }
+  const { data, error } = await supabase.rpc("request_supervalu_catalog_refresh", { p_kind: "offers" });
+  if (error) return { ok: false, message: error.message };
+  if (data?.ok === false) return { ok: false, message: String(data.message ?? data.error ?? "National refresh could not be queued") };
   const meta = await loadLatestSupervaluOfferSyncMeta(supabase);
-
-  if (options?.retryOnlyIfStaleWeek) {
-    if (!isSupervaluOfferWeekStale(meta)) {
-      return skippedSyncResult("skipped-current-week", meta);
-    }
-  } else if (options?.retryOnlyIfLowCount) {
-    if (
-      meta.syncedAt &&
-      meta.offerCount >= SUPERVALU_MIN_FULL_STORE_OFFER_COUNT &&
-      !isSupervaluOfferWeekStale(meta)
-    ) {
-      return skippedSyncResult("skipped-retry", meta);
-    }
-  }
-
-  if (options?.skipIfAlreadySyncedToday && shouldSkipThursdayOffersSync(meta)) {
-    return skippedSyncResult("skipped-already-synced-today", meta);
-  }
-
-  const offers = options?.meatPilotOnly
-    ? await fetchSupervaluMeatPilotOffers(options?.storeId)
-    : await fetchSupervaluFullStoreOffers(options?.storeId);
-
-  if (
-    offers.length > 0 &&
-    offers.length < SUPERVALU_MIN_FULL_STORE_OFFER_COUNT &&
-    !options?.meatPilotOnly
-  ) {
-    console.warn(
-      "[supervalu-offers-sync] low offer count",
-      offers.length,
-      "expected at least",
-      SUPERVALU_MIN_FULL_STORE_OFFER_COUNT,
-    );
-  }
-
-  const areaCounts = countOffersByServiceArea(offers);
-  for (const [area, min] of Object.entries(SUPERVALU_SERVICE_AREA_MIN_COUNTS)) {
-    const count = areaCounts[area] ?? 0;
-    if (count < min && !options?.meatPilotOnly) {
-      console.warn(
-        "[supervalu-offers-sync] low service_area count",
-        area,
-        count,
-        "expected at least",
-        min,
-      );
-    }
-  }
-
-  const persisted = await persistSupervaluNationalOffers(supabase, offers);
-  if (!persisted.ok) return persisted;
-
-  const snapshot = buildSupervaluOffersSnapshot({
-    syncBatchId: persisted.syncBatchId,
-    syncedAt: persisted.syncedAt,
-    offerWeekStart: persisted.offerWeekStart,
-    offerWeekEnd: persisted.offerWeekEnd,
-    offers,
-  });
-  const snapshotResult = await persistSupervaluOffersSnapshot(supabase, snapshot);
-  if (!snapshotResult.ok) {
-    console.error("[supervalu-offers-sync]", snapshotResult.message);
-  }
-
-  if (!options?.skipPromptRecompile) {
-    const { regenerateCaraCustomPrompt } = await import("@/lib/cara-prompt-from-org");
-    for (const orgId of persisted.organizationIds) {
-      await regenerateCaraCustomPrompt(supabase, orgId);
-    }
-  }
-
-  return toSupervaluOffersSyncResult(persisted);
+  return {
+    ok: true, queued: true, syncBatchId: "queued-national-consensus",
+    offerCount: meta.offerCount, organizationsUpdated: 0,
+    offerWeekStart: meta.offerWeekStart ?? "", offerWeekEnd: meta.offerWeekEnd ?? "",
+    syncedAt: meta.syncedAt ?? "",
+  };
 }
 
 export async function loadLatestSupervaluOfferSyncMeta(
@@ -178,8 +84,11 @@ export async function loadLatestSupervaluOfferSyncMeta(
 ): Promise<SupervaluOfferSyncMeta> {
   const { data, error } = await supabase
     .from("retail_weekly_offers")
-    .select("synced_at, offer_week_start, offer_week_end")
+    .select("sync_batch_id, synced_at, offer_week_start, offer_week_end")
     .eq("retail_banner", "supervalu")
+    .eq("is_national", true)
+    .lte("offer_week_start", formatInTimeZone(new Date(), DUBLIN, "yyyy-MM-dd"))
+    .gte("offer_week_end", formatInTimeZone(new Date(), DUBLIN, "yyyy-MM-dd"))
     .order("synced_at", { ascending: false })
     .limit(1);
 
@@ -197,7 +106,10 @@ export async function loadLatestSupervaluOfferSyncMeta(
     .from("retail_weekly_offers")
     .select("id", { count: "exact", head: true })
     .eq("retail_banner", "supervalu")
-    .eq("synced_at", latest.synced_at);
+    .eq("is_national", true)
+    .eq("sync_batch_id", latest.sync_batch_id)
+    .lte("offer_week_start", formatInTimeZone(new Date(), DUBLIN, "yyyy-MM-dd"))
+    .gte("offer_week_end", formatInTimeZone(new Date(), DUBLIN, "yyyy-MM-dd"));
 
   return {
     syncedAt: String(latest.synced_at ?? ""),

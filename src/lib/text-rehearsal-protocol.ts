@@ -26,7 +26,7 @@ export type TextRehearsalOutboundPacket =
 
 export function encodeTextRehearsalPacket(
   packet: TextRehearsalInboundPacket | TextRehearsalOutboundPacket,
-): Uint8Array {
+): Uint8Array<ArrayBuffer> {
   return new TextEncoder().encode(JSON.stringify(packet));
 }
 

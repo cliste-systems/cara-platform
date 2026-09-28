@@ -104,7 +104,6 @@ export default async function AdminSupportTicketPage({
         description="Ticket detail"
         backHref="/admin/support"
         backLabel="Support tickets"
-        fillViewport
       >
         <AdminErrorCard message={loadError} />
       </AdminPageShell>
@@ -139,7 +138,6 @@ export default async function AdminSupportTicketPage({
       description={description}
       backHref="/admin/support"
       backLabel="Support tickets"
-      fillViewport
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <TicketStatusChip status={ticket.status} />

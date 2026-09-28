@@ -109,8 +109,7 @@ export default async function AdminCustomersPage({
     <AdminPageShell
       icon={Users}
       title="Customers"
-      description="Managed custom jobs and self-serve SaaS accounts — provision, configure, and support from one place."
-      fillViewport
+      description="Set up retail stores, connect their organisations, and manage client access."
     >
       {loadError ? (
         <p className="text-sm text-red-700" role="alert">
@@ -160,6 +159,7 @@ export default async function AdminCustomersPage({
                       >
                         {displayCustomerName(row.name)}
                       </Link>
+                      {row.accountName ? <span className="mt-1 block text-xs text-gray-500">{row.accountName}</span> : null}
                       {row.slug ? (
                         <span className="mt-0.5 block font-mono text-xs text-gray-400">
                           {row.slug}

@@ -1,3 +1,4 @@
+import { isRetailOfferObservationFresh } from "@/lib/retail-offer-freshness";
 import { formatInTimeZone } from "date-fns-tz";
 
 const DUBLIN = "Europe/Dublin";
@@ -11,6 +12,7 @@ export type RetailPromotionRow = {
   label: string | null;
   valid_from: string;
   valid_to: string;
+  synced_at?: string | null;
 };
 
 export type RetailStorePriceListing = {
@@ -50,13 +52,43 @@ function positiveNumber(value: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/** Retailer bundle terms are independent of an individual selling price. */
+export function parseRetailMultibuyLabel(label: string | null | undefined): {
+  kind: "quantity_total" | "buy_get" | "mix_match" | "generic";
+  quantity: number | null;
+  totalEur: number | null;
+  buyQuantity: number | null;
+  getQuantity: number | null;
+  benefit: string | null;
+  mixMatch: boolean;
+} | null {
+  const numbers: Record<string, string> = { one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9", ten: "10" };
+  const text = String(label ?? "").toLowerCase().replace(/[-–]/g, " ")
+    .replace(/\b(?:bogo|bogof)\b/g, "buy 1 get 1 free")
+    .replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\b/g, (word) => numbers[word]!);
+  const mixMatch = /\bmix\s*(?:&|and)\s*match\b/.test(text);
+  const base = { quantity: null, totalEur: null, buyQuantity: null, getQuantity: null, benefit: null, mixMatch };
+  const total = text.match(/\b(\d+)\s+for\s+[€£]?\s*(\d+(?:[.,]\d{1,2})?)/);
+  if (total) {
+    const quantity = Number(total[1]);
+    const totalEur = Number(total[2]!.replace(",", "."));
+    return quantity >= 2 && totalEur > 0 ? { ...base, kind: "quantity_total", quantity, totalEur } : null;
+  }
+  const buyGet = text.match(/\bbuy\s+(\d+)\s+(?:and\s+)?get\s+(\d+)\s+(free|half\s+price|\d+\s*%\s*off)/);
+  if (buyGet && Number(buyGet[1]) > 0 && Number(buyGet[2]) > 0) {
+    return { ...base, kind: "buy_get", buyQuantity: Number(buyGet[1]), getQuantity: Number(buyGet[2]), benefit: buyGet[3]!.replace(/\s+/g, " ") };
+  }
+  if (mixMatch) return { ...base, kind: "mix_match" };
+  return /\bmulti\s*buys?\b/.test(text) ? { ...base, kind: "generic" } : null;
+}
+
 export function inferPromotionTypeFromLabel(
   label: string | null | undefined,
 ): string | null {
   const value = String(label ?? "").trim();
   if (!value) return null;
+  if (parseRetailMultibuyLabel(value)) return "multibuy";
   if (/real\s+rewards|rewards?\s+price/i.test(value)) return "loyalty";
-  if (/\b\d+\s*for\s*[€£]?\s*\d/i.test(value)) return "multibuy";
   if (/half[ -]?price|50\s*%\s*off/i.test(value)) return "half_price";
   if (/save\s*\d+(?:[.,]\d+)?\s*%/i.test(value)) return "percentage";
   if (/save\s*[€£]\s*\d/i.test(value)) return "money_off";
@@ -133,7 +165,7 @@ function buildPresentation(input: {
         : null),
     isMultibuy:
       inferred === "multibuy" ||
-      /\b\d+\s*for\s*[€£]?\s*\d/i.test(input.offerLabel ?? ""),
+      parseRetailMultibuyLabel(input.offerLabel) != null,
     multibuyQuantity: multibuy?.quantity ?? null,
     multibuyTotalEur: multibuy?.totalEur ?? null,
     multibuySavingEur: multibuySaving,
@@ -148,7 +180,7 @@ export function resolveStoredRetailPrice(
 ): RetailPricePresentation {
   const today = formatInTimeZone(reference, DUBLIN, "yyyy-MM-dd");
   const activePromotions = (listing.retail_promotions ?? []).filter(
-    (promo) => promo.valid_from <= today && promo.valid_to >= today,
+    (promo) => promo.valid_from <= today && promo.valid_to >= today && isRetailOfferObservationFresh(promo.synced_at, reference),
   );
   const promo =
     activePromotions.find((row) => row.loyalty_required === true) ??
@@ -157,8 +189,9 @@ export function resolveStoredRetailPrice(
 
   const current =
     positiveNumber(promo?.offer_price_eur) ??
-    positiveNumber(listing.display_price_eur) ??
-    positiveNumber(listing.regular_price_eur);
+    (promo
+      ? positiveNumber(listing.display_price_eur) ?? positiveNumber(listing.regular_price_eur)
+      : positiveNumber(listing.regular_price_eur) ?? positiveNumber(listing.display_price_eur));
   const regular =
     positiveNumber(promo?.regular_price_eur) ??
     positiveNumber(listing.regular_price_eur);
@@ -167,7 +200,7 @@ export function resolveStoredRetailPrice(
     currentPriceEur: current,
     regularPriceEur: regular,
     pricePerUnit: listing.price_per_unit,
-    offerLabel: promo?.label ?? listing.source_price_label,
+    offerLabel: promo?.label ?? null,
     promotionType: promo?.promotion_type ?? null,
     loyaltyRequired: promo?.loyalty_required === true,
     loyaltyProgram: promo?.loyalty_program ?? null,

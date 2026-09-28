@@ -1,4 +1,4 @@
-/** Cartesia "Siobhan - Warm Welcomer" — same default as code-base-2 voice worker. */
+/** Cartesia "Siobhan - Warm Welcomer" — same default as cara-voice-platform voice worker. */
 export const CARTESIA_SIOBHAN_VOICE_ID =
   "d79d2b77-9192-4e10-9407-5d43ca034803";
 
@@ -9,7 +9,7 @@ export function isCartesiaVoiceId(voiceId: string | null | undefined): boolean {
   );
 }
 
-/** LiveKit Inference TTS model — aligned with code-base-2 `resolveTtsConfig`. */
+/** LiveKit Inference TTS model — aligned with cara-voice-platform `resolveTtsConfig`. */
 export function resolveLiveKitTtsModel(): string {
   return (
     process.env.LIVEKIT_INFERENCE_TTS_MODEL?.trim() || "cartesia/sonic-3.6"
@@ -21,7 +21,7 @@ export function resolveLiveKitTtsLanguage(): string {
 }
 
 /**
- * Resolve Cartesia voice id for previews — same order as code-base-2
+ * Resolve Cartesia voice id for previews — same order as cara-voice-platform
  * `resolveTtsConfig` / `resolveCartesiaVoiceId`.
  */
 export function resolveOrgCartesiaVoiceId(

@@ -10,11 +10,14 @@ import {
   formatOwnBrandFallbackQuote,
   inferCatalogOfferBrowseCategories,
   inferCatalogSearchIntent,
+  searchSupervaluCatalogLive,
   normalizeCatalogBrandQuery,
   normalizeSupervaluCatalogProduct,
   stripCatalogPackagingNoise,
   stripCatalogSearchBoilerplate,
 } from "./supervalu-catalog-search";
+
+import { currentSupervaluOfferWeek } from "./supervalu-offers-normalize";
 
 describe("supervalu catalog search", () => {
   it("normalizes any gateway product with a name", () => {
@@ -317,4 +320,74 @@ describe("supervalu catalog search", () => {
     assert.match(quote, /Wagyu Sirloin/i);
     assert.doesNotMatch(quote, /never sell/i);
   });
+});
+
+describe("national product tool integration", () => {
+  function database(rows: Record<string, unknown>[], rpcRows: Record<string, unknown>[] = []) {
+    const calls: Record<string, unknown>[] = [];
+    return {
+      calls,
+      async rpc(_name: string, args: Record<string, unknown>) { calls.push(args); return { data: rpcRows, error: null }; },
+      from(table: string) {
+        assert.equal(table, "retail_weekly_offers", "offer browse must not fall back to regular-price catalogue");
+        const equals: Array<[string, unknown]> = [];
+        return {
+          select() { return this; },
+          eq(key: string, value: unknown) { equals.push([key, value]); return this; },
+          order() { return this; },
+          async range(from: number, to: number) {
+            return { data: rows.filter((row) => equals.every(([key, value]) => row[key] === value)).slice(from, to + 1), error: null };
+          },
+        };
+      },
+    };
+  }
+  function row(name: string, label = "Only €4", fulfilment = "counter") {
+    const week = currentSupervaluOfferWeek();
+    return {
+      id: name, retail_banner: "supervalu", is_national: true, product_name: name,
+      department: "Meat", service_area: "butcher", fulfilment, offer_channel: fulfilment === "counter" ? "butcher_counter" : "prepack",
+      current_price_eur: 4, was_price_eur: null, discount_label: label, search_text: name.toLowerCase(),
+      offer_week_start: week.start, offer_week_end: week.end, synced_at: new Date().toISOString(),
+    };
+  }
+
+  it("returns verified meat offers through the same search used by calls", async () => {
+    const db = database([row("Counter Beef"), row("Prepack Chicken", "Only €4", "prepack"), { ...row("Local Pork"), is_national: false }]);
+    const matches = await searchSupervaluCatalogLive("is there any meat offers in the meat counter this week", { supabase: db as never, retailBanner: "supervalu" });
+    assert.deepEqual(matches.map((match) => match.productName), ["Counter Beef"]);
+  });
+
+  it("wires the exact multibuy RPC while keeping verified weekly fallback", async () => {
+    const db = database([row("Bundle Beef", "3 for €10"), row("Other Beef", "2 for €5")]);
+    const matches = await searchSupervaluCatalogLive("three for ten euro meat offers", { supabase: db as never, retailBanner: "supervalu" });
+    assert.equal(db.calls[0]?.p_mechanic, "multibuy");
+    assert.equal(db.calls[0]?.p_quantity, 3);
+    assert.equal(db.calls[0]?.p_total_eur, 10);
+    assert.equal(db.calls[0]?.p_service_area, "butcher");
+    assert.deepEqual(matches.map((match) => match.productName), ["Bundle Beef"]);
+  });
+
+  it("never fills an absent named campaign with other offers", async () => {
+    const db = database([row("Ordinary Beef")]);
+    assert.deepEqual(await searchSupervaluCatalogLive("Super 7 offers", { supabase: db as never, retailBanner: "supervalu" }), []);
+    assert.equal(db.calls[0]?.p_named_phrase, "super 7");
+  });
+
+  it("recognises general promotion wording as an offer browse", async () => {
+    for (const query of ["promotions", "any deals", "weekly specials", "current offers"]) {
+      assert.equal(inferCatalogSearchIntent(query), "offer");
+      const matches = await searchSupervaluCatalogLive(query, { supabase: database([row("Current Beef")]) as never, retailBanner: "supervalu" });
+      assert.equal(matches.length, 1, query);
+    }
+  });
+});
+
+it("quotes catalog bundle mechanics independently of their single-item price", () => {
+  for (const currentPriceEur of [null, 4]) {
+    const quote = formatCatalogStockQuote({ productName: "Breakfast Cereal", discountLabel: "BOGOF", isOnOffer: true, currentPriceEur, intent: "offer" });
+    assert.match(quote, /buy one get one free/i);
+    assert.doesNotMatch(quote, /not showing as on offer|on offer.*at four|zero euro/i);
+    if (currentPriceEur == null) assert.doesNotMatch(quote, /single item price/i);
+  }
 });

@@ -32,9 +32,11 @@ import {
   type OrganizationNiche,
   isOrganizationNiche,
   parseOrganizationNiche,
-  PRODUCT_NAME_BY_NICHE,
 } from "@/lib/organization-niche";
-import { sendInviteEmail } from "@/lib/invite-email";
+import { userNeedsPassword } from "@/lib/invite-onboarding";
+import { userHasCurrentLegalAcceptances } from "@/lib/legal-acceptance-status";
+import { clientSlug, supportsInvoiceClientSetup, type ClientAccountOption, type ClientAccountSelection } from "@/lib/admin-client-account";
+import { deliverClientInvitation, findClientAuthUser, validateClientAccountUser } from "@/lib/admin-client-invitation";
 import {
   buildSecurityEventContext,
   logSecurityEvent,
@@ -216,31 +218,41 @@ async function getAppOriginForRedirect(
 }
 
 export type CreateOrganizationResult =
-  | { ok: true; organizationId: string; warning?: string }
+  | { ok: true; organizationId: string; accountId: string; inviteSent: boolean; warning?: string }
   | { ok: false; message: string };
 
 function formatAuthError(message: string): string {
-  const m = message.toLowerCase();
-  if (
-    m.includes("rate limit") ||
-    m.includes("too many emails") ||
-    m.includes("email rate limit")
-  ) {
-    return (
-      "Email rate limit exceeded. Supabase's built-in email service only allows a handful of messages per hour. " +
-      "Wait and try again, or connect custom SMTP under Supabase → Authentication → Emails → SMTP Settings " +
-      "(e.g. Resend or Amazon SES) for production volume."
-    );
-  }
-  if (
-    m.includes("already been registered") ||
-    m.includes("already registered") ||
-    m.includes("user already exists") ||
-    m.includes("duplicate")
-  ) {
-    return "An account with this email already exists. Use a different owner email or reset the user in Supabase Auth.";
+  if (/rate limit|too many emails/i.test(message)) {
+    return "The email service is temporarily limiting invitations. Wait a few minutes and retry the invitation.";
   }
   return message;
+}
+
+export async function listClientAccounts(): Promise<
+  { ok: true; accounts: ClientAccountOption[] } | { ok: false; message: string }
+> {
+  await assertAdminOperator();
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin.from("accounts")
+      .select("id, name, billing_email, billing_contact_name, billing_address, billing_vat_number, billing_method, platform_subscription_id, organizations(id, niche)")
+      .eq("status", "active")
+      .or("billing_method.eq.manual_invoice,billing_method.is.null")
+      .order("name");
+    if (error) throw new Error(error.message);
+    return { ok: true, accounts: (data ?? []).filter((account) => supportsInvoiceClientSetup({ billingMethod: account.billing_method, subscriptionId: account.platform_subscription_id, storeNiches: account.organizations.map((store) => store.niche) })).map((account) => ({
+      id: account.id,
+      name: account.name,
+      billing_email: account.billing_email,
+      billing_contact_name: account.billing_contact_name,
+      billing_address: account.billing_address,
+      billing_vat_number: account.billing_vat_number,
+      billing_method: account.billing_method,
+      storeCount: account.organizations?.length ?? 0,
+    })) };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Could not load organisations." };
+  }
 }
 
 export async function createOrganization(payload: {
@@ -253,339 +265,220 @@ export async function createOrganization(payload: {
   ownerMobile?: string | null;
   assignPhoneNumber?: boolean;
   niche?: OrganizationNiche;
-  /** Optional; shown on the public book directory and used for distance search */
+  account: ClientAccountSelection;
   address?: string | null;
-  /** Optional; geocoded with address via Google Geocoding API (Ireland) */
   storefrontEircode?: string | null;
-  /** From `window.location.origin` so invite redirect matches this app */
   clientOrigin?: string | null;
 }): Promise<CreateOrganizationResult> {
   const operator = await assertAdminOperator();
   const name = payload.name.trim();
   const slug = payload.slug.trim().toLowerCase();
-  const tier = payload.tier;
-  const planTier =
-    payload.planTier && isPlanTier(payload.planTier) ? payload.planTier : "pro";
   const ownerEmail = payload.ownerEmail.trim().toLowerCase();
   const ownerName = payload.ownerName.trim();
-  const ownerMobile = (payload.ownerMobile ?? "").trim();
+  const address = payload.address?.trim() || null;
+  const storefrontEircode = payload.storefrontEircode?.trim().toUpperCase() || null;
   const assignPhoneNumber = payload.assignPhoneNumber !== false;
-
-  if (!name || !slug) {
-    return { ok: false, message: "Name and slug are required." };
+  const validEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  if (!name || name.length > 200 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 120) {
+    return { ok: false, message: "Enter a store name and a valid store identifier (letters, numbers and hyphens)." };
   }
-
-  if (!ownerName) {
-    return { ok: false, message: "Owner name is required." };
-  }
-
-  if (!ownerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) {
-    return { ok: false, message: "A valid owner email is required." };
-  }
-
-  if (tier !== "connect" && tier !== "native") {
-    return { ok: false, message: "Invalid tier." };
-  }
-
-  const niche: OrganizationNiche =
-    payload.niche && isOrganizationNiche(payload.niche)
-      ? payload.niche
-      : "retail";
-
-    const addressTrim = (payload.address ?? "").trim();
-    const eircodeTrim = (payload.storefrontEircode ?? "").trim();
-  let mapLat: number | null = null;
-  let mapLng: number | null = null;
-  const geoQuery = [addressTrim, eircodeTrim].filter(Boolean).join(", ");
-  if (geoQuery) {
-    const g = await geocodeIrelandLocation(geoQuery);
-    if (g) {
-      mapLat = g.lat;
-      mapLng = g.lng;
-    }
-  }
-
-  let admin;
-  try {
-    admin = createAdminClient();
-  } catch (e) {
-    return {
-      ok: false,
-      message: e instanceof Error ? e.message : "Admin client unavailable.",
-    };
+  if (!ownerName || !validEmail(ownerEmail)) return { ok: false, message: "Enter the client's name and a valid invitation email." };
+  if (payload.niche && payload.niche !== "retail") return { ok: false, message: "New clients must be retail stores." };
+  const selection = payload.account;
+  if (!selection || !["new", "existing"].includes(selection.mode)) return { ok: false, message: "Create or select the legal organisation that owns this store." };
+  if (selection.mode === "existing" && !UUID_RE.test(selection.id)) return { ok: false, message: "Select a valid organisation." };
+  if (selection.mode === "new" && (!selection.name.trim() || !validEmail(selection.billingEmail.trim()) || !selection.billingAddress.trim())) {
+    return { ok: false, message: "The legal organisation name, invoice email and billing address are required." };
   }
 
   let organizationId: string | null = null;
-  let userId: string | null = null;
-
+  let accountId: string | null = null;
+  let inviteSent = false;
   try {
-    const { data: accountRow, error: accountError } = await admin
-      .from("accounts")
-      .insert({
-        name,
-        slug,
+    const admin = createAdminClient();
+    const existingUser = await findClientAuthUser(admin, ownerEmail);
+    await validateClientAccountUser(admin, existingUser, selection.mode === "existing" ? selection.id : null);
+    let accountName: string;
+    let planTier: PlanTier = "pro";
+    let isPrimaryLocation = true;
+    let existingBillingUpdate: Record<string, string> | null = null;
+    if (selection.mode === "existing") {
+      const { data: account, error } = await admin.from("accounts")
+        .select("id, name, status, plan_tier, billing_method, billing_email, billing_address, platform_subscription_id, organizations(niche)")
+        .eq("id", selection.id).maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!account || account.status !== "active" || !supportsInvoiceClientSetup({ billingMethod: account.billing_method, subscriptionId: account.platform_subscription_id, storeNiches: account.organizations.map((store) => store.niche) })) {
+        return { ok: false, message: "Select an active organisation with invoice billing. Refresh the organisation list and try again." };
+      }
+      const invoiceEmail = account.billing_email?.trim() || selection.billingEmail?.trim().toLowerCase();
+      const invoiceAddress = account.billing_address?.trim() || selection.billingAddress?.trim();
+      if (!invoiceEmail || !validEmail(invoiceEmail) || !invoiceAddress) return { ok: false, message: "Add the organisation’s invoice email and billing address before continuing." };
+      existingBillingUpdate = { billing_method: "manual_invoice" };
+      if (!account.billing_email?.trim()) existingBillingUpdate.billing_email = invoiceEmail;
+      if (!account.billing_address?.trim()) existingBillingUpdate.billing_address = invoiceAddress;
+      accountId = account.id;
+      accountName = account.name;
+      planTier = isPlanTier(account.plan_tier) ? account.plan_tier : "pro";
+      const { count, error: countError } = await admin.from("organizations").select("id", { count: "exact", head: true }).eq("account_id", account.id);
+      if (countError) throw new Error(countError.message);
+      isPrimaryLocation = count === 0;
+    } else {
+      accountName = selection.name.trim();
+      const { data: account, error } = await admin.from("accounts").insert({
+        name: accountName,
+        slug: `${clientSlug(accountName) || "organisation"}-${crypto.randomUUID().slice(0, 8)}`,
         status: "active",
         launch_status: "not_started",
         plan_tier: planTier,
-      })
-      .select("id")
-      .single();
-
-    if (accountError || !accountRow?.id) {
-      return {
-        ok: false,
-        message: accountError?.message ?? "Could not create account.",
-      };
+        billing_method: "manual_invoice",
+        billing_email: selection.billingEmail.trim().toLowerCase(),
+        billing_contact_name: selection.billingContactName?.trim() || null,
+        billing_address: selection.billingAddress.trim(),
+        billing_vat_number: selection.billingVatNumber?.trim() || null,
+      }).select("id").single();
+      if (error || !account) throw new Error(error?.message ?? "Could not create the organisation.");
+      accountId = account.id;
     }
-
-    const accountId = accountRow.id as string;
-
-    const { data: orgRow, error: orgError } = await admin
-      .from("organizations")
-      .insert({
-        account_id: accountId,
-        is_primary_location: true,
-        name,
-        slug,
-        tier,
-        plan_tier: planTier,
-        niche,
-        is_active: niche === "retail" ? false : true,
-        notification_phone: ownerMobile || null,
-        address: addressTrim || null,
-        storefront_eircode: eircodeTrim || null,
-        storefront_map_lat: mapLat,
-        storefront_map_lng: mapLng,
-        agent_location_address: addressTrim || null,
-        agent_location_eircode: eircodeTrim || null,
-        retail_banner: niche === "retail" ? "supervalu" : null,
-        ...(niche === "retail" ? { routing_links: buildRetailRoutePack({}) } : {}),
-      })
-      .select("id")
-      .single();
-
-    if (orgError || !orgRow?.id) {
-      await admin.from("accounts").delete().eq("id", accountId);
-      return {
-        ok: false,
-        message: orgError?.message ?? "Could not create organization.",
-      };
+    if (existingBillingUpdate) {
+      const { error: billingError } = await admin.from("accounts").update(existingBillingUpdate).eq("id", accountId);
+      if (billingError) throw new Error(`Invoice billing could not be updated: ${billingError.message}`);
     }
-
-    organizationId = orgRow.id as string;
-
-    const appOrigin = await getAppOriginForRedirect(payload.clientOrigin);
-    const inviteRedirectTo = `${appOrigin}/auth/callback`;
-
-    const productName =
-      PRODUCT_NAME_BY_NICHE[parseOrganizationNiche(niche)];
-
-    const inviteResult = await sendInviteEmail({
-      email: ownerEmail,
-      recipientName: ownerName,
-      businessName: name,
-      productName,
-      redirectTo: inviteRedirectTo,
-      admin,
-    });
-
-    if (!inviteResult.ok) {
-      await admin.from("organizations").delete().eq("id", organizationId);
-      return {
-        ok: false,
-        message: formatAuthError(inviteResult.message),
-      };
+    const geoQuery = [address, storefrontEircode].filter(Boolean).join(", ");
+    const coordinates = geoQuery ? await geocodeIrelandLocation(geoQuery) : null;
+    const { data: store, error: storeError } = await admin.from("organizations").insert({
+      account_id: accountId,
+      is_primary_location: isPrimaryLocation,
+      name,
+      slug,
+      tier: "native",
+      plan_tier: planTier,
+      niche: "retail",
+      status: "active",
+      onboarding_step: 7,
+      is_active: false,
+      notification_phone: payload.ownerMobile?.trim() || null,
+      address,
+      storefront_eircode: storefrontEircode,
+      storefront_map_lat: coordinates?.lat ?? null,
+      storefront_map_lng: coordinates?.lng ?? null,
+      agent_location_address: address,
+      agent_location_eircode: storefrontEircode,
+      retail_banner: "supervalu",
+      routing_links: buildRetailRoutePack({}),
+    }).select("id").single();
+    if (storeError || !store) {
+      // Only this request's unused parent may be removed. Existing organisations and users are never deleted.
+      if (selection.mode === "new") await admin.from("accounts").delete().eq("id", accountId);
+      throw new Error(storeError?.message ?? "Could not save the store.");
     }
-
-    userId = inviteResult.userId;
-
-    const { error: inviteRowError } = await admin.from("admin_invites").insert({
+    organizationId = store.id;
+    const { data: invite, error: inviteError } = await admin.from("admin_invites").insert({
       organization_id: organizationId,
       email: ownerEmail,
       recipient_name: ownerName,
-      invited_by: operator.id,
-      sent_at: new Date().toISOString(),
+      invited_by: UUID_RE.test(operator.id) ? operator.id : null,
+      user_id: existingUser?.id ?? null,
+      sent_at: null,
+      delivery_status: "pending",
+    }).select("id").single();
+    if (inviteError || !invite) throw new Error(`The store was saved, but the invitation record could not be saved: ${inviteError?.message ?? "unknown error"}`);
+
+    const appOrigin = await getAppOriginForRedirect(payload.clientOrigin);
+    const invitation = await deliverClientInvitation({
+      admin, inviteId: invite.id, organizationId: store.id, accountId: accountId!,
+      email: ownerEmail, recipientName: ownerName, businessName: name, organizationName: accountName,
+      redirectTo: `${appOrigin}/auth/callback`,
     });
-
-    if (inviteRowError) {
-      await admin.auth.admin.deleteUser(userId);
-      await admin.from("organizations").delete().eq("id", organizationId);
-      await admin.from("accounts").delete().eq("id", accountId);
-      return {
-        ok: false,
-        message: `Invite record could not be saved: ${inviteRowError.message}`,
-      };
-    }
-
-    const { error: profileError } = await admin.from("profiles").insert({
-      id: userId,
-      account_id: accountId,
-      organization_id: organizationId,
-      active_organization_id: organizationId,
-      role: "admin",
-      name: ownerName,
-    });
-
-    if (profileError) {
-      await admin.auth.admin.deleteUser(userId);
-      await admin.from("organizations").delete().eq("id", organizationId);
-      await admin.from("accounts").delete().eq("id", accountId);
-      return {
-        ok: false,
-        message: `Profile could not be created: ${profileError.message}`,
-      };
-    }
-
-    await admin.from("account_memberships").insert({
-      user_id: userId,
-      account_id: accountId,
-      role: "admin",
-    });
-
-    let warning: string | undefined;
+    inviteSent = invitation.ok;
+    const warnings: string[] = [];
+    if (!invitation.ok) warnings.push(`The store is saved. The invitation was not sent: ${formatAuthError(invitation.message)} Retry the invitation below; do not create the store again.`);
+    else if (invitation.warning) warnings.push(invitation.warning);
     if (assignPhoneNumber) {
-      const phoneResult = await provisionOrganizationPhoneNumber(organizationId);
-      if (!phoneResult.ok) {
-        warning = phoneResult.message;
+      try {
+        const phone = await provisionOrganizationPhoneNumber(store.id);
+        if (!phone.ok) warnings.push(`Phone assignment needs attention: ${phone.message}`);
+      } catch {
+        warnings.push("The store is saved, but a phone number could not be assigned. Assign it from the store setup page.");
       }
     }
-
     revalidatePath("/admin");
     revalidatePath("/admin/customers");
     await recordAdminEvent(operator, {
-      eventType: "admin_organization_created",
-      outcome: "success",
-      targetUserId: userId,
+      eventType: "admin_organization_created", outcome: "success",
+      targetUserId: invitation.ok ? invitation.userId : existingUser?.id,
       targetEmail: ownerEmail,
-      metadata: {
-        organization_id: organizationId,
-        slug,
-        tier,
-        plan_tier: planTier,
-        niche,
-        assign_phone: assignPhoneNumber,
-      },
+      metadata: { organization_id: store.id, account_id: accountId, slug, niche: "retail", billing_method: "manual_invoice", invite_sent: inviteSent },
     });
-    return { ok: true, organizationId, warning };
-  } catch (e) {
-    if (userId) {
-      try {
-        await admin.auth.admin.deleteUser(userId);
-      } catch {
-        /* best effort */
-      }
+    return { ok: true, organizationId: store.id, accountId: accountId!, inviteSent, warning: warnings.join(" ") || undefined };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Client setup could not be completed.";
+    await recordAdminEvent(operator, { eventType: "admin_organization_create_failed", outcome: "failure", targetEmail: ownerEmail, metadata: { organization_id: organizationId, account_id: accountId, reason: message } });
+    if (organizationId && accountId) {
+      revalidatePath("/admin/customers");
+      return { ok: true, organizationId, accountId, inviteSent, warning: `${message} Your store has been kept. Open the store to finish setup; do not create it again.` };
     }
-    if (organizationId) {
-      try {
-        await admin.from("organizations").delete().eq("id", organizationId);
-      } catch {
-        /* best effort */
-      }
-    }
-    await recordAdminEvent(operator, {
-      eventType: "admin_organization_create_failed",
-      outcome: "failure",
-      targetEmail: ownerEmail,
-      metadata: { slug, tier, niche, reason: e instanceof Error ? e.message : "unknown" },
-    });
-    return {
-      ok: false,
-      message:
-        e instanceof Error
-          ? e.message
-          : "Provisioning failed. No changes were kept.",
-    };
+    return { ok: false, message };
   }
 }
 
 export type ResendOrganizationInviteResult =
-  | { ok: true }
+  | { ok: true; warning?: string }
   | { ok: false; message: string };
 
 export async function resendOrganizationInvite(
   organizationId: string,
+  savedContact?: { email: string; name: string },
 ): Promise<ResendOrganizationInviteResult> {
   const operator = await assertAdminOperator();
   const id = organizationId.trim();
-  if (!UUID_RE.test(id)) {
-    return { ok: false, message: "Invalid organization id." };
-  }
-
-  let admin;
+  if (!UUID_RE.test(id)) return { ok: false, message: "Invalid store id." };
   try {
-    admin = createAdminClient();
-  } catch (e) {
-    return {
-      ok: false,
-      message: e instanceof Error ? e.message : "Admin client unavailable.",
-    };
+    const admin = createAdminClient();
+    const { data: org, error: orgError } = await admin.from("organizations")
+      .select("id, name, account_id, accounts(name)").eq("id", id).maybeSingle();
+    if (orgError || !org?.account_id) return { ok: false, message: orgError?.message ?? "Store not found." };
+    const { data: existingInvite, error: inviteError } = await admin.from("admin_invites")
+      .select("id, email, recipient_name, accepted_at").eq("organization_id", id)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (inviteError) return { ok: false, message: inviteError.message };
+    let invite = existingInvite;
+    if (!invite && savedContact) {
+      const email = savedContact.email.trim().toLowerCase();
+      const name = savedContact.name.trim();
+      if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, message: "A valid client contact is required to retry setup." };
+      const user = await findClientAuthUser(admin, email);
+      await validateClientAccountUser(admin, user, org.account_id);
+      const { data: saved, error } = await admin.from("admin_invites").insert({
+        organization_id: id, email, recipient_name: name, user_id: user?.id ?? null,
+        invited_by: UUID_RE.test(operator.id) ? operator.id : null, sent_at: null, delivery_status: "pending",
+      }).select("id, email, recipient_name, accepted_at").single();
+      if (error) return { ok: false, message: `The store is saved, but its invitation could not be recorded: ${error.message}` };
+      invite = saved;
+    }
+    if (!invite?.email) return { ok: false, message: "No invitation is on file for this store. Its contact must be added before an invitation can be sent." };
+    if (invite.accepted_at) {
+      const invitedUser = await findClientAuthUser(admin, invite.email);
+      if (invitedUser && !userNeedsPassword(invitedUser) && await userHasCurrentLegalAcceptances(invitedUser.id, id)) {
+        return { ok: false, message: "This client has already completed account setup. They can sign in with their existing password." };
+      }
+    }
+    const appOrigin = await getAppOriginForRedirect(null);
+    const account = Array.isArray(org.accounts) ? org.accounts[0] : org.accounts;
+    const sent = await deliverClientInvitation({
+      admin, inviteId: invite.id, organizationId: id, accountId: org.account_id,
+      email: invite.email, recipientName: invite.recipient_name ?? "", businessName: org.name,
+      organizationName: account?.name ?? org.name, redirectTo: `${appOrigin}/auth/callback`,
+    });
+    revalidatePath("/admin");
+    revalidatePath("/admin/customers");
+    revalidatePath(`/admin/customers/${id}`);
+    revalidatePath(`/admin/organizations/${id}`);
+    if (!sent.ok) return { ok: false, message: formatAuthError(sent.message) };
+    await recordAdminEvent(operator, { eventType: "admin_invite_resent", outcome: "success", targetUserId: sent.userId, targetEmail: invite.email, metadata: { organization_id: id, account_id: org.account_id } });
+    return { ok: true, warning: sent.warning };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "The invitation could not be sent." };
   }
-
-  const { data: org } = await admin
-    .from("organizations")
-    .select("id, name, niche")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (!org?.id) {
-    return { ok: false, message: "Organization not found." };
-  }
-
-  const { data: invite } = await admin
-    .from("admin_invites")
-    .select("id, email, recipient_name, accepted_at")
-    .eq("organization_id", id)
-    .order("sent_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!invite?.email) {
-    return { ok: false, message: "No invite on file for this organization." };
-  }
-
-  if (invite.accepted_at) {
-    return { ok: false, message: "Owner has already accepted the invite." };
-  }
-
-  const appOrigin = await getAppOriginForRedirect(null);
-  const inviteRedirectTo = `${appOrigin}/auth/callback`;
-  const niche = parseOrganizationNiche(org.niche);
-  const productName = PRODUCT_NAME_BY_NICHE[niche];
-
-  const inviteResult = await sendInviteEmail({
-    email: invite.email,
-    recipientName: String(invite.recipient_name ?? ""),
-    businessName: String(org.name ?? ""),
-    productName,
-    redirectTo: inviteRedirectTo,
-    admin,
-  });
-
-  if (!inviteResult.ok) {
-    return { ok: false, message: formatAuthError(inviteResult.message) };
-  }
-
-  await admin
-    .from("admin_invites")
-    .update({
-      sent_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", invite.id);
-
-  revalidatePath("/admin");
-  revalidatePath("/admin/customers");
-  revalidatePath(`/admin/organizations/${id}`);
-
-  await recordAdminEvent(operator, {
-    eventType: "admin_invite_resent",
-    outcome: "success",
-    targetUserId: inviteResult.userId,
-    targetEmail: invite.email,
-    metadata: { organization_id: id },
-  });
-
-  return { ok: true };
 }
 
 export type UpdateOrganizationNicheResult =
@@ -637,81 +530,49 @@ export type DeleteOrganizationResult =
   | { ok: true }
   | { ok: false; message: string };
 
-/**
- * Removes a tenant: deletes every auth user in the org (profiles cascade),
- * then deletes the organization row (call_logs, services, tickets cascade).
- */
-export async function deleteOrganization(
-  organizationId: string
-): Promise<DeleteOrganizationResult> {
+/** Remove a store without deleting logins that belong to the wider organisation. */
+export async function deleteOrganization(organizationId: string): Promise<DeleteOrganizationResult> {
   const operator = await assertAdminOperator();
   const id = organizationId.trim();
-  if (!UUID_RE.test(id)) {
-    return { ok: false, message: "Invalid organization id." };
-  }
-
-  let admin;
+  if (!UUID_RE.test(id)) return { ok: false, message: "Invalid store id." };
   try {
-    admin = createAdminClient();
-  } catch (e) {
-    return {
-      ok: false,
-      message: e instanceof Error ? e.message : "Admin client unavailable.",
-    };
-  }
-
-  try {
-    const { data: members, error: listError } = await admin
-      .from("profiles")
-      .select("id")
-      .eq("organization_id", id);
-
-    if (listError) {
-      return { ok: false, message: listError.message };
-    }
-
-    for (const row of members ?? []) {
-      const { error: delUserError } = await admin.auth.admin.deleteUser(
-        row.id
-      );
-      if (delUserError) {
-        return {
-          ok: false,
-          message: `Could not remove a user (${row.id}): ${delUserError.message}`,
-        };
+    const admin = createAdminClient();
+    const { data: store, error: storeError } = await admin.from("organizations")
+      .select("id, account_id, is_primary_location").eq("id", id).maybeSingle();
+    if (storeError || !store) return { ok: false, message: storeError?.message ?? "Store not found." };
+    let replacementId: string | null = null;
+    if (store.account_id) {
+      const { data: remaining, error: remainingError } = await admin.from("organizations")
+        .select("id").eq("account_id", store.account_id).neq("id", id)
+        .order("is_primary_location", { ascending: false }).order("created_at", { ascending: true }).limit(1);
+      if (remainingError) throw new Error(remainingError.message);
+      replacementId = remaining?.[0]?.id ?? null;
+      if (replacementId) {
+        // Move both legacy and active references before the deleted store's FK cascade runs.
+        const { error: profileError } = await admin.from("profiles").update({
+          organization_id: replacementId, active_organization_id: replacementId,
+          updated_at: new Date().toISOString(),
+        }).eq("account_id", store.account_id).or(`organization_id.eq.${id},active_organization_id.eq.${id}`);
+        if (profileError) throw new Error(profileError.message);
+        if (store.is_primary_location) {
+          const { error: oldPrimaryError } = await admin.from("organizations").update({ is_primary_location: false }).eq("id", id);
+          if (oldPrimaryError) throw new Error(oldPrimaryError.message);
+          const { error: primaryError } = await admin.from("organizations").update({ is_primary_location: true }).eq("id", replacementId).eq("account_id", store.account_id);
+          if (primaryError) throw new Error(primaryError.message);
+        }
       }
     }
-
-    const { error: orgDelError } = await admin
-      .from("organizations")
-      .delete()
-      .eq("id", id);
-
-    if (orgDelError) {
-      return { ok: false, message: orgDelError.message };
-    }
-
+    const { error: deleteError } = await admin.from("organizations").delete().eq("id", id);
+    if (deleteError) throw new Error(deleteError.message);
     revalidatePath("/admin");
-    await recordAdminEvent(operator, {
-      eventType: "admin_organization_deleted",
-      outcome: "success",
-      metadata: {
-        organization_id: id,
-        deleted_user_count: members?.length ?? 0,
-      },
-    });
+    revalidatePath("/admin/customers");
+    revalidatePath("/dashboard", "layout");
+    await recordAdminEvent(operator, { eventType: "admin_organization_deleted", outcome: "success", metadata: { organization_id: id, account_id: store.account_id, replacement_organization_id: replacementId, deleted_user_count: 0 } });
     return { ok: true };
-  } catch (e) {
-    await recordAdminEvent(operator, {
-      eventType: "admin_organization_delete_failed",
-      outcome: "failure",
-      metadata: { organization_id: id, reason: e instanceof Error ? e.message : "unknown" },
-    });
-    return {
-      ok: false,
-      message:
-        e instanceof Error ? e.message : "Failed to delete organization.",
-    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not delete the store.";
+    await recordAdminEvent(operator, { eventType: "admin_organization_delete_failed", outcome: "failure", metadata: { organization_id: id, reason: message } });
+    return { ok: false, message };
   }
 }
 
@@ -740,10 +601,13 @@ export async function createSupportDashboardLink(
     };
   }
 
+  const { data: store, error: storeError } = await admin.from("organizations")
+    .select("account_id").eq("id", id).maybeSingle();
+  if (storeError || !store?.account_id) return { ok: false, message: storeError?.message ?? "Store not found." };
   const { data: rows, error: listError } = await admin
     .from("profiles")
     .select("id, role")
-    .eq("organization_id", id);
+    .eq("account_id", store.account_id);
 
   if (listError) {
     return { ok: false, message: listError.message };
@@ -798,7 +662,8 @@ export async function createSupportDashboardLink(
     };
   }
 
-  const supportCookieValue = await createSupportDashboardCookieValue();
+  const supportCookieValue = await createSupportDashboardCookieValue({ userId: target.id, accountId: store.account_id, organizationId: id });
+  if (!supportCookieValue) return { ok: false, message: "Secure support access is not configured. Set the support dashboard signing secret before opening a client dashboard." };
   if (supportCookieValue) {
     (await cookies()).set(
       SUPPORT_DASHBOARD_COOKIE,
@@ -1327,7 +1192,7 @@ export type SetOrganizationLiveResult =
   | { ok: true }
   | { ok: false; message: string };
 
-const GO_LIVE_STEP_IDS = ["phone_assigned"] as const;
+const GO_LIVE_STEP_IDS = ["phone_assigned", "legal_acceptance"] as const;
 
 export async function setOrganizationLive(
   organizationId: string,

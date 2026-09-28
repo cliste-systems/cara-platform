@@ -66,23 +66,55 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient();
 
-  const { data: dedupeRow, error: dedupeErr } = await admin
+  const { error: dedupeErr } = await admin
     .from("stripe_webhook_events")
-    .insert({ event_id: event.id, event_type: event.type })
-    .select("event_id")
+    .insert({
+      event_id: event.id,
+      event_type: event.type,
+      status: "pending",
+      livemode: event.livemode,
+      payload: event,
+    })
+    .select("event_id, status")
     .maybeSingle();
   if (dedupeErr) {
     if (dedupeErr.code === "23505") {
-      return NextResponse.json({ received: true, duplicate: true });
+      const { data: existing } = await admin
+        .from("stripe_webhook_events")
+        .select("status")
+        .eq("event_id", event.id)
+        .maybeSingle();
+      if (existing?.status === "completed") {
+        return NextResponse.json({ received: true, duplicate: true });
+      }
     }
-    await captureObservedError(dedupeErr, {
-      route: "stripe/webhook",
-      eventId: event.id,
-    });
-    return new NextResponse("dedupe error", { status: 500 });
+    if (dedupeErr.code !== "23505") {
+      await captureObservedError(dedupeErr, {
+        route: "stripe/webhook",
+        eventId: event.id,
+      });
+      return new NextResponse("dedupe error", { status: 500 });
+    }
   }
-  if (!dedupeRow) {
-    return NextResponse.json({ received: true, duplicate: true });
+
+  const { data: claimedEvent, error: claimErr } = await admin
+    .from("stripe_webhook_events")
+    .update({
+      status: "processing",
+      attempts: 1,
+      processing_started_at: new Date().toISOString(),
+      last_error: null,
+    })
+    .eq("event_id", event.id)
+    .in("status", ["pending", "failed"])
+    .select("event_id")
+    .maybeSingle();
+  if (claimErr) {
+    await captureObservedError(claimErr, { route: "stripe/webhook", eventId: event.id });
+    return new NextResponse("webhook claim error", { status: 500 });
+  }
+  if (!claimedEvent) {
+    return NextResponse.json({ received: true, in_progress: true });
   }
 
   try {
@@ -111,10 +143,55 @@ export async function POST(req: NextRequest) {
         await handleSetupIntentSucceeded(setupIntent);
         break;
       }
+      case "invoice.created":
+      case "invoice.finalized":
+      case "invoice.finalization_failed":
+      case "invoice.updated":
+      case "invoice.paid":
+      case "invoice.payment_failed":
+      case "invoice.voided":
+      case "invoice.marked_uncollectible": {
+        await syncBillingInvoice(admin, event.data.object as Stripe.Invoice, event.livemode);
+        break;
+      }
+      case "payment_intent.succeeded":
+      case "payment_intent.processing":
+      case "payment_intent.payment_failed": {
+        await syncBillingPaymentIntent(
+          admin,
+          event.data.object as Stripe.PaymentIntent,
+          event.livemode,
+        );
+        break;
+      }
+      case "charge.refunded":
+      case "charge.dispute.created":
+      case "charge.dispute.updated":
+      case "charge.dispute.closed": {
+        await syncBillingAdjustment(admin, event.data.object as Stripe.Charge | Stripe.Dispute, event.type, event.livemode);
+        break;
+      }
       default:
         break;
     }
+    await admin
+      .from("stripe_webhook_events")
+      .update({
+        status: "completed",
+        processed_at: new Date().toISOString(),
+        processing_started_at: null,
+      })
+      .eq("event_id", event.id);
   } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown webhook error";
+    await admin
+      .from("stripe_webhook_events")
+      .update({
+        status: "failed",
+        last_error: message.slice(0, 2000),
+        next_attempt_at: new Date(Date.now() + 60_000).toISOString(),
+      })
+      .eq("event_id", event.id);
     await captureObservedError(err, {
       route: "stripe/webhook",
       eventType: event.type,
@@ -131,6 +208,127 @@ export async function GET() {
 }
 
 type AdminClient = ReturnType<typeof createAdminClient>;
+
+async function resolveProjectionAccountId(
+  admin: AdminClient,
+  metadata: Stripe.Metadata | null | undefined,
+  customerId: string | null,
+) {
+  const metadataAccountId = metadata?.cliste_account_id?.trim();
+  if (metadataAccountId) return metadataAccountId;
+  if (!customerId) return null;
+  const { data } = await admin
+    .from("accounts")
+    .select("id")
+    .eq("platform_customer_id", customerId)
+    .maybeSingle();
+  return (data?.id as string | undefined) ?? null;
+}
+
+function stripeId(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && "id" in value && typeof value.id === "string") {
+    return value.id;
+  }
+  return null;
+}
+
+async function syncBillingInvoice(
+  admin: AdminClient,
+  invoice: Stripe.Invoice,
+  livemode: boolean,
+) {
+  const customerId = stripeId(invoice.customer);
+  const accountId = await resolveProjectionAccountId(admin, invoice.metadata, customerId);
+  await admin.from("billing_invoices").upsert(
+    {
+      account_id: accountId,
+      stripe_invoice_id: invoice.id,
+      stripe_customer_id: customerId,
+      stripe_subscription_id: invoice.metadata?.cliste_subscription_id ?? null,
+      livemode,
+      status: invoice.status ?? "draft",
+      collection_method: invoice.collection_method,
+      currency: invoice.currency,
+      amount_due: invoice.amount_due ?? 0,
+      amount_paid: invoice.amount_paid ?? 0,
+      amount_remaining: invoice.amount_remaining ?? 0,
+      subtotal: invoice.subtotal ?? 0,
+      total: invoice.total ?? 0,
+      due_date: invoice.due_date ? new Date(invoice.due_date * 1000).toISOString() : null,
+      period_start: invoice.period_start ? new Date(invoice.period_start * 1000).toISOString() : null,
+      period_end: invoice.period_end ? new Date(invoice.period_end * 1000).toISOString() : null,
+      hosted_invoice_url: invoice.hosted_invoice_url,
+      invoice_pdf: invoice.invoice_pdf,
+      number: invoice.number,
+      attempted: invoice.attempted ?? false,
+      last_finalization_error: invoice.last_finalization_error?.message ?? null,
+      metadata: invoice.metadata ?? {},
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "stripe_invoice_id,livemode" },
+  );
+}
+
+async function syncBillingPaymentIntent(
+  admin: AdminClient,
+  intent: Stripe.PaymentIntent,
+  livemode: boolean,
+) {
+  const customerId = stripeId(intent.customer);
+  const accountId = await resolveProjectionAccountId(admin, intent.metadata, customerId);
+  const latestCharge = stripeId(intent.latest_charge);
+  await admin.from("billing_payments").upsert(
+    {
+      account_id: accountId,
+      stripe_payment_intent_id: intent.id,
+      stripe_charge_id: latestCharge,
+      stripe_invoice_id: intent.metadata?.stripe_invoice_id ?? null,
+      livemode,
+      status: intent.status,
+      currency: intent.currency,
+      amount: intent.amount,
+      amount_received: intent.amount_received,
+      failure_code: intent.last_payment_error?.code ?? null,
+      failure_message: intent.last_payment_error?.message ?? null,
+      captured_at: intent.status === "succeeded" ? new Date().toISOString() : null,
+      metadata: intent.metadata ?? {},
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "stripe_payment_intent_id,livemode" },
+  );
+}
+
+async function syncBillingAdjustment(
+  admin: AdminClient,
+  object: Stripe.Charge | Stripe.Dispute,
+  eventType: string,
+  livemode: boolean,
+) {
+  const charge = "amount_refunded" in object ? object : null;
+  const dispute = charge ? null : (object as Stripe.Dispute);
+  const source = charge ?? dispute;
+  if (!source) return;
+  const metadata = charge?.metadata;
+  const customerId = charge ? stripeId(charge.customer) : null;
+  const accountId = await resolveProjectionAccountId(admin, metadata, customerId);
+  const kind = eventType.startsWith("charge.dispute") ? "dispute" : "refund";
+  await admin.from("billing_adjustments").upsert(
+    {
+      account_id: accountId,
+      stripe_object_id: source.id,
+      stripe_payment_intent_id: charge ? stripeId(charge.payment_intent) : null,
+      livemode,
+      kind,
+      status: eventType.endsWith("closed") ? "closed" : "succeeded",
+      currency: source.currency,
+      amount: charge?.amount_refunded ?? charge?.amount ?? dispute?.amount ?? 0,
+      reason: dispute?.reason ?? null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "stripe_object_id,livemode" },
+  );
+}
 
 async function handlePlatformCheckoutCompleted(
   session: Stripe.Checkout.Session,
@@ -184,6 +382,31 @@ async function handlePlatformSubscriptionChange(
     organizationId: orgId,
   });
   if (!accountId) return;
+
+  await admin.from("billing_subscriptions").upsert(
+    {
+      account_id: accountId,
+      stripe_subscription_id: sub.id,
+      stripe_customer_id: stripeId(sub.customer),
+      livemode: Boolean(sub.livemode),
+      status: sub.status,
+      collection_method: sub.collection_method,
+      currency: sub.items.data[0]?.price.currency ?? null,
+      current_period_start: sub.items.data[0]?.current_period_start
+        ? new Date(sub.items.data[0].current_period_start * 1000).toISOString()
+        : null,
+      current_period_end: sub.items.data[0]?.current_period_end
+        ? new Date(sub.items.data[0].current_period_end * 1000).toISOString()
+        : null,
+      cancel_at: sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null,
+      canceled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null,
+      trial_end: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
+      service_access_role: sub.metadata?.cliste_service_access_role === "supplemental" ? "supplemental" : "core",
+      metadata: sub.metadata ?? {},
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "stripe_subscription_id,livemode" },
+  );
 
   const isHealthy =
     sub.status === "active" ||

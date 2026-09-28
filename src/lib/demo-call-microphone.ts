@@ -14,7 +14,32 @@ export async function ensureMicrophoneAccess(): Promise<void> {
   }
 
   preflightMicStream?.getTracks().forEach((track) => track.stop());
-  preflightMicStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  preflightMicStream = null;
+
+  const constraints: MediaStreamConstraints = {
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+  };
+
+  try {
+    preflightMicStream = await navigator.mediaDevices.getUserMedia(constraints);
+  } catch (err) {
+    // #region agent log
+    fetch('http://127.0.0.1:7662/ingest/95496c05-1739-4e32-b7be-319b56b1c5b5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0f50f3'},body:JSON.stringify({sessionId:'0f50f3',runId:'mic',hypothesisId:'A',location:'demo-call-microphone.ts:ensureMicrophoneAccess',message:'getUserMedia_failed',data:{name:err instanceof DOMException?err.name:err instanceof Error?err.name:'unknown',msg:err instanceof Error?err.message.slice(0,160):String(err)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    const busy =
+      (err instanceof DOMException && err.name === "NotReadableError") ||
+      (err instanceof Error && /could not start audio source/i.test(err.message));
+    if (!busy) throw err;
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    preflightMicStream = await navigator.mediaDevices.getUserMedia(constraints);
+  }
+  // #region agent log
+  fetch('http://127.0.0.1:7662/ingest/95496c05-1739-4e32-b7be-319b56b1c5b5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0f50f3'},body:JSON.stringify({sessionId:'0f50f3',runId:'mic',hypothesisId:'A',location:'demo-call-microphone.ts:ensureMicrophoneAccess',message:'getUserMedia_ok',data:{tracks:preflightMicStream.getAudioTracks().length},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 }
 
 export function releasePreflightMicrophone(): void {

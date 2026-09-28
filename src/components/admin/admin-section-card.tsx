@@ -22,19 +22,19 @@ export function AdminSectionCard({
   return (
     <section
       className={cn(
-        "overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm",
+        "overflow-hidden rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] shadow-[0_1px_0_rgba(17,24,29,0.05),0_14px_34px_-28px_rgba(17,24,29,0.32)]",
         className,
       )}
     >
       {title ? (
-        <header className="border-b border-gray-100 px-4 py-3">
-          <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
+        <header className="border-b border-[#e3e9e5] px-5 py-4">
+          <h2 className="text-sm font-semibold tracking-tight text-[#11181d]">{title}</h2>
           {description ? (
-            <p className="mt-1 text-xs text-gray-500">{description}</p>
+            <p className="mt-1 text-xs leading-5 text-[#6b7c75]">{description}</p>
           ) : null}
         </header>
       ) : null}
-      <div className={cn(padded && "p-5", contentClassName)}>{children}</div>
+      <div className={cn(padded && "p-5 sm:p-6", contentClassName)}>{children}</div>
     </section>
   );
 }

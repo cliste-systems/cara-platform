@@ -304,7 +304,13 @@ function stripHtml(html: string): string {
 }
 
 function previewText(value: string | null | undefined, max = 130): string {
-  const normalized = (value ?? "").replace(/\s+/g, " ").trim();
+  // Plain-text marketing emails often use long decoration lines. Keep the
+  // preview focused on the actual message instead of rows of asterisks.
+  const normalized = (value ?? "")
+    .replace(/[*_=~\-]{4,}/g, " ")
+    .replace(/[\u200B\u200C\u200D\uFEFF\u00AD]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
   if (normalized.length <= max) return normalized;
   return `${normalized.slice(0, max).trim()}…`;
 }
@@ -628,33 +634,52 @@ export async function listAdminInbox(
   }
 
   const admin = createAdminClient();
-  let query = admin
-    .from("admin_email_messages")
-    .select(
-      "resend_email_id,direction,parent_resend_email_id,message_id,in_reply_to,from_address,from_name,to_addresses,cc_addresses,bcc_addresses,reply_to_addresses,subject,text_body,html_body,headers,attachments,received_at,sent_at,read_at,archived_at,resend_sent_at,delivered_at,delivery_delayed_at,bounced_at,failed_at,suppressed_at,complained_at,opened_at,clicked_at,last_delivery_event,last_delivery_event_at,delivery_detail,created_at",
-    )
-    .limit(250);
+  const messages: AdminEmailListItem[] = [];
+  const seenIds = new Set<string>();
+  const pageSize = 250;
 
-  if (folder === "sent") {
-    query = query.eq("direction", "outbound").order("sent_at", { ascending: false });
-  } else if (folder === "archived") {
-    query = query
-      .eq("direction", "inbound")
-      .not("archived_at", "is", null)
-      .order("received_at", { ascending: false });
-  } else {
-    query = query
-      .eq("direction", "inbound")
-      .is("archived_at", null)
-      .order("received_at", { ascending: false });
+  // Fetch every stored message, not just the newest 250 across all mailboxes.
+  // Filtering each batch after retrieval also retains legacy recipients stored
+  // as display-name addresses ("Name <email>"), not just bare email strings.
+  for (let offset = 0; ; offset += pageSize) {
+    let query = admin
+      .from("admin_email_messages")
+      .select(
+        "resend_email_id,direction,parent_resend_email_id,from_address,from_name,to_addresses,subject,text_body,html_body,received_at,sent_at,read_at,archived_at,resend_sent_at,delivered_at,delivery_delayed_at,bounced_at,failed_at,suppressed_at,complained_at,opened_at,clicked_at,last_delivery_event,last_delivery_event_at,created_at",
+      );
+
+    if (folder === "sent") {
+      query = query.eq("direction", "outbound").order("sent_at", { ascending: false });
+    } else if (folder === "archived") {
+      query = query
+        .eq("direction", "inbound")
+        .not("archived_at", "is", null)
+        .order("received_at", { ascending: false });
+    } else {
+      query = query
+        .eq("direction", "inbound")
+        .is("archived_at", null)
+        .order("received_at", { ascending: false });
+    }
+
+    const { data, error } = await query
+      .order("created_at", { ascending: false })
+      .order("resend_email_id", { ascending: false })
+      .range(offset, offset + pageSize - 1);
+    if (error) throw new Error(error.message);
+
+    const rows = (data ?? []) as AdminEmailRow[];
+    for (const row of rows) {
+      // A message arriving between page requests can shift an offset. Avoid
+      // showing the same email twice while the next refresh picks up new mail.
+      if (seenIds.has(row.resend_email_id)) continue;
+      seenIds.add(row.resend_email_id);
+      if (rowBelongsToIdentity(row, identity)) messages.push(rowToListItem(row));
+    }
+    if (rows.length < pageSize) break;
   }
 
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-
-  return ((data ?? []) as AdminEmailRow[])
-    .filter((row) => rowBelongsToIdentity(row, identity))
-    .map(rowToListItem);
+  return messages;
 }
 
 export async function getAdminEmailMessage(

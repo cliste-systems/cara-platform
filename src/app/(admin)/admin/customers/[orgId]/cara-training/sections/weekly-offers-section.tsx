@@ -5,6 +5,7 @@ import { RefreshCw } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { isRetailOfferObservationFresh } from "@/lib/retail-offer-freshness";
 import { CaraTrainingField } from "@/components/admin/cara-training-field";
 import { CaraTrainingSectionFooter } from "@/components/admin/cara-training-feedback";
 
@@ -35,6 +36,11 @@ export function WeeklyOffersSection({ data, onChange, onSaved }: Props) {
       const result = await refreshSupervaluWeeklyOffers();
       if (!result.ok) {
         setError(result.message);
+        return;
+      }
+      if (result.queued) {
+        setMessage("National offers refresh queued. Cara will use the updated offers when the source checks finish.");
+        await onSaved();
         return;
       }
       setMessage(
@@ -72,8 +78,10 @@ export function WeeklyOffersSection({ data, onChange, onSaved }: Props) {
 
   if (data.retailBanner !== "supervalu") return null;
 
-  const syncedLabel = data.offersSyncedAt
-    ? new Date(data.offersSyncedAt).toLocaleString("en-IE", {
+  const syncedDate = data.offersSyncedAt ? new Date(data.offersSyncedAt) : null;
+  const offersVerified = data.offersOfferCount > 0 && isRetailOfferObservationFresh(data.offersSyncedAt);
+  const syncedLabel = syncedDate && Number.isFinite(syncedDate.getTime())
+    ? syncedDate.toLocaleString("en-IE", {
         dateStyle: "medium",
         timeStyle: "short",
         timeZone: "Europe/Dublin",
@@ -83,19 +91,26 @@ export function WeeklyOffersSection({ data, onChange, onSaved }: Props) {
   return (
     <SectionCard
       title="Weekly offers sync"
-      description="National SuperValu promotional snapshot — butcher, deli, fish, produce, off-licence, and grocery. Cara quotes these via searchSuperValuProducts on calls."
+      description="Published SuperValu offers across all departments, including counter offers, multibuys and Real Rewards prices."
     >
       <CaraTrainingField label="Last sync" feed="prompt">
         <p className="text-sm text-slate-700">
           {syncedLabel}
           {data.offersOfferCount > 0
-            ? ` — ${data.offersOfferCount} active offer rows`
+            ? ` — ${data.offersOfferCount} offers in the last snapshot`
             : ""}
           {data.offersWeekStart && data.offersWeekEnd
             ? ` (${data.offersWeekStart} to ${data.offersWeekEnd})`
             : ""}
         </p>
       </CaraTrainingField>
+
+      {!offersVerified ? (
+        <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          Current national offers have not been verified in the last 48 hours. Cara will avoid quoting
+          stale deals. Request a refresh and check the search preview once it finishes.
+        </p>
+      ) : null}
 
       <CaraTrainingField
         label="Search preview"
@@ -122,7 +137,7 @@ export function WeeklyOffersSection({ data, onChange, onSaved }: Props) {
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" disabled={pending} onClick={refresh}>
             <RefreshCw className="mr-1.5 size-3.5" aria-hidden />
-            {pending ? "Syncing…" : "Refresh weekly offers now"}
+            {pending ? "Requesting…" : "Refresh weekly offers now"}
           </Button>
           <a
             href="/api/admin/supervalu-offers-snapshot"

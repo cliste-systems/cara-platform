@@ -3,9 +3,11 @@ import { NextResponse } from "next/server";
 import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
 import {
   inferWeeklyOffersListIntent,
+  loadLatestRetailOfferWeekEnd,
   RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS,
   searchRetailWeeklyOffers,
 } from "@/lib/retail-weekly-offers-search";
+import { RETAIL_OFFERS_UNVERIFIED_MESSAGE } from "@/lib/retail-offer-freshness";
 import { buildProductClarificationHint } from "@/lib/retail-product-clarification";
 import type {
   SupervaluFulfilment,
@@ -167,11 +169,11 @@ export async function POST(request: Request) {
       ? body.fulfilment
       : undefined;
 
-  const matches = await searchRetailWeeklyOffers(admin, retailBanner, query, {
-    channel,
-    serviceArea,
-    fulfilment,
-  });
+  const reference = new Date();
+  const [matches, latestOfferWeekEnd] = await Promise.all([
+    searchRetailWeeklyOffers(admin, retailBanner, query, { channel, serviceArea, fulfilment, reference }),
+    loadLatestRetailOfferWeekEnd(admin, retailBanner, reference),
+  ]);
 
   const mappedMatches = matches.map((match) => ({
     id: match.id,
@@ -181,6 +183,7 @@ export async function POST(request: Request) {
     service_area: match.serviceArea,
     fulfilment: match.fulfilment,
     is_alcohol: match.isAlcohol,
+    campaign_names: match.campaignNames,
     current_price_eur: match.currentPriceEur,
     was_price_eur: match.wasPriceEur,
     discount_label: match.discountLabel,
@@ -197,6 +200,10 @@ export async function POST(request: Request) {
     fulfilment: fulfilment ?? null,
     list: inferWeeklyOffersListIntent(query),
     clarification_hint: clarificationHint,
+    offers_freshness: latestOfferWeekEnd == null ? RETAIL_OFFERS_UNVERIFIED_MESSAGE : null,
+    no_match_quote: mappedMatches.length === 0
+      ? "I couldn't verify a current national offer matching that request. A team member can check the offers in store."
+      : null,
     matches: clarificationHint ? [] : mappedMatches,
   });
 }

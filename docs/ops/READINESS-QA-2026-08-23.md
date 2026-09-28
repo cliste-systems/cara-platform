@@ -9,10 +9,10 @@ Execution of the admin readiness plan against hosted dev Supabase (`rtoebbwzwxcn
 | Org ID | `9fc358db-dc4d-44a4-b87a-654f10d04103` |
 | Org name | `[smoke test] Murphy's SuperValu Killarney` |
 | Cliste DID | `+35315551947707` |
-| Owner login | `shop@cliste.test` / `ShopCara2026!` |
-| Admin login | `admin@cliste.test` / `AdminCara2026!` |
+| Owner login | `shop@cliste.test` / `[use the unique test credential from your password manager]` |
+| Admin login | `admin@cliste.test` / `[use the unique test credential from your password manager]` |
 | App branch | `chore/hellocara-dns-script` |
-| Voice worker (Layer C) | **Not available** — `code-base-2` not in this repo |
+| Voice worker (Layer C) | **Not available** — `cara-voice-platform` not in this repo |
 | `DASHBOARD_HOME_MOCK` | Unset (off) |
 
 ## Phase 1 — Reset
@@ -59,7 +59,7 @@ All scenarios via `npx tsx scripts/simulate-call-complete.ts --all` against `htt
 
 ### Layer C (live voice / adversarial)
 
-**Blocked — manual only.** The voice worker lives in `code-base-2` (separate repo). This app cannot dial or score LLM behaviour without a deployed worker sharing `CLISTE_VOICE_WEBHOOK_SECRET` and the same Supabase project.
+**Blocked — manual only.** The voice worker lives in `cara-voice-platform` (separate repo). This app cannot dial or score LLM behaviour without a deployed worker sharing `CLISTE_VOICE_WEBHOOK_SECRET` and the same Supabase project.
 
 See [Adversarial playbook (Layer C)](#layer-c-adversarial-playbook-manual) below for scenarios to run when the worker is available.
 
@@ -96,7 +96,7 @@ See [Adversarial playbook (Layer C)](#layer-c-adversarial-playbook-manual) below
 
 | Area | Expected | Actual | Severity | Fix |
 |------|----------|--------|----------|-----|
-| Layer C adversarial calls | Live worker scores LLM | Worker repo not in workspace | P1 | Run playbook in `code-base-2` when worker deployed |
+| Layer C adversarial calls | Live worker scores LLM | Worker repo not in workspace | P1 | Run playbook in `cara-voice-platform` when worker deployed |
 | `seed-retail-demo-user` deletes `admin@cliste.test` | Both users coexist | Retail seed removed admin user | P2 | **Fixed** — no longer deletes `admin@cliste.test` |
 | `finalizeCaraTrainingSave` in CLI scripts | Prompt regen without Next context | `revalidatePath` throws outside Next | P2 | Scripts should call `regenerateCaraCustomPrompt` only (fixed in `complete-retail-train-cara.ts`) |
 | Store setup 11-step UI | Admin can run full retail setup | Pages unwired per `RETAILSTORESETUP.md` | P2 | Wire store-setup flow or merge into customer detail |
@@ -115,7 +115,7 @@ See [Adversarial playbook (Layer C)](#layer-c-adversarial-playbook-manual) below
 
 ## Layer C — Adversarial playbook (manual)
 
-Run when `code-base-2` voice worker is deployed against this Supabase project and app URL, with matching `CLISTE_VOICE_WEBHOOK_SECRET`. Dial Cliste DID `+35315551947707` from a mobile.
+Run when `cara-voice-platform` voice worker is deployed against this Supabase project and app URL, with matching `CLISTE_VOICE_WEBHOOK_SECRET`. Dial Cliste DID `+35315551947707` from a mobile.
 
 | # | Caller intent | Expected Cara behaviour | Dashboard outcome | Layer B only? |
 |---|---------------|-------------------------|-------------------|---------------|

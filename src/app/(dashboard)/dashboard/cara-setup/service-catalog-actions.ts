@@ -23,7 +23,7 @@ import {
 import { regenerateCaraCustomPrompt } from "@/lib/cara-prompt-from-org";
 import { dashboardVerticalCopy } from "@/lib/dashboard-vertical-copy";
 import { AGENT_CONFIG_REVALIDATE_PATHS } from "@/lib/dashboard-routes";
-import { requireDashboardSession } from "@/lib/dashboard-session";
+import { requireDashboardAdmin } from "@/lib/dashboard-admin";
 import { parseAgentBusinessRules } from "@/lib/agent-business-rules";
 import type { RoutingActionSummary } from "@/lib/cara-custom-prompt";
 import {
@@ -130,7 +130,7 @@ export type ImportBookingMenuResult =
 export async function importBookingMenuForServices(
   rawUrl: string,
 ): Promise<ImportBookingMenuResult> {
-  await requireDashboardSession();
+  await requireDashboardAdmin();
   const result = await importBookingMenuFromUrl(rawUrl);
   if (!result.ok) return result;
   const services = result.data.services;
@@ -159,7 +159,7 @@ export type SaveServiceCatalogResult =
 export async function saveServiceCatalog(
   payload: SaveServiceCatalogPayload,
 ): Promise<SaveServiceCatalogResult> {
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId } = await requireDashboardAdmin();
 
   const { data: org } = await supabase
     .from("organizations")
@@ -265,7 +265,7 @@ export async function saveServiceCatalog(
 export async function upsertServiceCatalogItem(
   draft: ServiceCatalogDraft,
 ): Promise<SaveServiceCatalogResult> {
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId } = await requireDashboardAdmin();
 
   const { data: org } = await supabase
     .from("organizations")
@@ -304,7 +304,7 @@ export async function upsertServiceCatalogItem(
 export async function deleteServiceCatalogItem(
   serviceId: string,
 ): Promise<SaveServiceCatalogResult> {
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId } = await requireDashboardAdmin();
 
   try {
     await deleteServiceForOrg(supabase, organizationId, serviceId);
@@ -324,7 +324,7 @@ export async function deleteServiceCatalogItem(
 export async function updateQuotePricesOnCalls(
   enabled: boolean,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId } = await requireDashboardAdmin();
   const services = await listServicesForOrg(supabase, organizationId);
 
   if (enabled && !catalogHasExtractedPrices(services)) {

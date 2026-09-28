@@ -8,6 +8,7 @@ import {
   deleteCallRecordingObjects,
 } from "@/lib/call-recordings-server";
 import { requireDashboardSession } from "@/lib/dashboard-session";
+import { requireDashboardAdmin } from "@/lib/dashboard-admin";
 import type { GdprPortabilityPayload } from "@/lib/gdpr-portability";
 import {
   buildSecurityEventContext,
@@ -262,7 +263,7 @@ export async function exportCustomerData(
 export async function eraseCustomerData(
   formData: FormData,
 ): Promise<GdprErasureResult> {
-  const session = await requireDashboardSession();
+  const session = await requireDashboardAdmin();
   const phoneRaw = String(formData.get("phone") ?? "");
   const phoneE164 = normalizePhoneOrNull(phoneRaw);
   if (!phoneE164) {

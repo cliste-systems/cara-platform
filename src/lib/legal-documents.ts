@@ -4,9 +4,9 @@ export type LegalDocumentType = "terms" | "privacy" | "dpa";
 
 /** ISO date aligned with `LEGAL_LAST_UPDATED` in legal-pages.ts — bump when documents change. */
 export const LEGAL_DOCUMENT_VERSIONS: Record<LegalDocumentType, string> = {
-  terms: "2026-06-12",
-  privacy: "2026-06-12",
-  dpa: "2026-06-12",
+  terms: "2026-09-28",
+  privacy: "2026-09-28",
+  dpa: "2026-09-28",
 };
 
 export const LEGAL_DOCUMENT_LABELS: Record<LegalDocumentType, string> = {
@@ -34,9 +34,9 @@ export const LEGAL_ACCEPTANCE_BYPASS_PREFIXES = [
 ] as const;
 
 export function requiredLegalDocuments(needsDpa: boolean): LegalDocumentType[] {
-  const docs: LegalDocumentType[] = ["terms", "privacy"];
-  if (needsDpa) docs.push("dpa");
-  return docs;
+  // Dashboard access can expose caller data before the store goes live.
+  void needsDpa;
+  return ["terms", "privacy", "dpa"];
 }
 
 export function orgNeedsDpaAcceptance(org: {

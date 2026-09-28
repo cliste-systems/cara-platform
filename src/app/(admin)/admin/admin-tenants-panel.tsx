@@ -39,12 +39,12 @@ type AdminTenantsPanelProps = {
 export function AdminTenantsPanel({ organizations }: AdminTenantsPanelProps) {
   return (
     <aside
-      className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm"
+      className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] shadow-[0_1px_0_rgba(17,24,29,0.05),0_14px_34px_-28px_rgba(17,24,29,0.32)]"
       aria-labelledby="tenants-heading"
     >
-      <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3">
-        <h2 id="tenants-heading" className="text-sm font-semibold text-[#0b1220]">
-          Tenants
+      <div className="flex shrink-0 items-center justify-between border-b border-[#e3e9e5] px-5 py-4">
+        <h2 id="tenants-heading" className="text-sm font-semibold tracking-tight text-[#11181d]">
+          Customers
         </h2>
         <span className="text-xs text-slate-500">{organizations.length}</span>
       </div>
@@ -52,7 +52,7 @@ export function AdminTenantsPanel({ organizations }: AdminTenantsPanelProps) {
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {organizations.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center px-4 py-8 text-center">
-            <p className="text-sm font-medium text-slate-600">No tenants yet</p>
+            <p className="text-sm font-medium text-[#4d5f58]">No customers yet</p>
             <p className="mt-1 max-w-[200px] text-xs leading-relaxed text-slate-500">
               Browse{" "}
               <Link href={adminCustomersPath()} className={adminTextLinkClass}>
@@ -62,7 +62,7 @@ export function AdminTenantsPanel({ organizations }: AdminTenantsPanelProps) {
             </p>
           </div>
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-[#e9efeb]">
             {organizations.map((org) => (
               <li
                 key={org.id}
@@ -72,7 +72,7 @@ export function AdminTenantsPanel({ organizations }: AdminTenantsPanelProps) {
                   href={adminCustomerPath(org.id)}
                   className={`${adminNavLinkBaseClass} min-w-0 flex-1 rounded-md`}
                 >
-                  <p className="truncate text-[13px] font-medium text-[#0b1220] hover:underline">
+                  <p className="truncate text-[13px] font-medium text-[#11181d] hover:underline">
                     {org.name}
                   </p>
                   <p className="truncate text-[11px] text-slate-500">

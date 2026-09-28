@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
+import { hasAccountOwnerAccess } from "./account-owner-access";
 
 import {
-  canManageDashboardConfig,
   dashboardRoleLabel,
 } from "@/lib/team-roles";
 
@@ -12,7 +12,9 @@ import {
 
 export async function requireDashboardAdmin(): Promise<DashboardSession> {
   const session = await requireDashboardSession();
-  if (!canManageDashboardConfig(session.profile.role)) {
+  if (!(await hasAccountOwnerAccess(session.supabase, {
+    userId: session.user.id, accountId: session.accountId, profileRole: session.profile.role,
+  }))) {
     redirect("/dashboard");
   }
   return session;

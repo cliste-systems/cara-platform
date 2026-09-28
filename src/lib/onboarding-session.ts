@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { normalizeOnboardingDbStep } from "@/components/onboarding/onboarding-steps";
 import { enforceOnboardingStepOrder } from "@/lib/onboarding-dev";
+import { hasAccountOwnerAccess } from "./account-owner-access";
 import { redirectIfEmailUnconfirmed } from "@/lib/require-email-confirmed";
 import { createClient } from "@/utils/supabase/server";
 
@@ -29,6 +30,8 @@ export type OnboardingStepKey = keyof typeof ONBOARDING_STEPS;
 export type OnboardingSession = {
   user: User;
   organizationId: string;
+  role: string | null;
+  accountId: string;
   status: string;
   onboardingStep: number;
   planTier: string;
@@ -55,7 +58,7 @@ export async function requireOnboardingSession(): Promise<OnboardingSession> {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("organization_id, active_organization_id, account_id")
+    .select("organization_id, active_organization_id, account_id, role")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -100,6 +103,8 @@ export async function requireOnboardingSession(): Promise<OnboardingSession> {
   return {
     user: user!,
     organizationId: org.id as string,
+    role: (profile.role as string | null) ?? null,
+    accountId: profile.account_id as string,
     status: lifecycleStatus,
     onboardingStep: normalizeOnboardingDbStep(
       (org.onboarding_step as number) ?? 1,
@@ -115,6 +120,14 @@ export async function requireOnboardingSession(): Promise<OnboardingSession> {
     stripeChargesEnabled: Boolean(org.stripe_charges_enabled),
     applicationFeeBps: (account?.application_fee_bps as number | null) ?? 100,
   };
+}
+
+export async function requireOnboardingAdminSession(): Promise<OnboardingSession> {
+  const session = await requireOnboardingSession();
+  if (!(await hasAccountOwnerAccess(await createClient(), {
+    userId: session.user.id, accountId: session.accountId, profileRole: session.role,
+  }))) redirect("/dashboard");
+  return session;
 }
 
 export function resolveCurrentStepPath(session: OnboardingSession): string {

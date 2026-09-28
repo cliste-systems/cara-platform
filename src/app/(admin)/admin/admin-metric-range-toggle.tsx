@@ -39,10 +39,10 @@ export function AdminMetricRangeToggle({
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1 rounded-full p-1",
+        "inline-flex items-center gap-1 rounded-lg p-1",
         isDark
           ? "border border-white/15 bg-white/10"
-          : "border border-slate-200/80 bg-white shadow-sm",
+          : "border border-[#d9e2dd] bg-white/80 shadow-sm",
       )}
       role="group"
       aria-label="Global metrics time range"
@@ -56,14 +56,14 @@ export function AdminMetricRangeToggle({
             onClick={() => setPeriod(value)}
             className={cn(
               adminSegmentedTabButtonClass,
-              "rounded-full px-3.5 py-1.5 text-xs",
+              "rounded-md px-3.5 py-1.5 text-xs",
               isDark
                 ? active
                   ? "bg-white text-[#0b1220] shadow-sm"
                   : "text-white/75 hover:bg-white/10 hover:text-white"
                 : active
-                  ? "bg-[#0b1220] text-white shadow-sm"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-[#0b1220]",
+                  ? "bg-[#353d42] text-white shadow-sm"
+                  : "text-[#5f6f68] hover:bg-[#f3f6f4] hover:text-[#11181d]",
             )}
           >
             {label}

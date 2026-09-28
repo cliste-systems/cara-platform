@@ -103,7 +103,7 @@ describe("retail product clarification", () => {
     assert.match(hint ?? "", /pre-pack/i);
   });
 
-  it("requires clarification for meat counter list when both fulfilment types exist", () => {
+  it("answers the explicitly requested meat counter directly and excludes prepack", () => {
     const response = resolveProductSearchResponse(
       "what's on offer in the meat counter this week",
       [
@@ -119,9 +119,9 @@ describe("retail product clarification", () => {
         },
       ],
     );
-    assert.ok(response.clarificationHint);
-    assert.match(response.clarificationHint ?? "", /Do NOT quote any prices/i);
-    assert.equal(response.matches.length, 2);
+    assert.equal(response.clarificationHint, null);
+    assert.equal(response.matches.length, 1);
+    assert.equal(response.matches[0]?.fulfilment, "counter");
   });
 
   it("narrows to counter only when fulfilment was chosen explicitly", () => {
@@ -340,7 +340,7 @@ describe("retail product clarification", () => {
     assert.equal(response.matches.length, 0);
   });
 
-  it("asks a broad alcohol offer caller to narrow before listing products", () => {
+  it("answers broad alcohol offer callers with current products", () => {
     const response = resolveProductSearchResponse(
       "alcohol",
       [
@@ -351,14 +351,12 @@ describe("retail product clarification", () => {
       ],
       { intent: "offer" },
     );
-    assert.equal(response.clarificationKind, "refinement");
-    assert.ok(response.clarificationHint);
-    assert.match(response.clarificationHint ?? "", /confirm naturally that there are offers/i);
-    assert.match(response.clarificationHint ?? "", /narrowing question/i);
-    assert.doesNotMatch(response.clarificationHint ?? "", /Sparkling Offer A|Red Wine Offer B/);
+    assert.equal(response.clarificationKind, null);
+    assert.equal(response.clarificationHint, null);
+    assert.equal(response.matches.length, 4);
   });
 
-  it("uses the same broad-offer refinement outside off-licence", () => {
+  it("answers department offers without mandatory refinement", () => {
     const response = resolveProductSearchResponse(
       "toiletries",
       [
@@ -368,8 +366,9 @@ describe("retail product clarification", () => {
       ],
       { intent: "offer" },
     );
-    assert.equal(response.clarificationKind, "refinement");
-    assert.ok(response.clarificationHint);
+    assert.equal(response.clarificationKind, null);
+    assert.equal(response.clarificationHint, null);
+    assert.equal(response.matches.length, 3);
   });
 
   it("never invents counter-vs-prepack clarification for produce", () => {
@@ -555,4 +554,23 @@ describe("retail product clarification", () => {
     assert.match(response.matches[0]?.product_name ?? "", /Avocados/i);
   });
 
+});
+
+it("never substitutes prepack when an explicit counter has no matching offers", () => {
+  const response = resolveProductSearchResponse("meat counter offers", [
+    { product_name: "Prepack steak", service_area: "butcher", fulfilment: "prepack" },
+  ], { intent: "offer", fulfilment: "counter" });
+  assert.deepEqual(response.matches, []);
+  assert.equal(response.clarificationHint, null);
+});
+
+it("answers broad meat offers with both labelled fulfilments", () => {
+  const matches = [
+    { product_name: "Counter steak", service_area: "butcher", fulfilment: "counter" },
+    { product_name: "Prepack chicken", service_area: "butcher", fulfilment: "prepack" },
+    { product_name: "Counter pork", service_area: "butcher", fulfilment: "counter" },
+  ];
+  const response = resolveProductSearchResponse("are there any meat offers", matches, { intent: "offer" });
+  assert.equal(response.clarificationHint, null);
+  assert.deepEqual(response.matches, matches);
 });

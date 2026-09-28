@@ -80,6 +80,7 @@ describe("retail price presentation", () => {
             offer_price_eur: 3.5,
             regular_price_eur: 4,
             label: "Only €3.50",
+            synced_at: "2026-09-22T10:00:00Z",
             valid_from: "2026-09-17",
             valid_to: "2026-09-23",
           },
@@ -90,6 +91,7 @@ describe("retail price presentation", () => {
             offer_price_eur: 3,
             regular_price_eur: 4,
             label: "Rewards Price €3",
+            synced_at: "2026-09-22T10:00:00Z",
             valid_from: "2026-09-17",
             valid_to: "2026-09-23",
           },
@@ -108,4 +110,27 @@ describe("retail price presentation", () => {
     assert.equal(inferPromotionTypeFromLabel("Half Price"), "half_price");
     assert.equal(inferPromotionTypeFromLabel("Save €2"), "money_off");
   });
+});
+
+it("removes an expired offer label and returns the regular price", () => {
+  const price = resolveStoredRetailPrice({
+    regular_price_eur: 6, display_price_eur: 4, price_per_unit: null,
+    source_price_label: "Rewards Price Only €4",
+    retail_promotions: [{ promotion_type: "loyalty", loyalty_required: true, loyalty_program: "Real Rewards", offer_price_eur: 4, regular_price_eur: 6, label: "Rewards Price Only €4", valid_from: "2026-09-17", valid_to: "2026-09-23" }],
+  }, new Date("2026-09-23T23:00:00Z"));
+  assert.equal(price.currentPriceEur, 6);
+  assert.equal(price.isOnOffer, false);
+  assert.equal(price.offerLabel, null);
+  assert.equal(price.loyaltyRequired, false);
+});
+
+it("presents non-price bundle terms without manufacturing totals or savings", () => {
+  for (const label of ["BOGOF", "Buy One Get One Free", "Mix & Match"]) {
+    const price = resolveNationalRetailPrice({ regularPriceEur: null, weeklyOffer: { current_price_eur: null, was_price_eur: null, discount_label: label, price_per_unit: null } });
+    assert.equal(price.isMultibuy, true, label);
+    assert.equal(price.currentPriceEur, null);
+    assert.equal(price.multibuyTotalEur, null);
+    assert.equal(price.savingsEur, null);
+    assert.equal(price.offerLabel, label);
+  }
 });

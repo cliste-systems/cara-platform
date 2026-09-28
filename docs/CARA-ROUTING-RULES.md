@@ -1,7 +1,7 @@
 # Cara routing rules (voice agent spec)
 
 How Cara decides what to do when a caller speaks. This is the authoritative
-behaviour spec for the voice worker (code-base-2). The dashboard "Call Flow"
+behaviour spec for the voice worker (cara-voice-platform). The dashboard "Call Flow"
 page produces the data described here; the worker must implement the matching
 and edge-case behaviour exactly as written.
 

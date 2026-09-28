@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { offerSearchProductTokens, scoreSupervaluSearchText } from "@/lib/retail-weekly-offers-search";
+import { offerSearchProductIdentityTokens, scoreSupervaluSearchText } from "@/lib/retail-weekly-offers-search";
+import { retailSearchTokenMatchesText } from "@/lib/retail-search-fuzzy";
 import { normalizeSearchText } from "@/lib/supervalu-offers-normalize";
 import { resolveStoredRetailPrice } from "@/lib/retail-price-presentation";
 import type { SupervaluFulfilment, SupervaluServiceArea } from "@/lib/supervalu-offers-types";
@@ -47,6 +48,7 @@ type CatalogRow = {
       label: string | null;
       valid_from: string;
       valid_to: string;
+      synced_at: string | null;
     }>;
   }>;
 };
@@ -56,7 +58,7 @@ function queryRequestsSupervaluBrand(query: string): boolean {
 }
 
 function productSearchTokens(query: string): string[] {
-  return offerSearchProductTokens(query).filter(
+  return offerSearchProductIdentityTokens(query).filter(
     (token) => !OWN_LABEL_QUERY_TOKENS.has(token),
   );
 }
@@ -108,32 +110,45 @@ export async function searchStoredRetailCatalog(
     fulfilment?: SupervaluFulfilment | null;
     serviceArea?: SupervaluServiceArea | null;
     limit?: number;
+    reference?: Date;
   },
 ): Promise<SupervaluCatalogMatch[]> {
-  const tokens = offerSearchProductTokens(input.query);
+  const tokens = productSearchTokens(input.query);
   if (tokens.length === 0) return [];
-  const broad = tokens[0]!.replace(/s$/, "");
-  let query = supabase
-    .from("retail_catalog_products")
-    .select(
-      "id,sku,product_name,brand,department,service_area,fulfilment,is_alcohol,search_text,retail_store_products!inner(id,regular_price_eur,display_price_eur,price_per_unit,source_price_label,is_listed,retail_promotions(promotion_type,loyalty_required,loyalty_program,offer_price_eur,regular_price_eur,label,valid_from,valid_to))",
-    )
-    .eq("retail_banner", input.retailBanner)
-    .eq("retail_store_products.source_store_id", input.sourceStoreId)
-    .eq("retail_store_products.is_listed", true)
-    .ilike("search_text", `%${broad}%`)
-    .limit(80);
-  if (input.fulfilment) query = query.eq("fulfilment", input.fulfilment);
-  if (input.serviceArea) query = query.eq("service_area", input.serviceArea);
+  const candidates = [...tokens].sort((a, b) => b.length - a.length);
+  let candidateRows: CatalogRow[] = [];
+  for (const candidate of candidates) {
+    const rows: CatalogRow[] = [];
+    const pageSize = 500;
+    for (let from = 0; ; from += pageSize) {
+      let query = supabase
+        .from("retail_catalog_products")
+        .select(
+          "id,sku,product_name,brand,department,service_area,fulfilment,is_alcohol,search_text,retail_store_products!inner(id,regular_price_eur,display_price_eur,price_per_unit,source_price_label,is_listed,retail_promotions(promotion_type,loyalty_required,loyalty_program,offer_price_eur,regular_price_eur,label,valid_from,valid_to,synced_at))",
+        )
+        .eq("retail_banner", input.retailBanner)
+        .eq("retail_store_products.source_store_id", input.sourceStoreId)
+        .eq("retail_store_products.is_listed", true)
+        .ilike("search_text", `%${candidate.replace(/s$/, "")}%`)
+        .order("id", { ascending: true });
+      if (input.fulfilment) query = query.eq("fulfilment", input.fulfilment);
+      if (input.serviceArea) query = query.eq("service_area", input.serviceArea);
+      const { data, error } = await query.range(from, from + pageSize - 1);
+      if (error) throw new Error(error.message);
+      rows.push(...((data ?? []) as unknown as CatalogRow[]));
+      if ((data ?? []).length < pageSize) break;
+    }
+    candidateRows = rows.filter((row) => tokens.every((token) =>
+      retailSearchTokenMatchesText(`${row.product_name} ${row.department}`, token),
+    ));
+    if (candidateRows.length > 0) break;
+  }
 
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-
-  return ((data ?? []) as unknown as CatalogRow[])
+  return candidateRows
     .map((row) => {
       const listing = row.retail_store_products?.[0];
       if (!listing) return null;
-      const price = resolveStoredRetailPrice(listing);
+      const price = resolveStoredRetailPrice(listing, input.reference);
       const isOnOffer = price.isOnOffer;
       const currentPrice = price.currentPriceEur;
       const regularPrice = price.regularPriceEur;
@@ -205,7 +220,7 @@ export async function searchNationalRetailCatalog(
   },
 ): Promise<SupervaluCatalogMatch[]> {
   if (input.intent === "offer") return [];
-  const tokens = offerSearchProductTokens(input.query);
+  const tokens = productSearchTokens(input.query);
   if (tokens.length === 0) return [];
 
   const productTokens = productSearchTokens(input.query);
@@ -217,23 +232,26 @@ export async function searchNationalRetailCatalog(
 
   let candidateRows: NationalCatalogRow[] = [];
   for (const candidate of candidateTokens) {
-    let query = supabase
-      .from("retail_catalog_products")
-      .select(
-        "id,sku,product_name,brand,department,service_area,fulfilment,is_alcohol,search_text,national_store_count,national_regular_price_eur",
-      )
-      .eq("retail_banner", input.retailBanner)
-      .eq("is_national", true)
-      .gte("national_store_count", 3)
-      .ilike("search_text", `%${candidate}%`)
-      .limit(200);
-
-    if (input.fulfilment) query = query.eq("fulfilment", input.fulfilment);
-    if (input.serviceArea) query = query.eq("service_area", input.serviceArea);
-
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-    const rows = (data ?? []) as NationalCatalogRow[];
+    const rows: NationalCatalogRow[] = [];
+    const pageSize = 500;
+    for (let from = 0; ; from += pageSize) {
+      let query = supabase
+        .from("retail_catalog_products")
+        .select(
+          "id,sku,product_name,brand,department,service_area,fulfilment,is_alcohol,search_text,national_store_count,national_regular_price_eur",
+        )
+        .eq("retail_banner", input.retailBanner)
+        .eq("is_national", true)
+        .gte("national_store_count", 3)
+        .ilike("search_text", `%${candidate}%`)
+        .order("id", { ascending: true });
+      if (input.fulfilment) query = query.eq("fulfilment", input.fulfilment);
+      if (input.serviceArea) query = query.eq("service_area", input.serviceArea);
+      const { data, error } = await query.range(from, from + pageSize - 1);
+      if (error) throw new Error(error.message);
+      rows.push(...((data ?? []) as NationalCatalogRow[]));
+      if ((data ?? []).length < pageSize) break;
+    }
     const relevantRows = rows.filter((row) => {
       if (
         queryRequestsSupervaluBrand(input.query) &&
@@ -245,7 +263,7 @@ export async function searchNationalRetailCatalog(
         return false;
       }
       const text = normalizeSearchText(`${row.product_name} ${row.department}`);
-      return productTokens.length === 0 || productTokens.every((token) => text.includes(token));
+      return productTokens.length === 0 || productTokens.every((token) => retailSearchTokenMatchesText(text, token));
     });
     if (relevantRows.length > 0) {
       candidateRows = relevantRows;

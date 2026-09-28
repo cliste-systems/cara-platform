@@ -24,7 +24,7 @@ import type { RoutingActionSummary } from "@/lib/cara-custom-prompt";
 import { buildCaraCapabilitiesFromPromptExtras } from "@/lib/call-handling-boundary";
 import { dashboardVerticalCopy } from "@/lib/dashboard-vertical-copy";
 import { voiceNoteBlockForCatalogDrafts } from "@/lib/service-policy-presets";
-import { requireOnboardingSession } from "@/lib/onboarding-session";
+import { requireOnboardingAdminSession, requireOnboardingSession } from "@/lib/onboarding-session";
 import {
   catalogHasExtractedPrices,
   type ServiceCatalogDraft,
@@ -58,7 +58,7 @@ export type OnboardingImportBookingMenuResult =
 export async function importBookingMenuForTrainCara(
   rawUrl: string,
 ): Promise<OnboardingImportBookingMenuResult> {
-  await requireOnboardingSession();
+  await requireOnboardingAdminSession();
   const result = await importBookingMenuFromUrl(rawUrl);
   if (!result.ok) return result;
   return {
@@ -101,7 +101,7 @@ export async function applyBookingMenuImportForTrainCara(input: {
   services: BookingMenuImportService[];
   bookingUrl: string;
 }): Promise<ApplyBookingMenuImportResult> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
   const admin = createAdminClient();
 
   const { data: org } = await admin
@@ -254,7 +254,7 @@ async function assertSalonCatalogAccess(
 export async function upsertServiceCatalogItemForTrainCara(
   draft: ServiceCatalogDraft,
 ): Promise<TrainCaraCatalogMutationResult> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
   const access = await assertSalonCatalogAccess(session.organizationId);
   if (!access.ok) return access;
 
@@ -289,7 +289,7 @@ export async function upsertServiceCatalogItemForTrainCara(
 export async function deleteServiceCatalogItemForTrainCara(
   serviceId: string,
 ): Promise<TrainCaraCatalogMutationResult> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
   const access = await assertSalonCatalogAccess(session.organizationId);
   if (!access.ok) return access;
 

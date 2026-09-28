@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { compactEircode, normalizeIrelandLocationQuery } from "@/lib/geocode-ireland";
-import { requireDashboardSession } from "@/lib/dashboard-session";
+import { requireDashboardAdmin } from "@/lib/dashboard-admin";
 import { auditVoiceGreetingSecurityEvent } from "@/lib/voice-greeting-audit";
 import { sanitizeGreetingLine } from "@/lib/voice-greeting-security";
 import {
@@ -113,7 +113,7 @@ function revalidateCaraSetup() {
  * structured fields via {@link regenerateCaraCustomPrompt}.
  */
 export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveResult> {
-  const { supabase, organizationId, user } = await requireDashboardSession();
+  const { supabase, organizationId, user } = await requireDashboardAdmin();
 
   const { data: orgRow } = await supabase
     .from("organizations")

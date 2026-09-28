@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 
+import { hasAccountOwnerAccess } from "@/lib/account-owner-access";
+import { managedClientSetupRequirement } from "@/lib/managed-onboarding-access";
+import { userHasCurrentLegalAcceptances } from "@/lib/legal-acceptance-status";
+
 import { resolveOrgCartesiaVoiceId, resolveLiveKitTtsLanguage, resolveLiveKitTtsModel } from "@/lib/cara-livekit-voice";
 import { synthesizeLiveKitInferenceSpeech } from "@/lib/livekit-inference-voice";
 import {
-  getVoiceApiRateLimitStatus,
-  recordVoiceApiRequest,
+  reserveVoiceApiRequest,
   voiceApiFingerprint,
   voiceApiRateLimitMessage,
 } from "@/lib/voice-api-rate-limit";
@@ -47,16 +50,35 @@ export async function POST(request: Request) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("organization_id")
+    .select("organization_id, account_id, role")
     .eq("id", user.id)
     .maybeSingle();
 
-  const organizationId = profile?.organization_id as string | undefined;
+  if (!profile?.organization_id || !(await hasAccountOwnerAccess(supabase, {
+    userId: user.id, accountId: profile.account_id, profileRole: profile.role,
+  }))) {
+    return NextResponse.json({ error: "An owner account is required." }, { status: 403 });
+  }
+
+  const organizationId = profile.organization_id as string;
+  const setupRequirement = await managedClientSetupRequirement({
+    user,
+    organizationId,
+    hasCurrentLegalAcceptances: userHasCurrentLegalAcceptances,
+  });
+  if (setupRequirement) {
+    return NextResponse.json({
+      error: setupRequirement === "password"
+        ? "Choose your account password before using voice preview."
+        : "Review and accept your organisation agreements before using voice preview.",
+      requiredSetup: setupRequirement,
+    }, { status: 403 });
+  }
+
   const fingerprint = voiceApiFingerprint(
-    request.headers,
     `voice-preview:${user.id}`,
   );
-  const rateLimit = await getVoiceApiRateLimitStatus("voice_preview", fingerprint);
+  const rateLimit = await reserveVoiceApiRequest("voice_preview", fingerprint);
 
   if (!rateLimit.allowed) {
     if (organizationId) {
@@ -155,7 +177,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: GUARDRAIL_MESSAGE }, { status: 400 });
   }
 
-  await recordVoiceApiRequest("voice_preview", fingerprint);
 
   let agentVoiceId: string | null = null;
   if (organizationId) {

@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 
 import {
   clearRateLimit,
+  emailRateLimitFingerprint,
   getRateLimitStatus,
   rateLimitFingerprint,
   recordRateLimitFailure,
@@ -74,7 +75,7 @@ export async function passwordSignIn(payload: {
   const securityCtx = buildSecurityEventContext(h);
   const turnstileEnabled = Boolean(process.env.TURNSTILE_SECRET_KEY?.trim());
   const ipFingerprint = rateLimitFingerprint(h, "auth-ip");
-  const emailFingerprint = rateLimitFingerprint(h, `auth-email:${email}`);
+  const emailFingerprint = emailRateLimitFingerprint(email);
   const ipStatus = await getRateLimitStatus("authenticate", ipFingerprint);
   const emailStatus = await getRateLimitStatus("authenticate", emailFingerprint);
   const preRequiresCaptcha =

@@ -1046,6 +1046,7 @@ export async function saveCaraTraining(
 export async function refreshSupervaluWeeklyOffers(): Promise<
   | {
       ok: true;
+      queued?: boolean;
       offerCount: number;
       organizationsUpdated: number;
       syncedAt: string;
@@ -1072,6 +1073,7 @@ export async function refreshSupervaluWeeklyOffers(): Promise<
   revalidatePath("/admin/customers");
   return {
     ok: true,
+    queued: result.queued,
     offerCount: result.offerCount,
     organizationsUpdated: result.organizationsUpdated,
     syncedAt: result.syncedAt,

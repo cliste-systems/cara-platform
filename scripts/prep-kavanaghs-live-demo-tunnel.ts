@@ -15,7 +15,7 @@ import { execSync } from "node:child_process";
 const PRODUCTION_APP_URL = "https://app.hellocara.ie";
 const LIVEKIT_AGENT_DIR =
   process.env.CLISTE_VOICE_WORKER_DIR?.trim() ||
-  `${process.env.HOME}/cliste-code-base-2`;
+  `${process.env.HOME}/cara-voice-platform`;
 
 function parseNgrokUrl(): string | null {
   const args = process.argv.slice(2);
@@ -64,7 +64,7 @@ function main(): void {
   if (!ngrokUrl) {
     console.log("Kavanaghs live demo — webhook tunnel setup\n");
     console.log("For live Action Inbox tickets during phone calls, tunnel webhooks locally:\n");
-    console.log("  Terminal 1: cd cliste-code-base-1 && npm run dev -- -p 3001");
+    console.log("  Terminal 1: cd cara-platform && npm run dev -- -p 3001");
     console.log("  Terminal 2: ngrok http 3001");
     console.log(
       "  Terminal 3: npx tsx scripts/prep-kavanaghs-live-demo-tunnel.ts --ngrok-url https://YOUR.ngrok-free.app\n",

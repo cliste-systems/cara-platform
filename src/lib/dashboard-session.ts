@@ -1,11 +1,16 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import type { User } from "@supabase/supabase-js";
 
 import { redirectIfEmailUnconfirmed } from "@/lib/require-email-confirmed";
 import { isLocalDashboardPreviewEnabled } from "@/lib/dashboard-dev";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { userNeedsPassword } from "@/lib/invite-onboarding";
+import { dashboardUserNeedsLegalAcceptance } from "@/lib/legal-acceptance-gate";
+import { DASHBOARD_LEGAL_ACCEPT_PATH } from "@/lib/legal-documents";
+import { readSupportDashboardCookieValue, SUPPORT_DASHBOARD_COOKIE } from "@/lib/support-dashboard-cookie";
 
 export type DashboardSessionProfile = {
   name: string | null;
@@ -323,7 +328,7 @@ async function resolveLocalPreviewDashboardAuth(): Promise<DashboardSession | nu
   }
 }
 
-async function resolveDashboardAuth(): Promise<ResolveDashboardAuth> {
+const resolveDashboardAuth = cache(async (): Promise<ResolveDashboardAuth> => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -342,10 +347,24 @@ async function resolveDashboardAuth(): Promise<ResolveDashboardAuth> {
     user.id,
   );
 
-  const organizationId =
+  let organizationId =
     profile?.active_organization_id ?? profile?.organization_id ?? null;
   if (profileError || !profile?.account_id || !organizationId) {
     return { tag: "user_no_org" };
+  }
+
+  const supportCookie = (await cookies()).get(SUPPORT_DASHBOARD_COOKIE)?.value;
+  if (supportCookie) {
+    const scope = await readSupportDashboardCookieValue(supportCookie);
+    if (scope?.userId === user.id && scope.accountId === profile.account_id) {
+      const { data: scopedOrganization } = await createAdminClient()
+        .from("organizations")
+        .select("id")
+        .eq("id", scope.organizationId)
+        .eq("account_id", profile.account_id)
+        .maybeSingle();
+      if (scopedOrganization) organizationId = scope.organizationId;
+    }
   }
 
   return {
@@ -362,12 +381,18 @@ async function resolveDashboardAuth(): Promise<ResolveDashboardAuth> {
       },
     },
   };
-}
+});
 
 export const requireDashboardSession = cache(
-  async (): Promise<DashboardSession> => {
+  async (options?: { allowOnboarding?: boolean }): Promise<DashboardSession> => {
     const r = await resolveDashboardAuth();
-    if (r.tag === "ok") return r.session;
+    if (r.tag === "ok") {
+      if (!options?.allowOnboarding && !r.session.isLocalPreview) {
+        if (userNeedsPassword(r.session.user)) redirect("/dashboard/set-password");
+        if (await dashboardUserNeedsLegalAcceptance(r.session)) redirect(DASHBOARD_LEGAL_ACCEPT_PATH);
+      }
+      return r.session;
+    }
     if (r.tag === "user_no_org") {
       redirect("/authenticate?error=profile");
     }

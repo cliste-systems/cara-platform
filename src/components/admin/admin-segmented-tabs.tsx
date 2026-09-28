@@ -22,7 +22,7 @@ export function AdminSegmentedTabs({
 }: AdminSegmentedTabsProps) {
   return (
     <div
-      className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5"
+      className="inline-flex max-w-full flex-wrap rounded-lg border border-[#d9e2dd] bg-[#f3f6f4] p-1"
       role="tablist"
       aria-label={ariaLabel}
     >
@@ -36,10 +36,10 @@ export function AdminSegmentedTabs({
             aria-selected={active}
             className={cn(
               adminNavLinkBaseClass,
-              "rounded-md px-3 py-1.5 text-sm font-medium",
+              "rounded-md px-3.5 py-2 text-sm font-semibold",
               active
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-600 hover:text-gray-900",
+                ? "bg-white text-[#11181d] shadow-sm"
+                : "text-[#6b7c75] hover:text-[#11181d]",
             )}
           >
             {label}

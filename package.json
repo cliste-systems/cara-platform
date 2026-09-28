@@ -1,10 +1,10 @@
 {
-  "name": "cliste-dashboard",
+  "name": "cara-platform",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3001",
-    "dev:text-rehearsal": "concurrently -k -n dashboard,worker -c blue,green \"LIVEKIT_AGENT_NAME=cliste-voice-local npm run dev\" \"LIVEKIT_AGENT_NAME=cliste-voice-local CLISTE_APP_URL=http://localhost:3001 npm --prefix ../cliste-code-base-2 run dev\"",
+    "dev:text-rehearsal": "concurrently -k -n dashboard,worker -c blue,green \"LIVEKIT_AGENT_NAME=cliste-voice-local npm run dev\" \"LIVEKIT_AGENT_NAME=cliste-voice-local CLISTE_APP_URL=http://localhost:3001 npm --prefix ../cara-voice-platform run dev\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -44,7 +44,6 @@
     "react-dom": "^19.2.6",
     "react-easy-crop": "^6.0.2",
     "resend": "^6.28.1",
-    "shadcn": "^4.1.1",
     "stripe": "^22.0.2",
     "tailwind-merge": "^3.5.0",
     "tw-animate-css": "^1.4.0",
@@ -63,8 +62,9 @@
     "knip": "^5.62.0",
     "postcss": "^8.5.6",
     "server-only": "^0.0.1",
+    "shadcn": "^4.1.1",
     "tailwindcss": "^4",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

@@ -49,6 +49,8 @@ export type SendTransactionalEmailInput = {
   /** Override platform From (e.g. per-business `{slug}@hellocara.ie`). */
   from?: EmailAddress;
   replyTo?: EmailAddress;
+  /** Stable key for retrying the exact same provider payload. */
+  idempotencyKey?: string;
 };
 
 export type SendTransactionalEmailResult =
@@ -118,7 +120,7 @@ export async function sendTransactionalEmail(
             : input.replyTo.email.trim(),
         }
       : {}),
-  });
+  }, input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined);
 
   if (!error) {
     return { ok: true };

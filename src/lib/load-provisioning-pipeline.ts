@@ -22,7 +22,7 @@ export async function loadProvisioningPipeline(): Promise<PipelineOrganization[]
 
   const { data: invites } = await admin
     .from("admin_invites")
-    .select("organization_id, email, sent_at, accepted_at")
+    .select("organization_id, user_id, email, sent_at, accepted_at")
     .order("sent_at", { ascending: false });
 
   const orgIds = [
@@ -71,7 +71,7 @@ export async function loadProvisioningPipeline(): Promise<PipelineOrganization[]
     const orgId = inv.organization_id as string;
     if (!inviteByOrg.has(orgId)) {
       inviteByOrg.set(orgId, {
-        sent_at: String(inv.sent_at),
+        sent_at: inv.sent_at ? String(inv.sent_at) : null,
         accepted_at: (inv.accepted_at as string | null) ?? null,
         email: String(inv.email),
       });
@@ -79,13 +79,12 @@ export async function loadProvisioningPipeline(): Promise<PipelineOrganization[]
   }
 
   const ownerByOrg = new Map<string, TenantProvisioningOwnerRow>();
-  for (const profile of profiles ?? []) {
-    const orgId = profile.organization_id as string;
-    if (ownerByOrg.has(orgId)) continue;
-    const userId = profile.id as string;
-    const hasLegal = await userHasCurrentLegalAcceptances(userId, orgId);
-    ownerByOrg.set(orgId, { user_id: userId, hasLegalAcceptances: hasLegal });
-  }
+  await Promise.all((orgs ?? []).map(async (org) => {
+    const userId = invites?.find((invite) => invite.organization_id === org.id && invite.user_id)?.user_id
+      ?? profiles?.find((profile) => profile.organization_id === org.id)?.id;
+    if (!userId) return;
+    ownerByOrg.set(org.id, { user_id: userId, hasLegalAcceptances: await userHasCurrentLegalAcceptances(userId, org.id) });
+  }));
 
   const results: PipelineOrganization[] = [];
   for (const org of orgs ?? []) {
@@ -157,7 +156,7 @@ export async function loadProvisioningStagesByOrgId(
     const orgId = inv.organization_id as string;
     if (!inviteByOrg.has(orgId)) {
       inviteByOrg.set(orgId, {
-        sent_at: String(inv.sent_at),
+        sent_at: inv.sent_at ? String(inv.sent_at) : null,
         accepted_at: (inv.accepted_at as string | null) ?? null,
         email: String(inv.email),
       });
@@ -204,7 +203,7 @@ export async function loadOrganizationProvisioning(
         .maybeSingle(),
       admin
         .from("admin_invites")
-        .select("sent_at, accepted_at, email")
+        .select("user_id, sent_at, accepted_at, email")
         .eq("organization_id", organizationId)
         .order("sent_at", { ascending: false })
         .limit(1)
@@ -223,13 +222,14 @@ export async function loadOrganizationProvisioning(
     ]);
 
   let owner: TenantProvisioningOwnerRow = null;
-  if (profile?.id) {
+  const ownerUserId = invite?.user_id ?? profile?.id;
+  if (ownerUserId) {
     const hasLegal = await userHasCurrentLegalAcceptances(
-      profile.id as string,
+      ownerUserId as string,
       organizationId,
     );
     owner = {
-      user_id: profile.id as string,
+      user_id: ownerUserId as string,
       hasLegalAcceptances: hasLegal,
     };
   }
@@ -241,7 +241,7 @@ export async function loadOrganizationProvisioning(
       : null,
     invite: invite
       ? {
-          sent_at: String(invite.sent_at),
+          sent_at: invite.sent_at ? String(invite.sent_at) : null,
           accepted_at: (invite.accepted_at as string | null) ?? null,
           email: String(invite.email),
         }

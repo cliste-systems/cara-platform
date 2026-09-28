@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidateActionTicketSurfaces } from "@/lib/action-ticket-routing";
-import { requireDashboardSession } from "@/lib/dashboard-session";
+import { requireDashboardAdmin } from "@/lib/dashboard-admin";
 import { isEngineerTestCallRow } from "@/lib/engineer-test-call";
 
 const UUID_RE =
@@ -11,7 +11,7 @@ export async function markTicketResolved(formData: FormData): Promise<void> {
   const ticketId = formData.get("ticketId");
   if (typeof ticketId !== "string" || !UUID_RE.test(ticketId)) return;
 
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId } = await requireDashboardAdmin();
 
   const { data: row } = await supabase
     .from("action_tickets")
@@ -39,7 +39,7 @@ export async function markTicketReopen(formData: FormData): Promise<void> {
   const ticketId = formData.get("ticketId");
   if (typeof ticketId !== "string" || !UUID_RE.test(ticketId)) return;
 
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId } = await requireDashboardAdmin();
 
   const { data: row } = await supabase
     .from("action_tickets")

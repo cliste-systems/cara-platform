@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { BookOpenCheck } from "lucide-react";
 
 import { adminCustomerPath } from "@/lib/admin-route-paths";
-import { adminMutedLinkClass } from "@/components/admin/admin-interactive";
+import { AdminPageShell } from "@/components/admin/admin-page-shell";
 import { loadAdminClientDetail } from "@/lib/load-admin-clients";
 
 import { loadCaraTrainingData } from "@/app/(admin)/admin/organizations/[id]/cara-training/cara-training-actions";
@@ -25,17 +24,7 @@ export default async function ClientCaraTrainingPage({ params }: PageProps) {
   const data = await loadCaraTrainingData(orgId);
   if (!data) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4 p-6 md:p-8">
-        <Link
-          href={adminCustomerPath(orgId)}
-          className={adminMutedLinkClass}
-        >
-          <ChevronLeft className="size-4" aria-hidden />
-          Back to customer
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
-          Train Cara — {client.name}
-        </h1>
+      <AdminPageShell icon={BookOpenCheck} title={`Train Cara — ${client.name}`} backHref={adminCustomerPath(orgId)} backLabel="Back to customer">
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           <p className="font-medium">Could not load Cara training data.</p>
           <p className="mt-1">
@@ -44,29 +33,19 @@ export default async function ClientCaraTrainingPage({ params }: PageProps) {
             to your local Supabase, then restart the dev server.
           </p>
         </div>
-      </div>
+      </AdminPageShell>
     );
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-6 md:p-8">
-      <div>
-        <Link
-          href={adminCustomerPath(orgId)}
-          className={`${adminMutedLinkClass} mb-4`}
-        >
-          <ChevronLeft className="size-4" aria-hidden />
-          Back to customer
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
-          Train Cara — {data.name}
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Structured training fields compile into the worker prompt. Do not edit
-          raw system instructions elsewhere.
-        </p>
-      </div>
+    <AdminPageShell
+      icon={BookOpenCheck}
+      title={`Train Cara — ${data.name}`}
+      description="Structured training fields compile into the worker prompt."
+      backHref={adminCustomerPath(orgId)}
+      backLabel="Back to customer"
+    >
       <CaraTrainingShell initial={data} />
-    </div>
+    </AdminPageShell>
   );
 }

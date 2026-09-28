@@ -1,12 +1,10 @@
-
 import {
-    LegalList,
+  LegalList,
   LegalPageHeader,
   LegalSection,
 } from "@/components/legal/legal-document";
 import { LegalInlineLink } from "@/components/legal/legal-path-context";
 import { CLISTE_COMPANY, companyRegistrationLine } from "@/lib/company-details";
-
 
 export function TermsDocument() {
   return (
@@ -17,16 +15,20 @@ export function TermsDocument() {
       />
 
       <p className="text-[15px] leading-relaxed text-slate-700">
-        By creating an account you agree to these Terms.
+        These Terms are accepted when an authorised representative expressly agrees
+        to them for the customer business. Creating a password alone does not
+        accept them. Any separately agreed written order or service agreement
+        sets out the customer, covered stores and commercial arrangements; its
+        specific terms take precedence over these Terms where they conflict.
       </p>
 
       <LegalSection title="1. The service">
         <p>
-          Hello Cara provides a SaaS platform including an AI voice agent for inbound
-          calls, a dashboard (calls, Action Inbox, contacts, routing, agent
-          setup), and optional SMS/email notifications. Platform subscription
-          and usage are billed via Stripe Billing. We may add or change features
-          as the product evolves.
+          Hello Cara provides a managed AI voice assistant for retail stores,
+          together with a dashboard for calls, Action Inbox, contacts, routing and
+          agent setup, and optional service notifications. We configure the
+          service with you. The stores, features and service arrangements covered
+          by your account are those agreed with us in writing.
         </p>
       </LegalSection>
 
@@ -38,18 +40,27 @@ export function TermsDocument() {
             members. Keep credentials confidential.
           </li>
           <li>
-            You must be at least 18 and authorised to bind your business to
-            these Terms.
+            You must be at least 18 and authorised to accept these Terms for the
+            named customer business. Tell us if that business or your authority
+            changes.
+          </li>
+          <li>
+            A billing organisation may cover several stores. Linking stores for
+            invoicing does not by itself authorise access to every store&apos;s
+            data or make separate store companies parties to the agreement.
           </li>
         </LegalList>
       </LegalSection>
 
-      <LegalSection title="3. Plans and fees">
+      <LegalSection title="3. Fees and invoice billing">
         <p>
-          Fees are shown at signup and in the Usage area of your dashboard. We
-          invoice via Stripe. Failed payments may lead to suspension after notice.
-          You may cancel from the billing portal; cancellation takes effect at
-          the end of the current billing period.
+          Managed retail accounts are billed by invoice to the agreed billing
+          organisation or contact. A payment card is not required to activate a
+          dashboard account. Fees, any usage charges, taxes, payment due dates,
+          renewal and cancellation arrangements are those agreed in writing with
+          you. Pay invoices using the instructions provided on them. If an invoice
+          is incorrect or disputed, contact us promptly. We may suspend service
+          for overdue, undisputed amounts after notice, subject to your agreement.
         </p>
       </LegalSection>
 
@@ -71,35 +82,61 @@ export function TermsDocument() {
 
       <LegalSection title="5. Customer and caller data">
         <p>
-          You are the data controller for your callers&rsquo; and contacts&rsquo;
-          data. Cliste Systems Limited processes that data as processor — see our{" "}
+          The business deciding how and why caller and contact data is used is
+          its data controller. We process that data on its documented instructions
+          under the Data Processing Agreement (DPA), which must be in place before
+          processing starts. A group paying invoices is not automatically the
+          controller for every store. Identify any separate store controllers and
+          ensure your representative has authority to act for them. See our{" "}
           <LegalInlineLink href="/legal/privacy">privacy notice</LegalInlineLink>{" "}
           and <LegalInlineLink href="/legal/dpa">DPA</LegalInlineLink>.
+        </p>
+        <p>
+          You must establish the appropriate lawful basis, give callers and staff
+          the required privacy information, and only provide data necessary for
+          the agreed service. Keep store information and escalation contacts
+          accurate. Do not use the service to collect payment-card details or
+          unnecessary sensitive information.
         </p>
       </LegalSection>
 
       <LegalSection title="6. AI voice agent">
         <p>
-          The agent answers calls on your behalf and may create action items or
-          optional appointments. You remain responsible for how you follow up.
-          The agent will identify itself as AI where required (see privacy
-          notice).
+          The agent answers calls on your behalf and may create action items.
+          AI can misunderstand callers or produce inaccurate information. Your
+          team must review important requests and follow up appropriately. Do not
+          rely on the service for emergencies, medical advice or decisions that
+          require human judgment.
+        </p>
+        <p>
+          The service must identify the assistant as AI at the start of the call
+          and provide the applicable recording and transcription notice. Do not
+          remove or bypass these disclosures. We remain responsible for our own
+          legal obligations; your agreement does not replace information that must
+          be provided directly to callers.
         </p>
       </LegalSection>
 
       <LegalSection title="7. Service levels">
         <p>
-          We aim for high availability but do not currently offer a contractual
-          SLA. Maintenance is scheduled outside Irish working hours where possible.
-          We are not liable for outages caused by third-party infrastructure
-          (hosting, telephony, speech AI, payments, or messaging providers).
+          Unless expressly agreed in writing, we do not offer a guaranteed
+          availability level or response time. The service depends on telephony,
+          hosting and other providers, and interruptions may occur. Keep an
+          alternative way for customers to contact the store. Any agreed support
+          or service-level commitments continue to apply.
         </p>
       </LegalSection>
 
-      <LegalSection title="8. Intellectual property">
+      <LegalSection title="8. Intellectual property and confidentiality">
         <p>
           Cliste Systems Limited owns platform IP. You own your business data and grant us rights
           needed to operate the service for you.
+        </p>
+        <p>
+          Each party must protect the other&apos;s confidential business
+          information and use it only to perform the agreement, sharing it only
+          with people who need it for that purpose and are bound to protect it,
+          or where disclosure is required by law. The DPA governs personal data.
         </p>
       </LegalSection>
 
@@ -108,6 +145,8 @@ export function TermsDocument() {
           To the extent permitted by Irish law, Hello Cara’s aggregate liability
           in any 12-month period is capped at fees paid in that period. We exclude
           indirect or consequential loss except where law does not allow exclusion.
+          Nothing in these Terms limits liability that cannot lawfully be limited
+          or excludes either party&apos;s statutory data-protection obligations.
         </p>
       </LegalSection>
 

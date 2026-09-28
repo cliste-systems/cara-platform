@@ -19,7 +19,7 @@ npx tsx scripts/seed-retail-dashboard-activity.ts --email shop@cliste.test --scr
 
 Then:
 
-1. Log in as `shop@cliste.test` / `ShopCara2026!`
+1. Log in as `shop@cliste.test` / `[use the unique test credential from your password manager]`
 2. Open `/dashboard` (range defaults to **Today**)
 3. Hard refresh (Ctrl+Shift+R)
 4. Use viewport **≥1024px** — bottom chart row is hidden below `lg` breakpoint

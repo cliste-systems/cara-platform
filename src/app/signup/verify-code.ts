@@ -23,8 +23,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Verifies the Supabase email OTP from the signup confirmation email and
- * signs the user in (cookies set via the server client). Rate-limited per
- * IP+email.
+ * signs the user in (cookies set via the server client). Rate-limited independently per
+ * IP and email.
  */
 export async function verifySignupCode(
   emailRaw: string,
@@ -43,7 +43,7 @@ export async function verifySignupCode(
   }
 
   const h = await headers();
-  const fpOrigin = rateLimitFingerprint(h, `signup-verify:${email}`);
+  const fpOrigin = rateLimitFingerprint(h, "signup-verify");
   const fpEmail = hashRateLimitIdentifier(`signup-verify-email:${email}`);
   if (!isSignupOnboardingDevRelaxed()) {
     for (const fp of [fpOrigin, fpEmail]) {

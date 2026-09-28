@@ -5,6 +5,7 @@ import {
 } from "@/lib/supervalu-catalog-search";
 import {
   inferWeeklyOffersListIntent,
+  inferWeeklyOfferFulfilmentFromQuery,
   offerSearchProductTokens,
   tokenizeSupervaluSearchQuery,
 } from "@/lib/retail-weekly-offers-search";
@@ -35,6 +36,7 @@ const COUNTER_PREPACK_AREA_HINTS: Record<string, string> = {
 export function isBroadProductQuery(query: string): boolean {
   const trimmed = query.trim();
   if (!trimmed) return false;
+  if (inferWeeklyOffersListIntent(trimmed)) return true;
 
   const core =
     stripCatalogPackagingNoise(stripCatalogSearchBoilerplate(trimmed)) || trimmed;
@@ -244,7 +246,7 @@ export function filterOfferMatchesByExplicitFulfilment<T extends ClarificationMa
   const narrowed = matches.filter(
     (match) => matchFulfilment(match) === explicitFulfilment,
   );
-  return narrowed.length > 0 ? narrowed : matches;
+  return narrowed;
 }
 
 /** @deprecated Use filterOfferMatchesByExplicitFulfilment — query text is not used for fulfilment. */
@@ -279,37 +281,6 @@ export function buildOfferFulfilmentClarificationHint(
   return (
     "Both fresh counter and pre-pack options are on offer this week — ask ONE short clarifying question, for example: " +
     `"Do you mean ${areaHint}?" Do NOT quote any prices or product names until they choose. Then call the tool again with fulfilment set to counter or prepack.`
-  );
-}
-
-/**
- * Broad offer browse: confirm offers exist, then narrow before reading a random list.
- *
- * This is deliberately category-agnostic. The caller's own words drive the
- * follow-up ("what type are you after?") rather than hardcoded department rules.
- */
-export function buildBroadOfferBrowseClarificationHint(
-  query: string,
-  matches: ClarificationMatch[],
-): string | null {
-  if (!isBroadProductQuery(query)) return null;
-  if (matches.length < 3) return null;
-
-  const labels = distinctProductLabels(matches);
-  const departments = new Set(
-    matches
-      .map((match) => String(match.department ?? "").trim().toLowerCase())
-      .filter(Boolean),
-  );
-
-  // Two near-identical results are small enough to answer directly. Once the
-  // result set is genuinely broad/diverse, make the conversation narrow first.
-  if (labels.length < 3 && departments.size < 2) return null;
-
-  return (
-    "Matching offers exist, but the caller's request is broad. " +
-    "Confirm naturally that there are offers, then ask ONE short narrowing question about what type, category, or brand they are after, using the caller's own words. " +
-    "Do NOT list product names or prices yet. Wait for their answer, then search again using that refinement."
   );
 }
 
@@ -357,7 +328,8 @@ export function buildProductClarificationHint(
   matches: ClarificationMatch[],
   explicitFulfilment?: SupervaluFulfilment | null,
 ): string | null {
-  const narrowed = filterOfferMatchesByExplicitFulfilment(matches, explicitFulfilment);
+  const narrowed = filterOfferMatchesByExplicitFulfilment(matches, explicitFulfilment ?? inferWeeklyOfferFulfilmentFromQuery(query));
+  if (inferWeeklyOffersListIntent(query)) return null;
   return (
     buildOfferFulfilmentClarificationHint(narrowed, explicitFulfilment) ??
     buildBroadProductClarificationHint(query, narrowed)
@@ -378,8 +350,15 @@ export function resolveProductSearchResponse<T extends ClarificationMatch>(
 } {
   let narrowed = filterOfferMatchesByExplicitFulfilment(
     matches,
-    options?.fulfilment,
+    options?.fulfilment ?? inferWeeklyOfferFulfilmentFromQuery(query),
   );
+
+  // Offer browsing is answerable now: return labelled products and prices
+  // across counter/pre-pack instead of making the caller narrow first.
+  // Explicit counter or aisle wording remains a hard constraint above.
+  if (options?.intent === "offer" || inferWeeklyOffersListIntent(query)) {
+    return { matches: narrowed, clarificationHint: null, clarificationKind: null };
+  }
 
   // Rank the caller's intended product form before choosing a price. This keeps
   // "fresh SuperValu avocado" on actual avocados instead of cheaper avocado oil,
@@ -397,16 +376,7 @@ export function resolveProductSearchResponse<T extends ClarificationMatch>(
     }
   }
 
-  // A broad offer category can legitimately return several different product
-  // names ("toiletries" -> shampoo, deodorant, shower gel). Detect that before
-  // product-name narrowing, otherwise the generic category token can erase the
-  // very evidence Cara needs in order to ask one useful refinement question.
-  const broadOfferHint =
-    options?.intent === "offer"
-      ? buildBroadOfferBrowseClarificationHint(query, narrowed)
-      : null;
-
-  if (!broadOfferHint && !queryMatchesDepartmentScope(query, narrowed)) {
+  if (!queryMatchesDepartmentScope(query, narrowed)) {
     narrowed = narrowMatchesByProductTokens(query, narrowed);
   }
 
@@ -435,14 +405,9 @@ export function resolveProductSearchResponse<T extends ClarificationMatch>(
     narrowed,
     options?.fulfilment,
   );
-  const refinementHint =
-    options?.intent === "offer"
-      ? broadOfferHint ?? buildBroadOfferBrowseClarificationHint(query, narrowed)
-      : buildBroadProductClarificationHint(query, narrowed, {
-          // A broad PRICE question usually needs one more detail (type/size/brand)
-          // before reading several prices. Stock/range browse can still return a category.
-          allowDepartmentBrowse: options?.intent !== "price",
-        });
+  const refinementHint = buildBroadProductClarificationHint(query, narrowed, {
+    allowDepartmentBrowse: options?.intent !== "price",
+  });
   const clarificationHint = fulfilmentHint ?? refinementHint;
   const clarificationKind: ProductClarificationKind | null = fulfilmentHint
     ? "fulfilment"

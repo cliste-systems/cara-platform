@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ConnectionState, RoomEvent, Track } from "livekit-client";
+import { ConnectionState, RemoteAudioTrack, RoomEvent, Track } from "livekit-client";
 import { useConnectionState, useRoomContext } from "@livekit/components-react";
 
 import { AdminSectionCard } from "@/components/admin/admin-section-card";
 import { cn } from "@/lib/utils";
+import type { TransportSample } from "@/lib/call-transport";
 
 export type DemoCallLogLevel = "info" | "warn" | "error" | "success";
 
@@ -514,6 +515,173 @@ export function DemoCallRoomTelemetry({
       room.off(RoomEvent.MediaDevicesError, onMediaDevicesError);
     };
   }, [room, sessionStartedAt]);
+
+  useEffect(() => {
+    if (connectionState !== ConnectionState.Connected || sessionEndedAt != null) return;
+
+    // Keep only numeric audio counters locally: never log the full RTC report,
+    // which can contain participant/track identifiers and network addresses.
+    type AudioCounters = Pick<RTCInboundRtpStreamStats,
+      "timestamp" | "packetsReceived" | "packetsLost" | "concealedSamples" |
+      "silentConcealedSamples" | "concealmentEvents" | "totalSamplesReceived" |
+      "jitterBufferDelay" | "jitterBufferEmittedCount"
+    >;
+    const previous = new WeakMap<RemoteAudioTrack, Map<string, AudioCounters>>();
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let lastWarningAt = -Infinity;
+    let unavailableLogged = false;
+    let saveWarningLogged = false;
+    let pendingSamples: TransportSample[] = [];
+    let saving = false;
+    const streams = new WeakMap<RemoteAudioTrack, Map<string, string>>();
+    const flush = async (final = false) => {
+      if ((!final && saving) || !pendingSamples.length) return;
+      saving = true;
+      const batch = pendingSamples.splice(0, 40);
+      try {
+        const response = await fetch("/api/admin/demo-call/transport", {
+          method: "POST", headers: { "Content-Type": "application/json" }, keepalive: final,
+          body: JSON.stringify({ roomName: room.name, samples: batch }),
+        });
+        if (!response.ok) {
+          console.warn("[demo-call-transport] upload_rejected", { status: response.status });
+          throw new Error("Telemetry upload failed");
+        }
+      } catch {
+        pendingSamples = [...batch, ...pendingSamples].slice(-120);
+        if (!saveWarningLogged) {
+          saveWarningLogged = true;
+          logAppendRef.current("warn", "telemetry", "Browser measurements could not be saved; retrying while the call is active.");
+        }
+      } finally { saving = false; }
+    };
+
+    const delta = (current: number | undefined, prior: number | undefined) =>
+      current != null && prior != null && Number.isFinite(current) &&
+      Number.isFinite(prior) && current >= prior ? current - prior : null;
+    const round = (value: number) => Math.round(value * 100) / 100;
+    const active = () => !cancelled && room.state === ConnectionState.Connected;
+
+    const sample = async () => {
+      if (!active()) return;
+      try {
+        for (const participant of room.remoteParticipants.values()) {
+          for (const publication of participant.audioTrackPublications.values()) {
+            const track = publication.track;
+            if (!(track instanceof RemoteAudioTrack) || !publication.isSubscribed) continue;
+            const receiver = track.receiver;
+            const stillCurrent = () => active() && !!receiver && track.receiver === receiver &&
+              publication.track === track && publication.isSubscribed &&
+              track.mediaStreamTrack.readyState === "live" &&
+              room.remoteParticipants.get(participant.identity) === participant;
+            if (!stillCurrent()) continue;
+
+            let report: RTCStatsReport | undefined;
+            try {
+              report = await track.getRTCStatsReport();
+            } catch {
+              // A receiver can disappear while getStats is pending.
+              if (stillCurrent() && !unavailableLogged) {
+                unavailableLogged = true;
+                logAppendRef.current("info", "audio_stats", "Browser audio statistics are unavailable");
+              }
+              continue;
+            }
+            if (!stillCurrent() || !report) continue;
+
+            let roundTripMs: number | null = null;
+            report.forEach((entry: RTCStats & { selectedCandidatePairId?: string }) => {
+              if (entry.type !== "transport" || !entry.selectedCandidatePairId) return;
+              const pair = report.get(entry.selectedCandidatePairId) as RTCIceCandidatePairStats | undefined;
+              if (pair?.currentRoundTripTime != null && Number.isFinite(pair.currentRoundTripTime)) roundTripMs = round(pair.currentRoundTripTime * 1000);
+            });
+            const trackStreams = streams.get(track) ?? new Map<string, string>();
+            streams.set(track, trackStreams);
+            const trackCounters = previous.get(track) ?? new Map<string, AudioCounters>();
+            previous.set(track, trackCounters);
+            report.forEach((stat: RTCInboundRtpStreamStats) => {
+              if (stat.type !== "inbound-rtp" || stat.kind !== "audio") return;
+              const current: AudioCounters = {
+                timestamp: stat.timestamp,
+                packetsReceived: stat.packetsReceived,
+                packetsLost: stat.packetsLost,
+                concealedSamples: stat.concealedSamples,
+                silentConcealedSamples: stat.silentConcealedSamples,
+                concealmentEvents: stat.concealmentEvents,
+                totalSamplesReceived: stat.totalSamplesReceived,
+                jitterBufferDelay: stat.jitterBufferDelay,
+                jitterBufferEmittedCount: stat.jitterBufferEmittedCount,
+              };
+              const prior = trackCounters.get(stat.id);
+              trackCounters.set(stat.id, current);
+              if (!prior || (current.packetsReceived != null && prior.packetsReceived != null && current.packetsReceived < prior.packetsReceived)) {
+                trackStreams.set(stat.id, crypto.randomUUID());
+                return;
+              }
+
+              const intervalMs = delta(current.timestamp, prior.timestamp);
+              if (intervalMs == null || intervalMs === 0) return;
+              const counters = {
+                packetsReceived: delta(current.packetsReceived, prior.packetsReceived),
+                packetsLost: delta(current.packetsLost, prior.packetsLost),
+                concealedSamples: delta(current.concealedSamples, prior.concealedSamples),
+                silentConcealedSamples: delta(current.silentConcealedSamples, prior.silentConcealedSamples),
+                concealmentEvents: delta(current.concealmentEvents, prior.concealmentEvents),
+                totalSamplesReceived: delta(current.totalSamplesReceived, prior.totalSamplesReceived),
+                jitterBufferDelay: delta(current.jitterBufferDelay, prior.jitterBufferDelay),
+                jitterBufferEmittedCount: delta(current.jitterBufferEmittedCount, prior.jitterBufferEmittedCount),
+              };
+              const atMs = Date.now() - sessionStartedAt;
+              const packetTotal = counters.packetsLost != null && counters.packetsReceived != null ? counters.packetsLost + counters.packetsReceived : 0;
+              const measurement: TransportSample = {
+                id: crypto.randomUUID(), stream: trackStreams.get(stat.id) ?? crypto.randomUUID(), atMs, intervalMs,
+                connectionQuality: room.localParticipant.connectionQuality,
+                packetLossPercent: packetTotal > 0 && counters.packetsLost != null ? round(100 * counters.packetsLost / packetTotal) : null,
+                jitterMs: stat.jitter != null && Number.isFinite(stat.jitter) ? round(stat.jitter * 1000) : null,
+                roundTripMs,
+                concealmentPercent: counters.concealedSamples != null && counters.totalSamplesReceived != null && counters.totalSamplesReceived > 0 ? round(100 * counters.concealedSamples / counters.totalSamplesReceived) : null,
+                averageJitterBufferMs: counters.jitterBufferDelay != null && counters.jitterBufferEmittedCount != null && counters.jitterBufferEmittedCount > 0 ? round(1000 * counters.jitterBufferDelay / counters.jitterBufferEmittedCount) : null,
+              };
+              pendingSamples.push(measurement);
+              console.info("[demo-call-audio]", JSON.stringify({
+                roomName: room.name,
+                measurement,
+                atMs,
+                intervalMs: round(intervalMs),
+                jitterMs: stat.jitter != null && Number.isFinite(stat.jitter) ? round(stat.jitter * 1000) : null,
+                ...counters,
+                averageJitterBufferMs: counters.jitterBufferDelay != null &&
+                  counters.jitterBufferEmittedCount != null && counters.jitterBufferEmittedCount > 0
+                  ? round(1000 * counters.jitterBufferDelay / counters.jitterBufferEmittedCount) : null,
+              }));
+
+              if (((counters.packetsLost ?? 0) > 0 || (counters.concealmentEvents ?? 0) > 0) &&
+                atMs - lastWarningAt >= 15_000) {
+                lastWarningAt = atMs;
+                logAppendRef.current("warn", "audio_stats",
+                  `Audio delivery at ${formatElapsed(atMs)}: ${counters.packetsLost ?? "unknown"} lost packets, ${counters.concealmentEvents ?? "unknown"} concealment events in ${(intervalMs / 1000).toFixed(1)}s. Numeric details are in the browser console.`,
+                  atMs,
+                );
+              }
+            });
+          }
+        }
+      } finally {
+        // Schedule after completion so slow getStats calls never overlap.
+        if (pendingSamples.length >= 5) await flush();
+        if (active()) timer = setTimeout(() => void sample(), 1_000);
+      }
+    };
+
+    logAppendRef.current("info", "audio_stats", "Audio delivery diagnostics enabled; saving numeric browser statistics every second");
+    void sample();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      void flush(true);
+    };
+  }, [connectionState, room, sessionEndedAt, sessionStartedAt]);
 
   return (
     <DemoCallEngineeringLogPanel

@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 const dashboardRepo = process.cwd();
-const workerRepo = resolve(dashboardRepo, "../cliste-code-base-2");
+const workerRepo = resolve(dashboardRepo, "../cara-voice-platform");
 const repos = [
   { name: "dashboard", dir: dashboardRepo },
   { name: "worker", dir: workerRepo },

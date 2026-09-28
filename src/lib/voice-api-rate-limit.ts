@@ -1,23 +1,21 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 
-import { rateLimitFingerprint } from "@/lib/auth-rate-limit";
+import { actorRateLimitFingerprint } from "./rate-limit-identifiers";
 import { isSignupOnboardingDevRelaxed } from "@/lib/onboarding-dev";
 
 export type VoiceApiRateLimitScope = "voice_preview" | "greeting_review";
 
 const CONFIG: Record<
   VoiceApiRateLimitScope,
-  { windowMs: number; maxRequests: number; eventType: string }
+  { windowMs: number; maxRequests: number }
 > = {
   voice_preview: {
     windowMs: 60_000,
     maxRequests: 20,
-    eventType: "voice_preview_request",
   },
   greeting_review: {
     windowMs: 60_000,
     maxRequests: 5,
-    eventType: "voice_greeting_rate_limited",
   },
 };
 
@@ -26,81 +24,42 @@ export type VoiceApiRateLimitStatus = {
   retryAfterSeconds: number;
 };
 
-async function countRequests(
-  scope: VoiceApiRateLimitScope,
-  actorKey: string,
-): Promise<{ count: number; windowStartMs: number | null }> {
-  const cfg = CONFIG[scope];
-  const windowStart = new Date(Date.now() - cfg.windowMs).toISOString();
-  try {
-    const admin = createAdminClient();
-    const { data, error } = await admin
-      .from("security_auth_events")
-      .select("created_at")
-      .eq("event_type", cfg.eventType)
-      .gte("created_at", windowStart)
-      .contains("metadata", { voice_api_actor: actorKey })
-      .order("created_at", { ascending: true })
-      .limit(cfg.maxRequests + 1);
-    if (error) {
-      console.warn("[voice-api-rate-limit] count failed", error.message);
-      return { count: 0, windowStartMs: null };
-    }
-    const rows = data ?? [];
-    const first = rows[0]?.created_at;
-    return {
-      count: rows.length,
-      windowStartMs: first ? new Date(first).getTime() : null,
-    };
-  } catch (e) {
-    console.warn("[voice-api-rate-limit] count failed", e);
-    return { count: 0, windowStartMs: null };
-  }
-}
-
-export async function getVoiceApiRateLimitStatus(
+/** Reserve one paid request atomically before making any provider call. */
+export async function reserveVoiceApiRequest(
   scope: VoiceApiRateLimitScope,
   fingerprint: string,
 ): Promise<VoiceApiRateLimitStatus> {
-  if (isSignupOnboardingDevRelaxed()) {
-    return { allowed: true, retryAfterSeconds: 0 };
-  }
+  if (isSignupOnboardingDevRelaxed()) return { allowed: true, retryAfterSeconds: 0 };
   const cfg = CONFIG[scope];
-  const { count, windowStartMs } = await countRequests(scope, fingerprint);
-  if (count < cfg.maxRequests) {
-    return { allowed: true, retryAfterSeconds: 0 };
-  }
-  const retryAfterSeconds = windowStartMs
-    ? Math.max(
-        1,
-        Math.ceil((windowStartMs + cfg.windowMs - Date.now()) / 1000),
-      )
-    : 60;
-  return { allowed: false, retryAfterSeconds };
-}
-
-export async function recordVoiceApiRequest(
-  scope: VoiceApiRateLimitScope,
-  fingerprint: string,
-): Promise<void> {
-  const cfg = CONFIG[scope];
+  const unavailable = { allowed: false, retryAfterSeconds: Math.ceil(cfg.windowMs / 1000) };
   try {
-    const admin = createAdminClient();
-    await admin.from("security_auth_events").insert({
-      event_type: cfg.eventType,
-      outcome: "success",
-      metadata: { voice_api_actor: fingerprint, voice_api_scope: scope },
+    const { data, error } = await createAdminClient().rpc("auth_rate_limit_record_failure", {
+      p_scope: scope,
+      p_fingerprint: fingerprint,
+      p_window_seconds: cfg.windowMs / 1000,
+      // The first maxRequests calls are admitted. The following call starts the
+      // lock; already-locked attempts retain that count and are always denied.
+      p_max_failures: cfg.maxRequests + 1,
+      p_lock_seconds: cfg.windowMs / 1000,
+      p_captcha_after: cfg.maxRequests + 1,
     });
-  } catch (e) {
-    console.warn("[voice-api-rate-limit] record failed", e);
+    const row = Array.isArray(data) ? data[0] : undefined;
+    if (error || !row || !Number.isInteger(row.failure_count) || row.failure_count < 1 ||
+        !Number.isInteger(row.retry_after_seconds) || row.retry_after_seconds < 0) {
+      console.warn("[voice-api-rate-limit] reservation unavailable", { scope, code: error?.code });
+      return unavailable;
+    }
+    const allowed = row.failure_count <= cfg.maxRequests && row.retry_after_seconds === 0;
+    return { allowed, retryAfterSeconds: allowed ? 0 : Math.max(1, row.retry_after_seconds) };
+  } catch {
+    console.warn("[voice-api-rate-limit] reservation unavailable", { scope });
+    return unavailable;
   }
 }
 
-export function voiceApiFingerprint(
-  headersList: Headers,
-  hint: string,
-): string {
-  return rateLimitFingerprint(headersList, hint);
+/** The caller supplies a user/org identifier from its verified session. */
+export function voiceApiFingerprint(actorKey: string): string {
+  return actorRateLimitFingerprint(actorKey);
 }
 
 export function voiceApiRateLimitMessage(retryAfterSeconds: number): string {

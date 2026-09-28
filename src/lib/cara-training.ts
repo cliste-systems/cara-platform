@@ -1170,7 +1170,7 @@ export async function submitExistenceQuickAnswer(
 
   if (!draft.ok) {
     if ("needsClarification" in draft) {
-      return { ok: false, needsClarification: draft.needsClarification };
+      return { ok: false, message: draft.needsClarification };
     }
     return { ok: false, message: draft.message };
   }

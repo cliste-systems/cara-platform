@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
 import { CLISTE_COMPANY } from "@/lib/company-details";
 import { planSupportsSelfServeCheckout } from "@/lib/cliste-plans";
-import { requireDashboardSession } from "@/lib/dashboard-session";
+import { requireDashboardAdmin } from "@/lib/dashboard-admin";
 import {
   createPlatformSubscriptionCheckout,
   parseOrgBillingSelection,
@@ -34,7 +34,7 @@ export async function prepareEmbeddedBillingCheckout(): Promise<EmbeddedBillingC
     };
   }
 
-  const { supabase, organizationId, user } = await requireDashboardSession();
+  const { supabase, organizationId, user } = await requireDashboardAdmin();
 
   const { data: org } = await supabase
     .from("organizations")
@@ -88,7 +88,7 @@ export async function prepareEmbeddedBillingCheckout(): Promise<EmbeddedBillingC
 export async function finaliseBillingCheckout(
   checkoutSessionId: string,
 ): Promise<void> {
-  const { organizationId } = await requireDashboardSession();
+  const { organizationId } = await requireDashboardAdmin();
   await persistPlatformCheckoutSession(organizationId, checkoutSessionId);
   revalidatePath("/dashboard/usage");
   revalidatePath("/dashboard/billing");
@@ -106,7 +106,7 @@ export async function openBillingPortal(): Promise<BillingPortalResult> {
     };
   }
 
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId } = await requireDashboardAdmin();
 
   const { data: org } = await supabase
     .from("organizations")

@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { Building2 } from "lucide-react";
 
 import {
   clientProvisionSourceBadgeClass,
@@ -16,8 +15,8 @@ import {
 } from "@/lib/organization-niche";
 import { createAdminClient } from "@/utils/supabase/admin";
 
-import { adminCustomerPath, adminCustomersPath } from "@/lib/admin-route-paths";
-import { adminMutedLinkClass } from "@/components/admin/admin-interactive";
+import { adminCustomersPath } from "@/lib/admin-route-paths";
+import { AdminPageShell } from "@/components/admin/admin-page-shell";
 import { AccountPlanForm } from "@/app/(admin)/admin/organizations/[id]/account-plan-form";
 import { GoLiveCard } from "@/app/(admin)/admin/organizations/[id]/go-live-card";
 import { IrishPhoneCard } from "@/app/(admin)/admin/organizations/[id]/irish-phone-card";
@@ -56,7 +55,7 @@ function ManagedInviteCard({
   inviteAcceptedAt: string | null;
 }) {
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <section className="rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] p-5 shadow-[0_1px_0_rgba(17,24,29,0.05),0_14px_34px_-28px_rgba(17,24,29,0.32)]">
       <h2 className="text-sm font-semibold text-gray-900">Owner invite</h2>
       <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
         <div>
@@ -83,7 +82,7 @@ function SelfServeClientSummary({
 }) {
   return (
     <>
-      <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <section className="rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] p-5 shadow-[0_1px_0_rgba(17,24,29,0.05),0_14px_34px_-28px_rgba(17,24,29,0.32)]">
         <h2 className="text-sm font-semibold text-gray-900">Account summary</h2>
         <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div>
@@ -107,7 +106,7 @@ function SelfServeClientSummary({
         </dl>
       </section>
 
-      <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <section className="rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] p-5 shadow-[0_1px_0_rgba(17,24,29,0.05),0_14px_34px_-28px_rgba(17,24,29,0.32)]">
         <h2 className="text-sm font-semibold text-gray-900">Onboarding progress</h2>
         <p className="mt-2 text-sm text-gray-600">
           Wizard step{" "}
@@ -118,7 +117,7 @@ function SelfServeClientSummary({
         </p>
       </section>
 
-      <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <section className="rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] p-5 shadow-[0_1px_0_rgba(17,24,29,0.05),0_14px_34px_-28px_rgba(17,24,29,0.32)]">
         <h2 className="text-sm font-semibold text-gray-900">Business snapshot</h2>
         <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
           <div>
@@ -145,11 +144,11 @@ export default async function AdminClientDetailPage({ params }: PageProps) {
     admin = createAdminClient();
   } catch (e) {
     return (
-      <div className="mx-auto max-w-3xl p-6 md:p-8">
+      <AdminPageShell icon={Building2} title="Customer" backHref={adminCustomersPath()} backLabel="Customers">
         <p className="text-destructive text-sm">
           {e instanceof Error ? e.message : "Admin client unavailable."}
         </p>
-      </div>
+      </AdminPageShell>
     );
   }
 
@@ -167,49 +166,35 @@ export default async function AdminClientDetailPage({ params }: PageProps) {
   const isManaged = client.provisionSource === "managed";
   const isRetail = niche === "retail";
 
-  const header = (
-    <div>
-      <Link
-        href={adminCustomersPath()}
-        className={`${adminMutedLinkClass} mb-4`}
-      >
-        <ChevronLeft className="size-4" aria-hidden />
-        Customers
-      </Link>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
-              {client.name}
-            </h1>
-            <span className={clientProvisionSourceBadgeClass(client.provisionSource)}>
-              {clientProvisionSourceLabel(client.provisionSource)}
-            </span>
-            {isManaged && client.provisioningStage ? (
-              <TenantProvisioningStageChip stage={client.provisioningStage} />
-            ) : null}
-          </div>
-          <p className="mt-1 font-mono text-sm text-gray-500">
-            {client.slug}
-            {client.storeCode ? ` · store ${client.storeCode}` : ""}
-            {" · "}
-            {ORGANIZATION_NICHE_ADMIN_LABELS[niche]}
-          </p>
-          <p className="mt-1 text-xs text-gray-500">
-            {clientProvisionSourceDescription(client.provisionSource)}
-          </p>
-        </div>
+  const shellProps = {
+    icon: Building2,
+    title: client.name,
+    description: (
+      <>
+        {client.slug}{client.storeCode ? ` · store ${client.storeCode}` : ""} · {ORGANIZATION_NICHE_ADMIN_LABELS[niche]}
+        <span className="block text-xs">{clientProvisionSourceDescription(client.provisionSource)}</span>
+      </>
+    ),
+    backHref: adminCustomersPath(),
+    backLabel: "Customers",
+    actions: (
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={clientProvisionSourceBadgeClass(client.provisionSource)}>
+          {clientProvisionSourceLabel(client.provisionSource)}
+        </span>
+        {isManaged && client.provisioningStage ? (
+          <TenantProvisioningStageChip stage={client.provisioningStage} />
+        ) : null}
         <OpenDashboardButton organizationId={orgId} />
       </div>
-    </div>
-  );
+    ),
+  };
 
   if (!isManaged) {
     return (
-      <div className="mx-auto max-w-6xl space-y-6 p-6 md:p-8">
-        {header}
+      <AdminPageShell {...shellProps}>
         <SelfServeClientSummary client={client} />
-      </div>
+      </AdminPageShell>
     );
   }
 
@@ -222,8 +207,7 @@ export default async function AdminClientDetailPage({ params }: PageProps) {
     const clisteNumber = org.phone_number as string | null;
 
     return (
-      <div className="mx-auto max-w-6xl space-y-6 p-6 md:p-8">
-        {header}
+      <AdminPageShell {...shellProps}>
         <ManagedInviteCard
           ownerEmail={client.ownerEmail}
           inviteSentAt={client.inviteSentAt}
@@ -253,17 +237,16 @@ export default async function AdminClientDetailPage({ params }: PageProps) {
               : null
           }
         />
-      </div>
+      </AdminPageShell>
     );
   }
 
   const accountId = org.account_id ?? null;
-  let planTier = client.planTier ?? "pro";
+  const planTier = client.planTier ?? "pro";
   const showLivekit = livekitUsNumbersEnabled();
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-6 md:p-8">
-      {header}
+    <AdminPageShell {...shellProps}>
       <ManagedInviteCard
         ownerEmail={client.ownerEmail}
         inviteSentAt={client.inviteSentAt}
@@ -277,6 +260,6 @@ export default async function AdminClientDetailPage({ params }: PageProps) {
       {showLivekit ? (
         <LiveKitPhoneCard organizationId={orgId} phoneNumber={org.phone_number} />
       ) : null}
-    </div>
+    </AdminPageShell>
   );
 }

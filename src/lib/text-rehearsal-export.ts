@@ -78,7 +78,7 @@ export function formatTextRehearsalExport(input: {
     lines.push("## Issues");
     for (const entry of input.issues) {
       const offset =
-        entry.offsetMs >= 0 ? `+${(entry.offsetMs / 1000).toFixed(1)}s` : "";
+        entry.atMs >= 0 ? `+${(entry.atMs / 1000).toFixed(1)}s` : "";
       lines.push(`${offset} [${entry.tag}] ${entry.message}`);
     }
   }

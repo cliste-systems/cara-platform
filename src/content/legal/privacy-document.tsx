@@ -1,6 +1,5 @@
-
 import {
-    LegalCallout,
+  LegalCallout,
   LegalList,
   LegalPageHeader,
   LegalSection,
@@ -8,7 +7,6 @@ import {
 } from "@/components/legal/legal-document";
 import { LegalInlineLink } from "@/components/legal/legal-path-context";
 import { CLISTE_COMPANY, companyRegistrationLine } from "@/lib/company-details";
-
 
 export function PrivacyNoticeDocument() {
   return (
@@ -20,28 +18,31 @@ export function PrivacyNoticeDocument() {
 
       <LegalCallout variant="info">
         Hello Cara is an <strong>AI voice receptionist and Action Inbox</strong> for
-        local businesses. We do not host public online booking storefronts or
-        take card payments from your customers on your behalf. Subscription
-        billing for your Hello Cara account is handled by Stripe separately.
+        retail stores. Managed accounts are set up by our team and billed to the
+        agreed organisation by invoice. Account activation does not require a
+        payment card. Acknowledging this notice confirms that it has been provided
+        to you; it is not consent to all processing.
       </LegalCallout>
 
       <LegalSection title="1. Who we are and our roles under GDPR">
         <p className="text-[14px] text-slate-600">{companyRegistrationLine()}</p>
         <LegalList>
           <li>
-            <strong>You, the business owner</strong>, are the{" "}
-            <em>data controller</em> for your callers&rsquo; and contacts&rsquo;
-            personal data (name, phone, call history, action-inbox items). You
-            decide why and how that data is used.
+            <strong>The customer business</strong> deciding why and how its
+            callers&rsquo; and contacts&rsquo; personal data is used is the{" "}
+            <em>data controller</em>. The controller may differ from the group
+            paying invoices where stores are operated by separate companies.
+            Linking stores for billing does not itself authorise sharing their
+            caller data.
           </li>
           <li>
             <strong>Hello Cara</strong> is your <em>data processor</em> for that
-            data — we act only on your documented instructions (this notice and
+            data — we act on the controller&apos;s documented instructions under
             the{" "}
             <LegalInlineLink href="/legal/dpa">
               Data Processing Agreement
             </LegalInlineLink>
-            ).
+            .
           </li>
           <li>
             <strong>Hello Cara</strong> is the <em>controller</em> for our own
@@ -57,12 +58,12 @@ export function PrivacyNoticeDocument() {
           rows={[
             [
               "Business account",
-              "Name, business name, email, phone, password hash",
-              "You at signup / settings",
+              "Name, role, store and organisation details, email, phone, password credentials, and acceptance records",
+              "You, your organisation's authorised administrator, or our team when setting up your account",
             ],
             [
               "Caller & contact data",
-              "Caller ID, optional name, action-inbox summaries",
+              "Caller ID, optional name, store enquiry details and action-inbox summaries",
               "Inbound calls, dashboard contacts",
             ],
             [
@@ -75,9 +76,9 @@ export function PrivacyNoticeDocument() {
               "Calls to your Hello Cara number",
             ],
             [
-              "Appointments (optional)",
-              "If your voice agent books through Hello Cara, service, time, reference",
-              "AI call flow / legacy data",
+              "Store service activity",
+              "Enquiries, routing, requests and follow-up details; appointment details where that service is used",
+              "Callers, store staff and configured integrations",
             ],
             [
               "Operational",
@@ -87,10 +88,11 @@ export function PrivacyNoticeDocument() {
             [
               "Platform billing",
               <>
-                Card data is handled by <strong>Stripe</strong>; we store
-                subscription and customer ids, not full card numbers.
+                Billing organisation, billing contact, invoice details and payment
+                status. If an agreed payment method uses <strong>Stripe</strong>,
+                Stripe handles its payment data; we do not store full card numbers.
               </>,
-              "Stripe Billing / Customer Portal",
+              "Your organisation, our invoicing records and any payment provider used",
             ],
           ]}
         />
@@ -99,8 +101,9 @@ export function PrivacyNoticeDocument() {
       <LegalSection title="3. Lawful bases (Article 6 GDPR)">
         <LegalList>
           <li>
-            <strong>Contract</strong> (Art 6(1)(b)): operating your account,
-            answering calls, Action Inbox notifications you configure.
+            <strong>Contract</strong> (Art 6(1)(b)): providing services where
+            necessary to perform a contract with you as an individual, or to take
+            steps at your request before entering that contract.
           </li>
           <li>
             <strong>Legal obligation</strong> (Art 6(1)(c)): tax records,
@@ -108,8 +111,9 @@ export function PrivacyNoticeDocument() {
           </li>
           <li>
             <strong>Legitimate interests</strong> (Art 6(1)(f)): security, fraud
-            prevention, service improvement that does not single out
-            individuals, audit logging.
+            prevention, administering relationships with corporate customers and
+            their staff, service communications, and audit logging. We assess
+            these interests against individuals&apos; rights.
           </li>
           <li>
             <strong>Consent</strong> (Art 6(1)(a)): only where required — e.g.
@@ -117,6 +121,13 @@ export function PrivacyNoticeDocument() {
             processing already carried out.
           </li>
         </LegalList>
+        <p>
+          For caller data we process on a store&apos;s behalf, that controller must
+          identify and explain its applicable lawful basis and purposes. Its
+          representative accepting the DPA does not give consent on behalf of
+          every caller. Account invitations and security messages concern the
+          service; they do not enrol you in marketing.
+        </p>
       </LegalSection>
 
       <LegalSection title="4. Retention">
@@ -132,17 +143,20 @@ export function PrivacyNoticeDocument() {
 
       <LegalSection title="5. International transfers">
         <p>
-          Your business and caller records are stored in the{" "}
-          <strong>EEA</strong> (Ireland). Dashboard hosting runs in{" "}
-          <strong>Dublin (dub1)</strong>, and the voice agent on{" "}
-          <strong>LiveKit Cloud</strong> (EU SIP and agent runtime in Frankfurt).
-          Some processing
-          — mainly{" "}
-          <strong>text-to-speech and LLM routing</strong> (ElevenLabs, OpenRouter)
-          and transactional email — may still use US-based sub-processors under the
-          EU&ndash;US Data Privacy Framework and/or Standard Contractual Clauses.
-          Audio recordings and transcripts are retained for up to 30 days; see{" "}
-          <LegalInlineLink href="/legal/sub-processors">sub-processors</LegalInlineLink>.
+          Primary business and caller records use EEA storage. Some processing by
+          voice, AI, email and other service providers may take place outside the
+          EEA. The{" "}
+          <LegalInlineLink href="/legal/sub-processors">sub-processor information</LegalInlineLink>
+          {" "}describes providers, purposes and locations; an EU company address
+          alone does not guarantee that all processing remains in the EEA.
+        </p>
+        <p>
+          Transfers require an applicable adequacy decision or appropriate
+          safeguards, such as the European Commission&apos;s Standard Contractual
+          Clauses and any necessary supplementary measures. The EU–US Data Privacy
+          Framework applies only where the recipient and processing are covered
+          by a valid certification. Contact our privacy team for information about
+          applicable safeguards and how to obtain a copy.
         </p>
       </LegalSection>
 
@@ -175,9 +189,11 @@ export function PrivacyNoticeDocument() {
 
       <LegalSection title="8. AI transparency">
         <p>
-          Calls to your Hello Cara number are answered by an AI agent that identifies
-          itself as AI where required. Callers may ask for a callback or use your
-          direct line.
+          The assistant identifies itself as AI at the start of the call and
+          provides the applicable recording and transcription notice. Each store
+          must also provide its caller privacy information. AI can misunderstand
+          a request; important outcomes require staff review. Callers can ask for
+          human follow-up using the store&apos;s available contact arrangements.
         </p>
       </LegalSection>
 
@@ -185,10 +201,12 @@ export function PrivacyNoticeDocument() {
         <p>
           We encrypt data in transit (TLS) and at rest (managed database
           encryption). Production database access is restricted and logged.
-          Voice calls are transcribed for up to 30 days; transcripts are redacted
-          for card numbers, government IDs, and obvious volunteered sensitive
-          phrases before storage. Call recordings are kept for up to 30 days for
-          quality review and dispute handling, then deleted automatically.
+          Stored transcripts use redaction controls to reduce exposure of card
+          numbers, government IDs and certain sensitive information. Redaction
+          cannot guarantee that all personal or sensitive information is removed
+          and does not redact audio recordings. Recording and transcript retention
+          is described below. Avoid giving the assistant unnecessary sensitive
+          information.
         </p>
       </LegalSection>
 
@@ -218,28 +236,31 @@ export function PrivacyNoticeDocument() {
               "30 days, then nulled",
               "Quality review; summary kept for trends",
             ],
-            ["AI summary & caller number", "13 months, then nulled", "Reporting window"],
+            ["AI summary, caller number & action-item caller details", "13 months, then removed", "Store follow-up and reporting"],
+            ["Contacts", "Anonymised after 24 months without updates", "Store contact management"],
             [
               "Appointments (if used)",
               "Account lifetime + 6 years where tax law requires",
               "Business records (Revenue)",
             ],
             [
-              "Legacy public-booking security rows",
-              "Purged by cron (30 min / 14 days)",
-              "Leftover tables from retired feature; no new writes",
+              "Invoice and accounting records",
+              "For the applicable statutory retention period",
+              "Accounting and legal obligations",
             ],
             ["Security audit log", "24 months", "Incident investigation"],
-            ["Business account", "Account lifetime + 30 days", "Closure handling"],
+            ["Business account & agreement records", "While the account is active and as needed afterwards for closure, legal obligations and establishing or defending claims", "Account administration and evidence of the agreement"],
           ]}
         />
       </LegalSection>
 
       <LegalSection title="12. Contact">
         <p>
-          <strong>{CLISTE_COMPANY.privacyEmail}</strong> — we aim to acknowledge within
-          5 working days and respond within 30 days (extendable for complex
-          requests, with notice).
+          Contact <strong>{CLISTE_COMPANY.privacyEmail}</strong> about this notice
+          or your data rights. Requests are handled without undue delay and within
+          the applicable GDPR timeframe, generally one month, with any permitted
+          extension explained to you. Where we act as processor, we assist the
+          relevant store controller in responding.
         </p>
       </LegalSection>
     </>

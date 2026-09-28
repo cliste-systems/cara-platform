@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -137,40 +138,45 @@ export function TopNavLocationSwitcher(
         {trigger}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-[232px]">
-        <DropdownMenuLabel>{locationLabel}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="cursor-pointer"
-          onSelect={() => onSelect("all")}
-        >
-          <span className="flex w-full items-center justify-between gap-2">
-            <span>All {locationLabel.toLowerCase()}s</span>
-            {viewAllLocations ? (
-              <Check className="size-4 text-slate-700" aria-hidden />
-            ) : null}
-          </span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        {locations.map((location) => {
-          const selected =
-            !viewAllLocations && location.id === activeOrganizationId;
-          return (
-            <DropdownMenuItem
-              key={location.id}
-              className={cn("cursor-pointer", selected && "bg-slate-50")}
-              onSelect={() => onSelect(location.id)}
-            >
-              <span className="flex w-full items-center justify-between gap-2">
-                <span className="truncate">
-                  {labelForLocation(location, accountName)}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>{locationLabel}</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="cursor-pointer"
+            onSelect={() => onSelect("all")}
+          >
+            <span className="flex w-full items-center justify-between gap-2">
+              <span>All {locationLabel.toLowerCase()}s</span>
+              {viewAllLocations ? (
+                <Check className="size-4 text-slate-700" aria-hidden />
+              ) : null}
+            </span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {locations.map((location) => {
+            const selected =
+              !viewAllLocations && location.id === activeOrganizationId;
+            return (
+              <DropdownMenuItem
+                key={location.id}
+                className={cn("cursor-pointer", selected && "bg-slate-50")}
+                onSelect={() => onSelect(location.id)}
+              >
+                <span className="flex w-full items-center justify-between gap-2">
+                  <span className="truncate">
+                    {labelForLocation(location, accountName)}
+                  </span>
+                  {selected ? (
+                    <Check
+                      className="size-4 shrink-0 text-slate-700"
+                      aria-hidden
+                    />
+                  ) : null}
                 </span>
-                {selected ? (
-                  <Check className="size-4 shrink-0 text-slate-700" aria-hidden />
-                ) : null}
-              </span>
-            </DropdownMenuItem>
-          );
-        })}
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -223,40 +229,45 @@ export function LocationSwitcher({
         <ChevronDown className="size-4 shrink-0 text-[#cbd5e1]" aria-hidden />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-[232px]">
-        <DropdownMenuLabel>{locationLabel}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="cursor-pointer"
-          onSelect={() => onSelect("all")}
-        >
-          <span className="flex w-full items-center justify-between gap-2">
-            <span>All {locationLabel.toLowerCase()}s</span>
-            {viewAllLocations ? (
-              <Check className="size-4 text-emerald-600" aria-hidden />
-            ) : null}
-          </span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        {locations.map((location) => {
-          const selected =
-            !viewAllLocations && location.id === activeOrganizationId;
-          return (
-            <DropdownMenuItem
-              key={location.id}
-              className={cn("cursor-pointer", selected && "bg-slate-50")}
-              onSelect={() => onSelect(location.id)}
-            >
-              <span className="flex w-full items-center justify-between gap-2">
-                <span className="truncate">
-                  {labelForLocation(location, accountName)}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>{locationLabel}</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="cursor-pointer"
+            onSelect={() => onSelect("all")}
+          >
+            <span className="flex w-full items-center justify-between gap-2">
+              <span>All {locationLabel.toLowerCase()}s</span>
+              {viewAllLocations ? (
+                <Check className="size-4 text-emerald-600" aria-hidden />
+              ) : null}
+            </span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {locations.map((location) => {
+            const selected =
+              !viewAllLocations && location.id === activeOrganizationId;
+            return (
+              <DropdownMenuItem
+                key={location.id}
+                className={cn("cursor-pointer", selected && "bg-slate-50")}
+                onSelect={() => onSelect(location.id)}
+              >
+                <span className="flex w-full items-center justify-between gap-2">
+                  <span className="truncate">
+                    {labelForLocation(location, accountName)}
+                  </span>
+                  {selected ? (
+                    <Check
+                      className="size-4 shrink-0 text-emerald-600"
+                      aria-hidden
+                    />
+                  ) : null}
                 </span>
-                {selected ? (
-                  <Check className="size-4 shrink-0 text-emerald-600" aria-hidden />
-                ) : null}
-              </span>
-            </DropdownMenuItem>
-          );
-        })}
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

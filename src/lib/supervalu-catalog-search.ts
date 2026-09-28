@@ -10,11 +10,13 @@ import {
   normalizeSearchText,
 } from "@/lib/supervalu-offers-normalize";
 import type { SupervaluFulfilment, SupervaluGatewayProduct, SupervaluServiceArea } from "@/lib/supervalu-offers-types";
+import { parseRetailMultibuyLabel } from "@/lib/retail-price-presentation";
 import { retailSearchTokenMatchesText } from "@/lib/retail-search-fuzzy";
+import { searchStructuredNationalPromotions, shouldUseStructuredPromotionSearch } from "@/lib/retail-promotion-search";
 import {
   inferRewardsPricePointFromQuery,
   inferWeeklyOffersListIntent,
-  offerSearchProductTokens,
+  offerSearchProductIdentityTokens,
   resolveWeeklyOfferSearchFilters,
   searchSyncedWeeklyOffersByQuery,
   RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS,
@@ -62,7 +64,7 @@ export function catalogProductTokens(query: string): string[] {
       stripCatalogSearchBoilerplate(normalizeCatalogBrandQuery(query)),
     ) ||
     normalizeCatalogBrandQuery(query);
-  return offerSearchProductTokens(core).filter(
+  return offerSearchProductIdentityTokens(core).filter(
     (token) =>
       !CATALOG_BRAND_QUERY_TOKENS.has(token) && !CATALOG_PREP_NOISE_TOKENS.has(token),
   );
@@ -81,7 +83,7 @@ export function filterCatalogMatchesByQuery(
   query: string,
   matches: SupervaluCatalogMatch[],
 ): SupervaluCatalogMatch[] {
-  if (matches.length === 0) return matches;
+  if (matches.length === 0 || inferWeeklyOffersListIntent(query)) return matches;
 
   const productTokens = catalogProductTokens(query);
   if (productTokens.length === 0) {
@@ -142,11 +144,11 @@ export function formatOwnBrandFallbackQuote(
 /** Infer whether the caller wants offer status, a price, or stock/range info. */
 export function inferCatalogSearchIntent(query: string): CatalogQuoteIntent {
   const q = query.toLowerCase();
-  if (inferRewardsPricePointFromQuery(q) != null) {
+  if (inferRewardsPricePointFromQuery(q) != null || shouldUseStructuredPromotionSearch(q)) {
     return "offer";
   }
   if (
-    /\bon offer\b|\bthis week\b|\bspecial\b|\bpromo|\bpromotion|\bdeal\b|\breduced\b|\bany offers\b|\bis it on\b|\bare they on\b|\boffers?\s+this\b/i.test(
+    /\boffers?\b|\bon offer\b|\bthis week\b|\bspecials?\b|\bpromo|\bpromotion|\bdeals?\b|\breduced\b|\bany offers\b|\bis it on\b|\bare they on\b|\boffers?\s+this\b/i.test(
       q,
     )
   ) {
@@ -166,7 +168,7 @@ export function inferCatalogSearchIntent(query: string): CatalogQuoteIntent {
 export function stripCatalogSearchBoilerplate(query: string): string {
   return query
     .replace(
-      /\b(on offer|this week|any offers?|special|promotion|promo|deal|reduced|how much is|how much|what(?:'s| is) the price|what(?:'s| is) the cost|price of|cost of|do you stock|do you sell|do you carry|are they on|is it on)\b/gi,
+      /\b(on offer|this week|any offers?|offers?|specials?|promotions?|promos?|deals?|reduced|how much is|how much|what(?:'s| is) the price|what(?:'s| is) the cost|price of|cost of|do you stock|do you sell|do you carry|are they on|is it on)\b/gi,
       " ",
     )
     .replace(
@@ -261,6 +263,7 @@ export type SupervaluCatalogMatch = {
   serviceArea?: string;
   fulfilment?: string;
   isAlcohol?: boolean;
+  campaignNames?: string[];
   source?: "synced" | "gateway" | "catalog";
 };
 
@@ -358,6 +361,15 @@ export function formatCatalogStockQuote(input: {
       input.wasPriceEur > input.currentPriceEur) ||
       Boolean(input.discountLabel?.trim()));
   const parts: string[] = [];
+
+  if (onOffer && parseRetailMultibuyLabel(input.discountLabel)) {
+    parts.push(`${input.productName}${dept}. ${formatSpokenDiscountLabel(input.discountLabel)} on the SuperValu national range.`);
+    if (input.currentPriceEur != null && input.currentPriceEur > 0) {
+      parts.push(`Single item price ${formatSpokenEurAmount(input.currentPriceEur)}.`);
+    }
+    parts.push("I can't confirm today's shelf stock from here.");
+    return parts.join(" ");
+  }
 
   if (intent === "offer") {
     if (onOffer && input.currentPriceEur != null) {
@@ -475,11 +487,6 @@ export function formatOfferFulfilmentMissQuote(input: {
   ].join("\n\n");
 }
 
-function catalogSearchCoreQuery(query: string): string {
-  const trimmed = query.trim();
-  const productQuery = stripCatalogSearchBoilerplate(trimmed) || trimmed;
-  return stripCatalogPackagingNoise(productQuery) || productQuery;
-}
 
 function syncedOfferToCatalogMatch(offer: WeeklyOfferMatch): SupervaluCatalogMatch {
   return {
@@ -495,6 +502,7 @@ function syncedOfferToCatalogMatch(offer: WeeklyOfferMatch): SupervaluCatalogMat
     serviceArea: offer.serviceArea,
     fulfilment: offer.fulfilment,
     isAlcohol: offer.isAlcohol,
+    campaignNames: offer.campaignNames,
     source: "synced",
   };
 }
@@ -640,36 +648,16 @@ async function searchSupervaluCatalogLiveInternal(
     retailBanner?: string;
     fulfilment?: SupervaluFulfilment | null;
     serviceArea?: SupervaluServiceArea | null;
+    reference?: Date;
   },
 ): Promise<SupervaluCatalogMatch[]> {
   const trimmed = query.trim().slice(0, SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS);
   if (!trimmed) return [];
 
   const intent = options?.intent ?? inferCatalogSearchIntent(trimmed);
+  const reference = options?.reference ?? new Date();
   const listIntent = inferWeeklyOffersListIntent(trimmed);
 
-  let nationalStoredMatches: SupervaluCatalogMatch[] = [];
-  if (options?.supabase && options?.retailBanner && options?.storeId) {
-    const stored = await searchStoredRetailCatalog(options.supabase, {
-      retailBanner: options.retailBanner,
-      sourceStoreId: options.storeId,
-      query: trimmed,
-      intent,
-      fulfilment: options.fulfilment,
-      serviceArea: options.serviceArea,
-      limit: listIntent ? RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS : SUPERVALU_CATALOG_SEARCH_MAX_RESULTS,
-    });
-    if (stored.length > 0) return filterCatalogMatchesByQuery(trimmed, stored);
-  } else if (options?.supabase && options?.retailBanner) {
-    nationalStoredMatches = await searchNationalRetailCatalog(options.supabase, {
-      retailBanner: options.retailBanner,
-      query: trimmed,
-      intent,
-      fulfilment: options.fulfilment,
-      serviceArea: options.serviceArea,
-      limit: listIntent ? RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS : SUPERVALU_CATALOG_SEARCH_MAX_RESULTS,
-    });
-  }
   const filters = resolveWeeklyOfferSearchFilters(trimmed, {
     fulfilment: options?.fulfilment,
     serviceArea: options?.serviceArea,
@@ -677,6 +665,38 @@ async function searchSupervaluCatalogLiveInternal(
   const fulfilment = filters.fulfilment ?? null;
   const serviceArea = filters.serviceArea ?? null;
 
+  // Mechanics are data constraints, not product names. Keep this ahead of
+  // ordinary catalogue fallback so an absent 3-for-10 never becomes an
+  // unrelated cheap product (or a regular-price stock answer).
+  if (shouldUseStructuredPromotionSearch(trimmed) && options?.supabase && options?.retailBanner) {
+    const [structured, synced] = await Promise.all([
+      searchStructuredNationalPromotions(options.supabase, {
+        retailBanner: options.retailBanner, query: trimmed, fulfilment, serviceArea, reference,
+        limit: RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS,
+      }),
+      searchSyncedWeeklyOffersByQuery(options.supabase, options.retailBanner, trimmed, {
+        fulfilment, serviceArea, reference, limit: RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS,
+      }),
+    ]);
+    const unique = new Map<string, SupervaluCatalogMatch>();
+    for (const match of [...structured, ...synced.map(syncedOfferToCatalogMatch)]) {
+      const key = normalizeProductKey(match.productName);
+      if (!unique.has(key)) unique.set(key, match);
+    }
+    return [...unique.values()].slice(0, RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS);
+  }
+
+  let storedMatches: SupervaluCatalogMatch[] = [];
+  if (options?.supabase && options?.retailBanner) {
+    const input = {
+      retailBanner: options.retailBanner, query: trimmed, intent,
+      fulfilment, serviceArea, reference,
+      limit: listIntent ? RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS : SUPERVALU_CATALOG_SEARCH_MAX_RESULTS,
+    };
+    storedMatches = options.storeId
+      ? await searchStoredRetailCatalog(options.supabase, { ...input, sourceStoreId: options.storeId })
+      : await searchNationalRetailCatalog(options.supabase, input);
+  }
   let syncedMatches: WeeklyOfferMatch[] = [];
   if (options?.supabase && options?.retailBanner) {
     syncedMatches = await searchSyncedWeeklyOffersByQuery(
@@ -687,6 +707,7 @@ async function searchSupervaluCatalogLiveInternal(
         limit: listIntent ? RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS : undefined,
         fulfilment,
         serviceArea,
+        reference,
       },
     );
   }
@@ -704,7 +725,7 @@ async function searchSupervaluCatalogLiveInternal(
   // and local promotions into another SuperValu store's answers.
   if (!options?.storeId && options?.supabase && options?.retailBanner) {
     const mergedNational = mergeGatewayWithSyncedOffers(
-      nationalStoredMatches,
+      storedMatches,
       syncedMatches,
       intent,
     );
@@ -720,6 +741,10 @@ async function searchSupervaluCatalogLiveInternal(
       );
     }
     return filteredNational;
+  }
+
+  if (storedMatches.length > 0) {
+    return filterCatalogMatchesByQuery(trimmed, mergeGatewayWithSyncedOffers(storedMatches, syncedMatches, intent));
   }
 
   const gatewayMatches = await searchSupervaluCatalogLiveSingle(trimmed, {
@@ -752,6 +777,7 @@ export async function searchSupervaluCatalogLiveWithFallback(
     retailBanner?: string;
     fulfilment?: SupervaluFulfilment | null;
     serviceArea?: SupervaluServiceArea | null;
+    reference?: Date;
   },
 ): Promise<SupervaluCatalogSearchResult> {
   const trimmed = query.trim().slice(0, SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS);
@@ -790,6 +816,7 @@ export async function searchSupervaluCatalogLive(
     retailBanner?: string;
     fulfilment?: SupervaluFulfilment | null;
     serviceArea?: SupervaluServiceArea | null;
+    reference?: Date;
   },
 ): Promise<SupervaluCatalogMatch[]> {
   const result = await searchSupervaluCatalogLiveWithFallback(query, options);

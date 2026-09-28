@@ -49,6 +49,14 @@ export function resolveEngineerTestCall(input: {
   return false;
 }
 
+/** Browser demo calls are internal test calls, but founders can review them in Call analysis. */
+export function isAdminDemoCallRow(row: {
+  caller_number?: string | null;
+  room_name?: string | null;
+}): boolean {
+  return isEngineerTestCallerNumber(row.caller_number) && isEngineerTestRoomName(row.room_name);
+}
+
 export function isEngineerTestCallRow(row: {
   engineer_test_call?: boolean | null;
   caller_number?: string | null;

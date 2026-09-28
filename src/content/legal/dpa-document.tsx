@@ -1,4 +1,3 @@
-
 import {
   LegalList,
   LegalPageHeader,
@@ -23,9 +22,20 @@ export function DpaDocument() {
         processing of personal data carried out by {CLISTE_COMPANY.legalName} on behalf of
         the Controller under the Hello Cara platform{" "}
         <LegalInlineLink href="/legal/terms">Terms of Service</LegalInlineLink>.
-        This DPA forms part of the agreement between the parties and applies to
-        all processing of personal data carried out by Cliste Systems Limited under the
-        agreement.
+        This DPA forms part of that agreement and covers customer personal data
+        processed on the Controller&apos;s instructions. It must be accepted by an
+        authorised representative, or otherwise agreed in writing, before that
+        processing begins. Our own account administration and billing data are
+        covered by the privacy notice.
+      </p>
+
+      <p className="text-[15px] leading-relaxed text-slate-700">
+        The Controller is the legal business deciding the purposes and means of
+        processing for the covered store(s). A billing organisation is not
+        automatically the Controller for separate store companies. Where several
+        legal businesses are covered, they and the representative&apos;s authority
+        to act for each must be identified in the customer agreement or written
+        processing instructions.
       </p>
 
       <LegalSection title="1. Definitions">
@@ -54,9 +64,9 @@ export function DpaDocument() {
       <LegalSection title="2. Subject matter and duration">
         <p>
           Cliste Systems Limited processes Personal Data to provide the Hello Cara platform — AI voice
-          receptionist, Action Inbox, optional appointments, SMS / email
-          notifications, and the operator dashboard — for the duration of the
-          customer&apos;s subscription, plus the retention periods set out in our{" "}
+          assistant, Action Inbox, store enquiries, service notifications and the
+          operator dashboard — for the duration of the customer agreement, plus
+          the applicable retention periods set out in our{" "}
           <LegalInlineLink href="/legal/privacy#retention">
             privacy notice
           </LegalInlineLink>
@@ -78,15 +88,15 @@ export function DpaDocument() {
             ],
             [
               "Data subject categories",
-              "The Controller's customers and staff users (operators)",
+              "The Controller's customers, other callers (including suppliers and staff), contacts, and authorised store users where processed on the Controller's behalf",
             ],
             [
               "Personal data categories",
-              "Name, mobile phone number, email, appointment metadata, voice call audio (up to 30 days in private storage), call transcripts (30 days), AI summaries (13 months)",
+              "Name, phone number, email, store enquiry and action-item details, call metadata, voice call audio (30-day retention), call transcripts (30-day retention), and AI summaries (13-month retention)",
             ],
             [
               "Special category data",
-              "None intended. Customers may volunteer health-related context during a call. Controller is responsible for not soliciting it.",
+              "Not intended for routine collection. Callers may volunteer sensitive information, including health or absence details. The Controller must identify any necessary processing and applicable Article 9 condition; both parties must minimise unnecessary sensitive data.",
             ],
           ]}
         />
@@ -97,18 +107,21 @@ export function DpaDocument() {
         <LegalList>
           <li>
             It has a lawful basis under Article 6 GDPR for every category of
-            Personal Data shared with {CLISTE_COMPANY.legalName} — typically performance of a
-            contract (Art 6(1)(b)) for booking, and legitimate interests
-            (Art 6(1)(f)) for repeat-customer recognition.
+            Personal Data shared with {CLISTE_COMPANY.legalName}, assessed for the
+            actual purpose. Consent is not assumed merely because a caller
+            telephones a store or a representative accepts this DPA.
           </li>
           <li>
-            It has provided appropriate transparency information to its customers
-            under Articles 13 / 14 GDPR, including disclosure of the AI voice
-            assistant.
+            It provides appropriate transparency information to callers, contacts
+            and staff under Articles 13 / 14 GDPR, including the purposes of any
+            recording or transcription. The Processor remains responsible for
+            its own transparency and other legal obligations.
           </li>
           <li>
-            It will not upload special category data unless it has the relevant
-            Article 9 condition.
+            It will not instruct unnecessary sensitive-data collection and will
+            identify an applicable Article 9 condition where special category
+            data must be processed. It will keep instructions, authorised users
+            and store access permissions current.
           </li>
         </LegalList>
       </LegalSection>
@@ -118,7 +131,11 @@ export function DpaDocument() {
         <LegalList ordered>
           <li>
             <strong>Process only on documented instructions</strong> from the
-            Controller, except where required by EU / Member State law.
+            Controller, including for transfers, except where required by EU /
+            Member State law. We will inform the Controller of such a legal
+            requirement before processing unless the law prohibits doing so,
+            and will inform it if an instruction appears to infringe applicable
+            data-protection law.
           </li>
           <li>
             Ensure persons authorised to process Personal Data are bound by
@@ -146,9 +163,10 @@ export function DpaDocument() {
             (security, breach notification, DPIA).
           </li>
           <li>
-            <strong>Notify</strong> the Controller without undue delay (and in any
-            event within 72 hours where feasible) of any Personal Data breach
-            affecting the Controller&apos;s data.
+            <strong>Notify</strong> the Controller without undue delay after
+            becoming aware of a Personal Data breach affecting its data, and
+            provide available information and assistance for its response.
+            Information may be supplied in stages as it becomes available.
           </li>
           <li>
             At the end of the agreement, <strong>delete or return</strong> all
@@ -164,22 +182,21 @@ export function DpaDocument() {
 
       <LegalSection title="6. International transfers">
         <p>
-          Several sub-processors are located in or transfer data to the United
-          States (see{" "}
-          <LegalInlineLink href="/legal/sub-processors">Sub-processors</LegalInlineLink>
-          ). Cliste Systems Limited relies on the <strong>EU-U.S. Data Privacy Framework</strong>{" "}
-          where the sub-processor is certified, and the EU Commission&apos;s{" "}
-          <strong>Standard Contractual Clauses</strong> (Module 3:
-          processor-to-processor) elsewhere, supplemented by the technical and
-          organisational measures in Annex II.
+          Some service providers process data outside the EEA. The locations and
+          processing activities are described in the{" "}
+          <LegalInlineLink href="/legal/sub-processors">sub-processor information</LegalInlineLink>
+          . A provider&apos;s EU establishment does not by itself mean all of its
+          processing stays in the EEA.
         </p>
         <p>
-          Cliste Systems Limited has completed a <strong>transfer impact assessment</strong> for
-          US transfers under Schrems II, documenting supplementary measures
-          including TLS in transit, private EU-hosted storage for call recordings
-          (30-day retention), transcript redaction, provider zero-data-retention
-          options where available, and automated retention deletion via our daily
-          data-retention cron.
+          Transfers must comply with GDPR Chapter V, using an applicable adequacy
+          decision or appropriate safeguards such as the European Commission&apos;s
+          Standard Contractual Clauses. Reliance on the EU–US Data Privacy
+          Framework requires the recipient and relevant processing to be covered
+          by a valid certification. Where required, we must assess the transfer
+          and implement supplementary measures. Information about applicable
+          safeguards and how to obtain a copy is available from our privacy
+          contact.
         </p>
       </LegalSection>
 
@@ -223,8 +240,10 @@ export function DpaDocument() {
           Within 30 days of the termination or expiry of the agreement, {CLISTE_COMPANY.legalName}
           will, at the Controller&apos;s choice, delete or return all Personal Data
           processed on its behalf, except where retention is required by Union
-          or Member State law. Backups are overwritten within the standard backup
-          rotation (35 days at the time of writing).
+          or Member State law. Any data awaiting deletion from backups must
+          remain protected and unavailable for ordinary use, and must be deleted
+          through the applicable backup lifecycle. We will provide information
+          about the applicable backup arrangements on request.
         </p>
       </LegalSection>
 
@@ -243,7 +262,7 @@ export function DpaDocument() {
         <LegalTable
           headers={["Field", "Value"]}
           rows={[
-            ["Controller", "The customer business (account holder of the Hello Cara account)"],
+            ["Controller", "The legal customer business, or each separately identified store controller, as recorded in the customer agreement or written processing instructions"],
             ["Processor", `${CLISTE_COMPANY.legalName}, Ireland`],
             [
               "Processor contact",
@@ -256,10 +275,10 @@ export function DpaDocument() {
                 </a>
               </>,
             ],
-            ["Frequency", "Continuous, for the duration of the subscription"],
+            ["Frequency", "As calls and service activity occur, for the duration of the customer agreement"],
             [
               "Storage location",
-              "EEA — Supabase AWS eu-west-1 (Ireland); Vercel dub1 (Dublin); LiveKit Cloud EU (Frankfurt); see Annex III",
+              "Primary business and caller records use EEA storage; processing by service providers may take place elsewhere. See Annex III and the applicable customer processing instructions.",
             ],
           ]}
         />
@@ -268,31 +287,32 @@ export function DpaDocument() {
       <LegalSection title="Annex II — Technical & organisational measures">
         <LegalList>
           <li>
-            <strong>Encryption</strong> — TLS 1.2+ in transit, AES-256 at rest
-            (Postgres, object storage).
+            <strong>Encryption</strong> — Encrypted application connections and
+            managed encryption at rest for database and recording storage.
           </li>
           <li>
-            <strong>Access control</strong> — Row-level security on every tenant
-            table; service role keys held only on the server.
+            <strong>Access control</strong> — Authenticated access, store
+            permissions and database access policies; privileged credentials are
+            restricted to server-side operations.
           </li>
           <li>
             <strong>Logging</strong> — Security audit log for privileged actions
             (admin actions, GDPR exports / erasures).
           </li>
           <li>
-            <strong>Network</strong> — Production behind Cloudflare WAF +
-            Turnstile bot protection.
+            <strong>Application protection</strong> — Request validation,
+            authentication controls and rate limiting on sensitive endpoints.
           </li>
           <li>
-            <strong>Backup</strong> — Supabase managed point-in-time recovery,
-            35-day window.
+            <strong>Operational security</strong> — Maintain measures appropriate
+            to the processing risks, including availability, recovery and
+            incident-response procedures, and review their effectiveness.
           </li>
           <li>
-            <strong>Retention</strong> — Daily cron at{" "}
-            <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
-              /api/cron/data-retention
-            </code>
-            .
+            <strong>Retention</strong> — Scheduled deletion or redaction for
+            recordings, transcripts and other covered service data according to
+            the privacy notice, together with tools for responding to erasure
+            requests.
           </li>
         </LegalList>
       </LegalSection>
@@ -308,7 +328,8 @@ export function DpaDocument() {
           <LegalInlineLink href="/legal/sub-processors">
             /legal/sub-processors
           </LegalInlineLink>{" "}
-          (category summary). Snapshot as of the date this DPA is accepted:
+          (category summary). The current named list is shown below; changes are
+          subject to Section 7.
         </p>
         <LegalTable
           headers={["Sub-processor", "Location", "Transfer mechanism"]}
@@ -319,7 +340,8 @@ export function DpaDocument() {
           ])}
         />
         <p className="text-[13px] text-slate-600">
-          For a countersigned copy before your first paid subscription, email{" "}
+          For a countersigned copy or to confirm separate store controllers
+          before processing begins, email{" "}
           <a
             href={`mailto:${CLISTE_COMPANY.privacyEmail}`}
             className="font-medium text-emerald-800 underline-offset-2 hover:underline"

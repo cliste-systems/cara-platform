@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
-/** Standard 5-column stats row used inside AdminListCard. */
+/** Responsive stats row shared by list pages and Overview. */
 export function AdminStatsGrid({
   children,
   className,
@@ -12,7 +12,8 @@ export function AdminStatsGrid({
 }) {
   return (
     <section
-      className={cn("grid grid-cols-2 gap-3 sm:grid-cols-5", className)}
+      className={cn("grid gap-3", className)}
+      style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))" }}
     >
       {children}
     </section>

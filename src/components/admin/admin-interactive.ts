@@ -10,7 +10,7 @@ export const adminTextLinkClass =
 
 /** Muted navigation links (back links, breadcrumbs). */
 export const adminMutedLinkClass =
-  "cursor-pointer inline-flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-900";
+  "cursor-pointer inline-flex items-center gap-1 text-sm font-medium text-[#6b7c75] hover:text-[#11181d]";
 
 /** Sidebar and shell navigation links. */
 export const adminNavLinkBaseClass =
@@ -22,19 +22,19 @@ export const adminSegmentedTabButtonClass =
 
 /** Primary filled action button used across admin pages. */
 export const adminPrimaryButtonClass = cn(
-  "inline-flex cursor-pointer items-center gap-2 rounded-md border border-gray-900 bg-gray-900 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-gray-800",
+  "inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#353d42] bg-[#353d42] px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#11181d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#353d42] focus-visible:ring-offset-2",
   adminInteractiveDisabledClass,
 );
 
 /** Secondary outline action button used across admin pages. */
 export const adminSecondaryButtonClass = cn(
-  "inline-flex cursor-pointer items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow-sm transition-colors hover:bg-gray-50",
+  "inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#cfd9d4] bg-[#fbfcfb] px-3.5 py-2 text-sm font-semibold text-[#35443f] shadow-sm transition-colors hover:border-[#a9b9b1] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#353d42] focus-visible:ring-offset-2",
   adminInteractiveDisabledClass,
 );
 
 /** Destructive outline action button. */
 export const adminDestructiveButtonClass = cn(
-  "inline-flex cursor-pointer items-center gap-2 rounded-md border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-700 shadow-sm transition-colors hover:bg-red-50",
+  "inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-3.5 py-2 text-sm font-semibold text-red-700 shadow-sm transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2",
   adminInteractiveDisabledClass,
 );
 

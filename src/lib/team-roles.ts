@@ -9,7 +9,7 @@ export const DASHBOARD_TEAM_ROLE_LABELS: Record<DashboardTeamRole, string> = {
 export function parseDashboardTeamRole(
   raw: string | null | undefined,
 ): DashboardTeamRole {
-  return raw === "member" ? "member" : "admin";
+  return raw === "admin" ? "admin" : "member";
 }
 
 export function isDashboardAdmin(role: string | null | undefined): boolean {

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { ClisteLogoMark } from "@/components/cliste-logo-mark";
 import {
   adminMfaAssuranceLevel,
-  requireAdminSessionUser,
+  requireAdminMfaSetupSessionUser,
 } from "@/lib/admin-session";
 
 import { AdminMfaSetup } from "./setup";
@@ -12,7 +12,7 @@ import { AdminMfaSetup } from "./setup";
 export const dynamic = "force-dynamic";
 
 export default async function AdminMfaPage() {
-  await requireAdminSessionUser();
+  await requireAdminMfaSetupSessionUser();
   const level = await adminMfaAssuranceLevel();
 
   if (level === "aal2") {

@@ -3,7 +3,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { HideStripeTestingAssistant } from "@/components/billing/hide-stripe-testing-assistant";
-import { DashboardGateShell } from "@/components/dashboard/dashboard-gate-shell";
 import { DashboardLiveRefresh } from "@/components/dashboard-live-refresh";
 
 import { DashboardVerticalProvider } from "./dashboard-vertical-context";
@@ -21,11 +20,7 @@ import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-
 import { navItemsForVertical } from "@/lib/dashboard-nav-items";
 import { resolveOrganizationDisplayName } from "@/lib/organization-display-name";
 import { verticalPackForNiche } from "@/lib/verticals";
-import {
-  dashboardPathnameFromHeaders,
-  dashboardShouldUseGateShell,
-  enforceDashboardLegalAcceptance,
-} from "@/lib/legal-acceptance-gate";
+import { userNeedsPassword } from "@/lib/invite-onboarding";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import {
   fetchDashboardNavBadges,
@@ -111,15 +106,8 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }>) {
   const session = await requireDashboardSession();
-  const pathname = await dashboardPathnameFromHeaders();
-
-  if (await dashboardShouldUseGateShell(session, pathname)) {
-    return <DashboardGateShell>{children}</DashboardGateShell>;
-  }
 
   const { supabase, organizationId, profile, user, accountId } = session;
-
-  await enforceDashboardLegalAcceptance(session);
 
   const [cookieStore, orgRow, locations, accountBilling] = await Promise.all([
     cookies(),
@@ -166,9 +154,7 @@ export default async function DashboardLayout({
     navSeenAt,
   );
 
-  const userMeta = user.user_metadata as Record<string, unknown> | undefined;
-  const needsPassword =
-    userMeta?.needs_password === true || userMeta?.needs_password === "true";
+  const needsPassword = userNeedsPassword(user);
 
   const vertical = verticalPackForNiche(orgRow?.niche);
   const resolvedNavItems = navItemsForVertical(navItems, vertical);

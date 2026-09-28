@@ -1,45 +1,48 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-
 import { buildInviteEmailBodies } from "./invite-email-bodies";
 
+const input = {
+  actionLink: "https://app.hellocara.ie/auth/callback?token_hash=abc&type=invite",
+  logoUrl: "https://app.hellocara.ie/m8x4p2n7.png",
+  businessName: "Murphy’s SuperValu Killarney",
+  productName: "Retail",
+  organizationName: "Murphy Retail Group",
+};
 
-const actionLink =
-  "https://app.hellocara.ie/auth/callback?token_hash=abc&type=invite";
-const logoUrl = "https://app.hellocara.ie/m8x4p2n7.png";
-
-test("invite subject includes name without leading comma", () => {
-  const bodies = buildInviteEmailBodies({
-    actionLink,
-    logoUrl,
-    recipientName: "Jane",
-    businessName: "Last Look Hair",
-    productName: "Salon",
-  });
-  assert.equal(bodies.subject, "Jane, you've been invited to HelloCara");
-  assert.equal(bodies.subject.startsWith(","), false);
+test("invitation explains password, agreements and dashboard in order", () => {
+  const bodies = buildInviteEmailBodies({ ...input, recipientName: "Jane", billingMethod: "invoice" });
+  assert.match(bodies.subject, /Set up your account for Murphy/);
+  assert.match(bodies.text, /Hi Jane,/);
+  assert.ok(bodies.text.indexOf("Choose your password") < bodies.text.indexOf("Review and accept"));
+  assert.ok(bodies.text.indexOf("Review and accept") < bodies.text.indexOf("Open your store dashboard"));
+  assert.match(bodies.text, /Organisation: Murphy Retail Group/);
+  assert.match(bodies.text, /No card details are needed/);
+  assert.match(bodies.html, /Set up my account/);
+  assert.ok(bodies.text.includes(input.actionLink));
 });
 
-test("invite subject omits name when empty", () => {
-  const bodies = buildInviteEmailBodies({
-    actionLink,
-    logoUrl,
-    businessName: "Last Look Hair",
-    productName: "Salon",
-  });
-  assert.equal(bodies.subject, "You've been invited to HelloCara");
+test("existing-user invitation never tells the user to replace their password", () => {
+  const bodies = buildInviteEmailBodies({ ...input, requiresPassword: false });
+  assert.match(bodies.text, /Sign in securely/);
+  assert.doesNotMatch(bodies.text, /Choose your password|No card details/);
+  assert.match(bodies.html, /Open my invitation/);
 });
 
-test("invite html uses HelloCara branding and first-party link", () => {
-  const bodies = buildInviteEmailBodies({
-    actionLink,
-    logoUrl,
-    businessName: "Last Look Hair",
-    productName: "Salon",
-  });
-  assert.match(bodies.html, /m8x4p2n7\.png/);
-  assert.match(bodies.html, /Accept invitation/);
-  assert.match(bodies.html, /Join Last Look Hair on HelloCara/);
-  assert.doesNotMatch(bodies.text, /supabase\.co/);
-  assert.ok(bodies.text.includes(actionLink));
+test("invitation escapes untrusted names, titles and links in HTML", () => {
+  const bodies = buildInviteEmailBodies({ ...input, recipientName: '<img src=x onerror="alert(1)">', businessName: '<script>bad()</script>', organizationName: 'A & B "Group"' });
+  assert.doesNotMatch(bodies.html, /<script>|<img src=x/);
+  assert.match(bodies.html, /&lt;script&gt;/);
+  assert.match(bodies.html, /A &amp; B &quot;Group&quot;/);
+  assert.match(bodies.html, /token_hash=abc&amp;type=invite/);
+});
+
+test("invitation carries accessible email structure and support guidance", () => {
+  const bodies = buildInviteEmailBodies(input);
+  assert.match(bodies.html, /<html lang="en" dir="ltr">/);
+  assert.match(bodies.html, /<table lang="en" dir="ltr" role="presentation"/);
+  assert.equal((bodies.html.match(/<h1/g) ?? []).length, 1);
+  assert.match(bodies.html, /Contact HelloCara Support/);
+  assert.match(bodies.text, /single-use/);
+  assert.match(bodies.text, /expired/);
 });

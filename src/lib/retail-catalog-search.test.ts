@@ -6,30 +6,20 @@ import { searchNationalRetailCatalog } from "./retail-catalog-search";
 function makeSupabaseRows(rows: unknown[]) {
   return {
     from() {
+      let needle = "";
       return {
-        select() {
-          return this;
-        },
-        eq() {
-          return this;
-        },
-        gte() {
-          return this;
-        },
+        select() { return this; },
+        eq() { return this; },
+        gte() { return this; },
+        order() { return this; },
         ilike(_column: string, pattern: string) {
-          const needle = pattern.replace(/%/g, "").toLowerCase();
+          needle = pattern.replace(/%/g, "").toLowerCase();
+          return this;
+        },
+        async range(from: number, to: number) {
           return {
-            ...this,
-            async limit() {
-              return {
-                data: rows.filter((row) =>
-                  String((row as { search_text?: string }).search_text ?? "")
-                    .toLowerCase()
-                    .includes(needle),
-                ),
-                error: null,
-              };
-            },
+            data: rows.filter((row) => String((row as { search_text?: string }).search_text ?? "").toLowerCase().includes(needle)).slice(from, to + 1),
+            error: null,
           };
         },
       };
@@ -129,4 +119,18 @@ describe("retail catalog search", () => {
 
     assert.match(matches[0]?.productName ?? "", /Don Carlos Extra Virgin Olive Oil/i);
   });
+});
+
+it("searches beyond the first page before rejecting an own-label national product", async () => {
+  const rows = Array.from({ length: 550 }, (_, index) => ({
+    id: `oil-${index}`, sku: `oil-${index}`, product_name: `Other Olive Oil ${index}`,
+    brand: "Other", department: "Olive Oil", service_area: "grocery", fulfilment: "prepack",
+    is_alcohol: false, search_text: `other olive oil ${index}`, national_store_count: 4, national_regular_price_eur: 5,
+  }));
+  rows.push({ ...rows[0]!, id: "own", sku: "own", product_name: "SuperValu Olive Oil", brand: "SuperValu", search_text: "supervalu olive oil" });
+  const matches = await searchNationalRetailCatalog(makeSupabaseRows(rows) as never, {
+    retailBanner: "supervalu", query: "SuperValu olive oil", intent: "stock",
+  });
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0]?.sku, "own");
 });

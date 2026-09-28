@@ -121,7 +121,6 @@ export default async function AdminSupportPage() {
           history.
         </>
       }
-      fillViewport
     >
       {loadError ? (
         <AdminErrorCard

@@ -19,7 +19,7 @@ These cannot be configured in-repo. Complete once per environment (production).
 3. Watch **Database egress** and **API requests** — these rise with dashboard traffic before storage does.
 4. Suggested alert threshold: **€50/month** overage on Pro at pilot scale.
 
-### LiveKit Cloud (voice worker — `cliste-code-base-2`)
+### LiveKit Cloud (voice worker — `cara-voice-platform`)
 
 1. [LiveKit Cloud dashboard](https://cloud.livekit.io) → Project → **Billing** / **Usage**
 2. Production agent runs in **`eu-central`** (Frankfurt) on the Ship plan — warm 24/7.

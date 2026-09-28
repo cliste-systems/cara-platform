@@ -94,6 +94,7 @@ describe("mergeIncomingCallEvent", () => {
         phase: "loading",
         callerNumber: "+353861001001",
         callLogId: "call-1",
+        usageRecordId: null,
         startedAt: "2026-09-15T12:00:00.000Z",
       },
     );

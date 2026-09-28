@@ -23,6 +23,7 @@ import {
   VOICE_ASSISTANT_DEFAULT_NAME,
 } from "../src/lib/voice-greeting";
 import { createAdminClient } from "../src/utils/supabase/admin";
+import { readTestSeedCredentials } from "../src/lib/test-seed-credentials";
 import { regenerateCaraCustomPrompt } from "../src/lib/cara-prompt-from-org";
 
 const SHOP_NAME = "Kavanaghs SuperValu Donegal Town";
@@ -30,8 +31,7 @@ const SHOP_SLUG = "kavanaghs-supervalu-donegal-town";
 const RETAIL_LINE_E164 = "+353749759508";
 const ADDRESS = "Quay Street, Donegal Town, Co. Donegal";
 const EIRCODE = "F94 E8N2";
-const PRESENTER_EMAIL = "kavanaghs@cliste.test";
-const PRESENTER_PASSWORD = "KavanaghsDemo2026!";
+const { email: PRESENTER_EMAIL, password: PRESENTER_PASSWORD } = readTestSeedCredentials();
 const PRESENTER_NAME = "Garreth Ferry";
 const STORE_MANAGER_NAME = "Garreth Ferry";
 const FRESH_FOOD_MANAGER_NAME = "Mark O'Toole";
@@ -445,7 +445,7 @@ async function main() {
   console.log(`  Cliste #:   ${RETAIL_LINE_E164}`);
   console.log(`  Manager SMS:${managerPhone}`);
   console.log(`  Dashboard:  sign in as ${PRESENTER_EMAIL}`);
-  console.log(`  Password:   ${PRESENTER_PASSWORD}`);
+  console.log("  Password: use the unique value supplied through CLISTE_SEED_PASSWORD.");
   console.log("\n  Next: npx tsx scripts/seed-kavanaghs-dashboard-activity.ts\n");
 }
 

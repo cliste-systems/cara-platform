@@ -24,7 +24,7 @@ Based on [`scripts/kavanaghs-five-part-demo-script.md`](../../../scripts/kavanag
 ### Rehearsal (day before)
 
 ```bash
-cd cliste-code-base-1
+cd cara-platform
 npx tsx scripts/rehearse-kavanaghs-demo.ts --manager-phone +353872715938 --probe-webhooks
 npx tsx scripts/rehearse-kavanaghs-demo.ts --simulate-five-part --app-url https://app.hellocara.ie
 ```

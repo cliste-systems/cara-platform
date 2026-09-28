@@ -15,6 +15,25 @@ Configure Sentry alert rules for: Stripe webhook handler errors, `usage-sync` / 
 |----------|----------|-------|
 | `CLISTE_VOICE_WEBHOOK_SECRET` | Yes | Shared with voice worker |
 
+## Post-call analysis
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `OPENAI_API_KEY` | Yes, on the dashboard server | Existing OpenAI project key; never use a `NEXT_PUBLIC_` name |
+| `OPENAI_CALL_ANALYSIS_MODEL` | Optional | Defaults to `gpt-6-sol`, using Responses with medium reasoning and a strict checklist schema |
+
+Call completion queues an admin-only review at `/admin/call-analysis`; the voice
+worker sends raw transcript and final diagnostics for ordinary calls as well as
+test calls. `/api/cron/call-analysis` retries interrupted reviews every five
+minutes, two per run. Errors are retryable and do not mark the customer call as
+failed. Retained non-engineer calls missing reviews queue automatically; engineer calls
+are excluded. The local development server also runs the queue automatically,
+without requiring an admin-page click. Both the dashboard and voice worker changes must be released for
+full diagnostic coverage. A review is a separate OpenAI request and incurs API
+usage; input/output token counts are stored with the result.
+
+See [Call Analysis](../CALL-ANALYSIS.md) for scoring, evidence limits and validation.
+
 ## Cron
 
 | Variable | Required | Notes |

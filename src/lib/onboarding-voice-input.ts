@@ -1,10 +1,7 @@
 import "server-only";
 
-import { headers } from "next/headers";
-
 import {
-  getVoiceApiRateLimitStatus,
-  recordVoiceApiRequest,
+  reserveVoiceApiRequest,
   voiceApiFingerprint,
   voiceApiRateLimitMessage,
 } from "@/lib/voice-api-rate-limit";
@@ -62,12 +59,10 @@ export async function prepareOnboardingVoiceGreetingInput(
   options: { rateLimitScope: "greeting_review" | null },
 ): Promise<VoiceGreetingInputResult> {
   if (options.rateLimitScope) {
-    const h = await headers();
     const fingerprint = voiceApiFingerprint(
-      h,
       `${options.rateLimitScope}:${ctx.session.organizationId}`,
     );
-    const rateLimit = await getVoiceApiRateLimitStatus(
+    const rateLimit = await reserveVoiceApiRequest(
       options.rateLimitScope,
       fingerprint,
     );
@@ -85,7 +80,6 @@ export async function prepareOnboardingVoiceGreetingInput(
         rateLimited: true,
       };
     }
-    await recordVoiceApiRequest(options.rateLimitScope, fingerprint);
   }
 
   const sanitized = sanitizeVoiceGreetingPayload({

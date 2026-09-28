@@ -7,7 +7,7 @@ import {
   normalizeBlockedCallerE164,
   type BlockedCallerRow,
 } from "@/lib/blocked-callers";
-import { requireDashboardSession } from "@/lib/dashboard-session";
+import { requireDashboardAdmin } from "@/lib/dashboard-admin";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -24,7 +24,7 @@ function revalidateBlockedCallerPaths() {
 }
 
 async function loadOrgPhoneGuardContext(
-  supabase: Awaited<ReturnType<typeof requireDashboardSession>>["supabase"],
+  supabase: Awaited<ReturnType<typeof requireDashboardAdmin>>["supabase"],
   organizationId: string,
 ) {
   const [{ data: org }, { data: dids }] = await Promise.all([
@@ -56,7 +56,7 @@ export async function addBlockedCaller(input: {
   phone: string;
   reason?: string | null;
 }): Promise<ActionResult & { callerE164?: string }> {
-  const { supabase, organizationId, user } = await requireDashboardSession();
+  const { supabase, organizationId, user } = await requireDashboardAdmin();
 
   const callerE164 = normalizeBlockedCallerE164(String(input.phone ?? ""));
   if (!callerE164) {
@@ -106,7 +106,7 @@ export async function removeBlockedCaller(input: {
     return { ok: false, message: "Invalid block entry." };
   }
 
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId } = await requireDashboardAdmin();
 
   const { data: row } = await supabase
     .from("blocked_callers")
@@ -141,7 +141,7 @@ export async function removeBlockedCallerByPhone(input: {
     return { ok: false, message: "Invalid phone number." };
   }
 
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId } = await requireDashboardAdmin();
 
   const { data: row } = await supabase
     .from("blocked_callers")
@@ -160,7 +160,7 @@ export async function removeBlockedCallerByPhone(input: {
 export async function saveBlockAnonymousCallers(input: {
   enabled: boolean;
 }): Promise<ActionResult> {
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId } = await requireDashboardAdmin();
 
   const { error } = await supabase
     .from("organizations")
@@ -196,7 +196,7 @@ export async function blockCallerAndDismissTicket(input: {
     return blockResult;
   }
 
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId } = await requireDashboardAdmin();
 
   const { data: row } = await supabase
     .from("action_tickets")

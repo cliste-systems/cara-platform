@@ -61,7 +61,7 @@ async function run(
       console.error("[cron] supervalu-offers-sync", result.message);
       return NextResponse.json(result, { status: 502 });
     }
-    return NextResponse.json(result);
+    return NextResponse.json(result, { status: result.queued ? 202 : 200 });
   } catch (err) {
     console.error("[cron] supervalu-offers-sync", err);
     return NextResponse.json(

@@ -3,17 +3,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
+  ArrowLeft,
   ArchiveRestore,
   Ban,
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   Eye,
   Inbox,
   Loader2,
   Mail,
   MailOpen,
+  Maximize2,
+  Minimize2,
+  MoreHorizontal,
+  Paperclip,
+  Reply,
   MousePointerClick,
   Plus,
   RefreshCw,
@@ -31,6 +39,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -38,9 +47,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
+import { EmailMessageBody } from "./email-message-body";
+import { EmailComposer } from "./email-composer";
+
 type Folder = "inbox" | "archived" | "sent";
 type GrammarTarget = "reply" | "compose";
-type MessageViewMode = "formatted" | "plain";
 type EmailIdentityKey = "hello" | "billing" | "cliste";
 type DeliveryStatus =
   | "sent"
@@ -229,144 +240,10 @@ function deliveryFailed(status: DeliveryStatus | null): boolean {
   );
 }
 
-function emailHasExternalImages(html: string): boolean {
-  return (
-    /<(?:img|source)\b[^>]*\b(?:src|srcset|poster)\s*=\s*["']?(?:https?:)?\/\//i.test(
-      html,
-    ) ||
-    /\bbackground\s*=\s*["']?(?:https?:)?\/\//i.test(html) ||
-    /url\(\s*["']?(?:https?:)?\/\//i.test(html)
-  );
-}
-
-function blockExternalImageSources(html: string): string {
-  const transparentPixel =
-    "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
-
-  return html
-    .replace(
-      /(\b(?:src|srcset|poster|background)\s*=\s*["'])\s*(?:https?:)?\/\/[^"']*(["'])/gi,
-      `$1${transparentPixel}$2`,
-    )
-    .replace(
-      /(\b(?:src|srcset|poster|background)\s*=\s*)(?:https?:)?\/\/[^\s>]+/gi,
-      `$1${transparentPixel}`,
-    )
-    .replace(
-      /url\(\s*(["']?)(?:https?:)?\/\/[^)]*\1\s*\)/gi,
-      "none",
-    );
-}
-
-function buildEmailFrameDocument(
-  html: string,
-  stripOpenTrackingPixel = false,
-  allowExternalImages = false,
-): string {
-  let safeHtml = html.replace(
-    /<meta\b[^>]*http-equiv\s*=\s*["']?refresh["']?[^>]*>/gi,
-    "",
-  );
-  if (stripOpenTrackingPixel) {
-    safeHtml = safeHtml.replace(
-      /<img\b[^>]*hellocara-email-open\?token=[^>]*>/gi,
-      "",
-    );
-  }
-  if (!allowExternalImages) {
-    safeHtml = blockExternalImageSources(safeHtml);
-  }
-
-  const frameCsp = allowExternalImages
-    ? "default-src 'none'; img-src data: blob: https:; style-src 'unsafe-inline'; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; form-action 'none';"
-    : "default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; form-action 'none';";
-
-  const head = [
-    `<meta http-equiv="Content-Security-Policy" content="${frameCsp}">`,
-    '<meta name="viewport" content="width=device-width, initial-scale=1">',
-    '<base target="_blank" rel="noopener noreferrer">',
-    "<style>",
-    "html{background:#fff;color-scheme:light;}",
-    "html,body{margin:0!important;min-height:100%;}",
-    "body{max-width:100%;overflow-wrap:anywhere;}",
-    "img{max-width:100%;height:auto;}",
-    "</style>",
-  ].join("");
-
-  if (/<head(?:\s|>)/i.test(safeHtml)) {
-    return safeHtml.replace(/<head([^>]*)>/i, `<head$1>${head}`);
-  }
-  if (/<html(?:\s|>)/i.test(safeHtml)) {
-    return safeHtml.replace(/<html([^>]*)>/i, `<html$1><head>${head}</head>`);
-  }
-  return `<!doctype html><html><head>${head}</head><body>${safeHtml}</body></html>`;
-}
-
-function EmailHtmlFrame({
-  html,
-  stripOpenTrackingPixel = false,
-  allowExternalImages = false,
-}: {
-  html: string;
-  stripOpenTrackingPixel?: boolean;
-  allowExternalImages?: boolean;
-}) {
-  const frameRef = useRef<HTMLIFrameElement>(null);
-  const observerRef = useRef<ResizeObserver | null>(null);
-  const [height, setHeight] = useState(560);
-  const srcDoc = useMemo(
-    () =>
-      buildEmailFrameDocument(
-        html,
-        stripOpenTrackingPixel,
-        allowExternalImages,
-      ),
-    [html, stripOpenTrackingPixel, allowExternalImages],
-  );
-
-  useEffect(() => {
-    setHeight(560);
-    return () => observerRef.current?.disconnect();
-  }, [html]);
-
-  const syncHeight = useCallback(() => {
-    const documentNode = frameRef.current?.contentDocument;
-    if (!documentNode) return;
-    const bodyHeight = documentNode.body?.scrollHeight ?? 0;
-    const rootHeight = documentNode.documentElement?.scrollHeight ?? 0;
-    const measured = Math.max(bodyHeight, rootHeight, 360);
-    setHeight(Math.min(measured + 8, 8000));
-  }, []);
-
-  const handleLoad = useCallback(() => {
-    observerRef.current?.disconnect();
-    syncHeight();
-
-    const documentNode = frameRef.current?.contentDocument;
-    if (!documentNode || typeof ResizeObserver === "undefined") return;
-
-    const observer = new ResizeObserver(syncHeight);
-    observer.observe(documentNode.documentElement);
-    if (documentNode.body) observer.observe(documentNode.body);
-    observerRef.current = observer;
-
-    window.setTimeout(syncHeight, 250);
-    window.setTimeout(syncHeight, 1000);
-  }, [syncHeight]);
-
-  return (
-    <iframe
-      ref={frameRef}
-      title="Email message"
-      srcDoc={srcDoc}
-      onLoad={handleLoad}
-      sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-      referrerPolicy="no-referrer"
-      className="block w-full border-0 bg-white"
-      style={{ height }}
-    />
-  );
-}
+const toolbarButtonClass =
+  "inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg px-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40";
+const fieldClass =
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[15px] text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100";
 
 async function apiJson<T>(
   input: RequestInfo | URL,
@@ -418,6 +295,12 @@ export function AdminEmailInboxView({
   const [selected, setSelected] = useState<EmailMessage | null>(null);
   const messageCacheRef = useRef<Map<string, EmailMessage>>(new Map());
   const messageRequestRef = useRef(0);
+  const listRequestRef = useRef(0);
+  const listPendingRef = useRef(false);
+  const replyDraftsRef = useRef(new Map<string, string>());
+  const [readerOpen, setReaderOpen] = useState(false);
+  const [expandedReader, setExpandedReader] = useState(false);
+  const [replyOpen, setReplyOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [reply, setReply] = useState("");
   const [composing, setComposing] = useState(false);
@@ -427,16 +310,18 @@ export function AdminEmailInboxView({
   const [loadingList, setLoadingList] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState(false);
   const [sending, setSending] = useState(false);
-  const [checkingGrammar, setCheckingGrammar] =
-    useState<GrammarTarget | null>(null);
+  const [checkingGrammar, setCheckingGrammar] = useState<GrammarTarget | null>(
+    null,
+  );
   const [changingState, setChangingState] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [messageView, setMessageView] = useState<MessageViewMode>("formatted");
-  const [allowExternalImages, setAllowExternalImages] = useState(false);
 
-  const activeIdentity =
-    identities.find((identity) => identity.key === identityKey) ??
+  const navigationBusy = sending || changingState || checkingGrammar !== null;
+
+  const activeIdentity = identities.find(
+    (identity) => identity.key === identityKey,
+  ) ??
     identities[0] ?? {
       key: "hello" as const,
       label: "Hello",
@@ -445,11 +330,10 @@ export function AdminEmailInboxView({
     };
 
   const loadFolder = useCallback(
-    async (
-      nextFolder: Folder,
-      preserveSelection = false,
-      silent = false,
-    ) => {
+    async (nextFolder: Folder, preserveSelection = false, silent = false) => {
+      if (silent && listPendingRef.current) return;
+      const requestId = ++listRequestRef.current;
+      listPendingRef.current = true;
       if (!silent) {
         setLoadingList(true);
         setError(null);
@@ -458,17 +342,34 @@ export function AdminEmailInboxView({
         const data = await apiJson<{ messages: EmailListItem[] }>(
           `/api/admin/inbox?folder=${nextFolder}&identity=${identityKey}`,
         );
+        if (requestId !== listRequestRef.current) return;
+        for (const message of data.messages) {
+          const cached = messageCacheRef.current.get(message.id);
+          if (
+            cached &&
+            (cached.readAt !== message.readAt ||
+              cached.archivedAt !== message.archivedAt)
+          ) {
+            messageCacheRef.current.delete(message.id);
+          }
+        }
         setMessages(data.messages);
         if (
-          !preserveSelection ||
-          !selectedId ||
-          !data.messages.some((message) => message.id === selectedId)
+          !preserveSelection &&
+          !window.matchMedia("(min-width: 1024px)").matches
         ) {
-          const nextId = data.messages[0]?.id ?? null;
-          setSelectedId(nextId);
-          if (!nextId) setSelected(null);
+          setReaderOpen(false);
         }
+        setSelectedId((current) => {
+          // A full reply can be opened from another folder. Background refreshes
+          // must not replace it, or reopen a message just marked unread.
+          if (preserveSelection) return current;
+          return window.matchMedia("(min-width: 1024px)").matches
+            ? (data.messages[0]?.id ?? null)
+            : null;
+        });
       } catch (loadError) {
+        if (requestId !== listRequestRef.current) return;
         if (!silent) {
           setError(
             loadError instanceof Error
@@ -477,10 +378,13 @@ export function AdminEmailInboxView({
           );
         }
       } finally {
-        if (!silent) setLoadingList(false);
+        if (requestId === listRequestRef.current) {
+          listPendingRef.current = false;
+          setLoadingList(false);
+        }
       }
     },
-    [identityKey, selectedId],
+    [identityKey],
   );
 
   const refreshDeliveryStatus = useCallback(async (id: string) => {
@@ -518,91 +422,100 @@ export function AdminEmailInboxView({
     }
   }, []);
 
-  const loadMessage = useCallback(async (id: string) => {
-    const requestId = ++messageRequestRef.current;
-    const cached = messageCacheRef.current.get(id);
+  const loadMessage = useCallback(
+    async (id: string) => {
+      const requestId = ++messageRequestRef.current;
+      const cached = messageCacheRef.current.get(id);
 
-    if (cached && cached.direction !== "outbound") {
-      setSelected(cached);
-      setMessageView(cached.htmlBody ? "formatted" : "plain");
-      setLoadingMessage(false);
-      return;
-    }
+      if (cached && cached.direction !== "outbound") {
+        setSelected(cached);
+        setLoadingMessage(false);
+        return;
+      }
 
-    setLoadingMessage(true);
-    setSelected(null);
-    setError(null);
+      setLoadingMessage(true);
+      setSelected(null);
+      setError(null);
 
-    try {
-      const data = await apiJson<{ message: EmailMessage }>(
-        `/api/admin/inbox/${encodeURIComponent(id)}`,
-      );
-      if (requestId !== messageRequestRef.current) return;
+      try {
+        const data = await apiJson<{ message: EmailMessage }>(
+          `/api/admin/inbox/${encodeURIComponent(id)}`,
+        );
+        if (requestId !== messageRequestRef.current) return;
 
-      const openedAt =
-        data.message.direction === "inbound" && !data.message.readAt
-          ? new Date().toISOString()
-          : data.message.readAt;
-      const openedMessage = { ...data.message, readAt: openedAt };
+        const openedAt =
+          data.message.direction === "inbound" && !data.message.readAt
+            ? new Date().toISOString()
+            : data.message.readAt;
+        const openedMessage = { ...data.message, readAt: openedAt };
 
-      if (openedMessage.direction !== "outbound") {
-        messageCacheRef.current.set(id, openedMessage);
-        if (messageCacheRef.current.size > 30) {
-          const oldest = messageCacheRef.current.keys().next().value as
-            | string
-            | undefined;
-          if (oldest) messageCacheRef.current.delete(oldest);
+        if (openedMessage.direction !== "outbound") {
+          messageCacheRef.current.set(id, openedMessage);
+          if (messageCacheRef.current.size > 30) {
+            const oldest = messageCacheRef.current.keys().next().value as
+              string | undefined;
+            if (oldest) messageCacheRef.current.delete(oldest);
+          }
+        }
+
+        setSelected(openedMessage);
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === id
+              ? {
+                  ...message,
+                  readAt: openedAt,
+                  preview: openedMessage.preview || message.preview,
+                }
+              : message,
+          ),
+        );
+
+        if (data.message.direction === "outbound") {
+          void refreshDeliveryStatus(id);
+        }
+
+        if (data.message.direction === "inbound" && !data.message.readAt) {
+          void apiJson<{ ok: true }>(
+            `/api/admin/inbox/${encodeURIComponent(id)}`,
+            {
+              method: "PATCH",
+              body: JSON.stringify({ read: true }),
+            },
+          ).catch(() => {
+            // Reading the message should never wait on the read-receipt write.
+          });
+        }
+      } catch (loadError) {
+        if (requestId !== messageRequestRef.current) return;
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Could not open email.",
+        );
+      } finally {
+        if (requestId === messageRequestRef.current) {
+          setLoadingMessage(false);
         }
       }
-
-      setSelected(openedMessage);
-      setMessageView(openedMessage.htmlBody ? "formatted" : "plain");
-      setMessages((current) =>
-        current.map((message) =>
-          message.id === id
-            ? {
-                ...message,
-                readAt: openedAt,
-                preview: openedMessage.preview || message.preview,
-              }
-            : message,
-        ),
-      );
-
-      if (data.message.direction === "outbound") {
-        void refreshDeliveryStatus(id);
-      }
-
-      if (data.message.direction === "inbound" && !data.message.readAt) {
-        void apiJson<{ ok: true }>(
-          `/api/admin/inbox/${encodeURIComponent(id)}`,
-          {
-            method: "PATCH",
-            body: JSON.stringify({ read: true }),
-          },
-        ).catch(() => {
-          // Reading the message should never wait on the read-receipt write.
-        });
-      }
-    } catch (loadError) {
-      if (requestId !== messageRequestRef.current) return;
-      setError(
-        loadError instanceof Error ? loadError.message : "Could not open email.",
-      );
-    } finally {
-      if (requestId === messageRequestRef.current) {
-        setLoadingMessage(false);
-      }
-    }
-  }, [refreshDeliveryStatus]);
+    },
+    [refreshDeliveryStatus],
+  );
 
   useEffect(() => {
     void loadFolder(folder);
-  }, [folder, identityKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [folder, loadFolder]);
 
   useEffect(() => {
-    setAllowExternalImages(false);
-    if (selectedId && !composing) void loadMessage(selectedId);
+    setReplyOpen(false);
+    setReply(selectedId ? (replyDraftsRef.current.get(selectedId) ?? "") : "");
+    if (selectedId && !composing) {
+      void loadMessage(selectedId);
+    } else {
+      ++messageRequestRef.current;
+      setSelected(null);
+      setLoadingMessage(false);
+    }
   }, [selectedId, composing, loadMessage]);
 
   useEffect(() => {
@@ -628,13 +541,7 @@ export function AdminEmailInboxView({
       window.removeEventListener("focus", refreshFolder);
       document.removeEventListener("visibilitychange", refreshFolder);
     };
-  }, [
-    folder,
-    selectedId,
-    composing,
-    loadFolder,
-    refreshDeliveryStatus,
-  ]);
+  }, [folder, selectedId, composing, loadFolder, refreshDeliveryStatus]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -654,7 +561,10 @@ export function AdminEmailInboxView({
   }, [messages, query]);
 
   const unreadCount = useMemo(
-    () => messages.filter((message) => !message.readAt).length,
+    () =>
+      messages.filter(
+        (message) => message.direction === "inbound" && !message.readAt,
+      ).length,
     [messages],
   );
 
@@ -662,6 +572,7 @@ export function AdminEmailInboxView({
     const draft = target === "reply" ? reply : composeBody;
     if (!draft.trim()) return;
 
+    const draftMessageRequest = messageRequestRef.current;
     setCheckingGrammar(target);
     setError(null);
     setNotice(null);
@@ -676,6 +587,8 @@ export function AdminEmailInboxView({
       });
 
       if (target === "reply") {
+        if (selectedId) replyDraftsRef.current.set(selectedId, data.suggested);
+        if (draftMessageRequest !== messageRequestRef.current) return;
         setReply(data.suggested);
       } else {
         setComposeBody(data.suggested);
@@ -710,13 +623,17 @@ export function AdminEmailInboxView({
         },
       );
       setReply("");
+      replyDraftsRef.current.delete(selected.id);
+      setReplyOpen(false);
       setNotice("Reply sent.");
       messageCacheRef.current.delete(selected.id);
       await loadMessage(selected.id);
       await loadFolder(folder, true, true);
     } catch (sendError) {
       setError(
-        sendError instanceof Error ? sendError.message : "Could not send reply.",
+        sendError instanceof Error
+          ? sendError.message
+          : "Could not send reply.",
       );
     } finally {
       setSending(false);
@@ -755,7 +672,9 @@ export function AdminEmailInboxView({
       setNotice("Email sent.");
     } catch (sendError) {
       setError(
-        sendError instanceof Error ? sendError.message : "Could not send email.",
+        sendError instanceof Error
+          ? sendError.message
+          : "Could not send email.",
       );
     } finally {
       setSending(false);
@@ -779,7 +698,22 @@ export function AdminEmailInboxView({
         },
       );
       messageCacheRef.current.delete(selected.id);
-      await loadFolder(folder);
+      if (change.archived !== undefined) {
+        await loadFolder(folder);
+      } else {
+        if (change.read === false) {
+          setSelectedId(null);
+          setSelected(null);
+          setReaderOpen(false);
+        } else {
+          setSelected((current) =>
+            current
+              ? { ...current, readAt: new Date().toISOString() }
+              : current,
+          );
+        }
+        await loadFolder(folder, true);
+      }
     } catch (stateError) {
       setError(
         stateError instanceof Error
@@ -840,715 +774,860 @@ export function AdminEmailInboxView({
     }
   };
 
-  return (
-    <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <aside className="flex w-[22rem] min-w-[19rem] shrink-0 flex-col border-r border-slate-200 bg-white">
-        <div className="shrink-0 border-b border-slate-100 p-3">
-          <div className="mb-3">
-            <p className="mb-1.5 px-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">
-              Mailbox
-            </p>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left shadow-sm outline-none transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-200"
-              >
-                <span className="min-w-0">
-                  <span className="block truncate text-xs font-semibold text-slate-900">
-                    {activeIdentity.label}
-                  </span>
-                  <span className="mt-0.5 block truncate text-[10px] text-slate-500">
-                    {activeIdentity.email}
-                  </span>
-                </span>
-                <ChevronDown
-                  className="size-4 shrink-0 text-slate-400"
-                  aria-hidden
-                />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[18rem]"
-              >
-                <DropdownMenuLabel>Choose mailbox</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {identities.map((identity) => {
-                  const selectedIdentity = identity.key === identityKey;
-                  return (
-                    <DropdownMenuItem
-                      key={identity.key}
-                      className={cn(
-                        "cursor-pointer py-2.5",
-                        selectedIdentity && "bg-slate-50",
-                      )}
-                      onSelect={() => {
-                        setIdentityKey(identity.key);
-                        setFolder("inbox");
-                        setComposing(false);
-                        setSelected(null);
-                        setSelectedId(null);
-                        setReply("");
-                        setNotice(null);
-                        setError(null);
-                      }}
-                    >
-                      <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                        <span className="min-w-0">
-                          <span className="block truncate text-xs font-semibold text-slate-900">
-                            {identity.label}
-                          </span>
-                          <span className="mt-0.5 block truncate text-[10px] text-slate-500">
-                            {identity.email}
-                          </span>
-                        </span>
-                        {selectedIdentity ? (
-                          <Check
-                            className="size-4 shrink-0 text-slate-700"
-                            aria-hidden
-                          />
-                        ) : null}
-                      </span>
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+  const selectMessage = (id: string) => {
+    setComposing(false);
+    setSelectedId(id);
+    setReaderOpen(true);
+    setNotice(null);
+    setError(null);
+  };
 
+  const resetMailboxView = () => {
+    ++listRequestRef.current;
+    ++messageRequestRef.current;
+    setMessages([]);
+    setLoadingList(true);
+    setSelectedId(null);
+    setSelected(null);
+    setComposing(false);
+    setReaderOpen(false);
+    setExpandedReader(false);
+    setQuery("");
+    setNotice(null);
+    setError(null);
+  };
+
+  const selectedIndex = filtered.findIndex(
+    (message) => message.id === selectedId,
+  );
+  const folderLabel =
+    FOLDERS.find((item) => item.value === folder)?.label ?? "Inbox";
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [&_button]:focus-visible:outline-none [&_button]:focus-visible:ring-2 [&_button]:focus-visible:ring-inset [&_button]:focus-visible:ring-blue-500">
+      <div
+        className={cn(
+          "flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-3 py-3 sm:px-5",
+          composing && "hidden",
+        )}
+      >
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className="flex min-w-0 cursor-pointer items-center gap-3 rounded-lg py-1 pr-3 text-left outline-none hover:bg-slate-50"
+            aria-label={`Choose mailbox, ${activeIdentity.label}`}
+            disabled={navigationBusy}
+          >
+            <span className="hidden size-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 sm:flex">
+              <Mail className="size-5" aria-hidden />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold text-slate-950">
+                {activeIdentity.label}
+              </span>
+              <span className="mt-0.5 block truncate text-xs text-slate-500">
+                {activeIdentity.email}
+              </span>
+            </span>
+            <ChevronDown
+              className="size-4 shrink-0 text-slate-400"
+              aria-hidden
+            />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-64">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Mailboxes</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {identities.map((identity) => (
+                <DropdownMenuItem
+                  key={identity.key}
+                  className="gap-3 px-3 py-3"
+                  onClick={() => {
+                    if (identity.key === identityKey) return;
+                    resetMailboxView();
+                    setIdentityKey(identity.key);
+                    setFolder("inbox");
+                  }}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium">
+                      {identity.label}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-slate-500">
+                      {identity.email}
+                    </span>
+                  </span>
+                  {identity.key === identityKey ? (
+                    <Check className="size-4 text-blue-600" aria-hidden />
+                  ) : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <button
+          type="button"
+          disabled={navigationBusy}
+          onClick={() => {
+            setComposing(true);
+            setReaderOpen(true);
+            setError(null);
+            setNotice(null);
+          }}
+          className={cn(
+            adminPrimaryButtonClass,
+            "shrink-0 rounded-lg px-3 py-2.5 sm:px-4",
+          )}
+        >
+          <Plus className="size-4" aria-hidden />
+          {composeTo || composeSubject || composeBody
+            ? "Continue draft"
+            : "New email"}
+        </button>
+      </div>
+
+      {error || notice ? (
+        <div
+          role={error ? "alert" : "status"}
+          className={cn(
+            "flex shrink-0 items-start justify-between gap-3 border-b px-4 py-3 text-sm",
+            error
+              ? "border-red-100 bg-red-50 text-red-700"
+              : "border-emerald-100 bg-emerald-50 text-emerald-800",
+          )}
+        >
+          <span>{error || notice}</span>
           <button
             type="button"
+            aria-label="Dismiss notification"
             onClick={() => {
-              setComposing(true);
-              setSelectedId(null);
-              setSelected(null);
-              setReply("");
               setError(null);
               setNotice(null);
             }}
-            className={cn(
-              adminPrimaryButtonClass,
-              "mb-3 w-full justify-center py-2",
-            )}
+            className="shrink-0 rounded p-0.5"
           >
-            <Plus className="size-3.5" aria-hidden />
-            New email
+            <X className="size-4" aria-hidden />
           </button>
-
-          <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1">
-            {FOLDERS.map(({ value, label, icon: Icon }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => {
-                  setFolder(value);
-                  setComposing(false);
-                  setSelected(null);
-                  setSelectedId(null);
-                  setReply("");
-                  setNotice(null);
-                }}
-                className={cn(
-                  "inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
-                  folder === value && !composing
-                    ? "bg-white text-slate-950 shadow-sm"
-                    : "text-slate-500 hover:text-slate-900",
-                )}
-              >
-                <Icon className="size-3.5" aria-hidden />
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <div className="relative mt-3">
-            <Search
-              className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-slate-400"
-              aria-hidden
-            />
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search email…"
-              className="w-full rounded-md border border-slate-200 bg-white py-2 pr-3 pl-8 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-200/80"
-            />
-          </div>
-
-          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
-            <span>
-              {folder === "inbox" && unreadCount > 0
-                ? `${unreadCount} unread · `
-                : ""}
-              {messages.length} message{messages.length === 1 ? "" : "s"}
-              {folder === "inbox" ? " · Live" : ""}
-            </span>
-            <button
-              type="button"
-              disabled={loadingList}
-              onClick={() => void loadFolder(folder, true)}
-              className="inline-flex cursor-pointer items-center gap-1 rounded px-1.5 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <RefreshCw
-                className={cn("size-3", loadingList && "animate-spin")}
-                aria-hidden
-              />
-              Refresh
-            </button>
-          </div>
         </div>
+      ) : null}
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {loadingList && messages.length === 0 ? (
-            <div className="flex items-center gap-2 p-5 text-sm text-slate-500">
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-              Loading mail…
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="p-6 text-center text-sm text-slate-500">
-              {query.trim()
-                ? "No email matches that search."
-                : folder === "sent"
-                  ? "No sent email yet."
-                  : folder === "archived"
-                    ? "No archived email."
-                    : "No received email yet."}
-            </div>
-          ) : (
-            filtered.map((message) => {
-              const active = selectedId === message.id && !composing;
-              const unread = message.direction === "inbound" && !message.readAt;
-              return (
+      <div className="flex min-h-0 min-w-0 flex-1">
+        <aside
+          aria-label="Email list"
+          className={cn(
+            "min-h-0 w-full shrink-0 flex-col border-r border-slate-200 bg-white lg:w-[300px] xl:w-[340px] 2xl:w-[380px]",
+            readerOpen || composing ? "hidden lg:flex" : "flex",
+            (expandedReader || composing) && "lg:hidden",
+          )}
+        >
+          <div className="shrink-0 border-b border-slate-200 px-3 pt-3">
+            <div
+              className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1"
+              aria-label="Email folders"
+            >
+              {FOLDERS.map(({ value, label, icon: Icon }) => (
                 <button
-                  key={message.id}
+                  key={value}
                   type="button"
+                  disabled={navigationBusy}
+                  aria-pressed={folder === value}
                   onClick={() => {
-                    setComposing(false);
-                    setSelectedId(message.id);
-                    setReply("");
-                    setNotice(null);
+                    if (folder === value) {
+                      setReaderOpen(false);
+                      setComposing(false);
+                      return;
+                    }
+                    resetMailboxView();
+                    setFolder(value);
                   }}
                   className={cn(
-                    "relative block w-full cursor-pointer border-b border-slate-100 px-4 py-3 text-left transition-colors hover:bg-slate-50",
-                    active && "bg-slate-100 hover:bg-slate-100",
+                    "flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium transition-colors",
+                    folder === value
+                      ? "bg-white text-slate-950 shadow-sm"
+                      : "text-slate-500 hover:text-slate-900",
                   )}
                 >
-                  {unread ? (
-                    <span
-                      className="absolute top-4 left-1.5 size-1.5 rounded-full bg-slate-900"
-                      aria-label="Unread"
-                    />
-                  ) : null}
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span
-                      className={cn(
-                        "truncate text-sm text-slate-900",
-                        unread ? "font-semibold" : "font-medium",
-                      )}
-                    >
-                      {folder === "sent"
-                        ? message.toAddresses[0] || "Recipient"
-                        : displaySender(message)}
-                    </span>
-                    <span className="shrink-0 text-[10px] tabular-nums text-slate-400">
-                      {whenLabel(message.occurredAt)}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 flex min-w-0 items-center gap-2">
-                    <p
-                      className={cn(
-                        "min-w-0 flex-1 truncate text-xs text-slate-700",
-                        unread && "font-medium text-slate-900",
-                      )}
-                    >
-                      {message.subject || "(no subject)"}
-                    </p>
-                    {folder === "sent" ? (
-                      <DeliveryStatusBadge
-                        status={message.deliveryStatus}
-                        compact
-                      />
-                    ) : null}
-                  </div>
-                  {message.preview ? (
-                    <p className="mt-1 line-clamp-2 text-xs leading-4 text-slate-500">
-                      {message.preview}
-                    </p>
-                  ) : null}
+                  <Icon className="size-3.5" aria-hidden />
+                  {label}
                 </button>
-              );
-            })
-          )}
-        </div>
-      </aside>
-
-      <section className="flex min-w-0 flex-1 flex-col bg-white">
-        {error ? (
-          <div
-            className="shrink-0 border-b border-red-100 bg-red-50 px-5 py-2.5 text-sm text-red-700"
-            role="alert"
-          >
-            {error}
-          </div>
-        ) : null}
-        {notice ? (
-          <div
-            className="shrink-0 border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-sm text-slate-700"
-            role="status"
-          >
-            {notice}
-          </div>
-        ) : null}
-
-        {composing ? (
-          <div className="flex min-h-0 flex-1 flex-col">
-            <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-100 px-6 py-4">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-950">
-                  New email
-                </h2>
-                <p className="mt-1 text-xs text-slate-500">
-                  From {activeIdentity.name} &lt;{activeIdentity.email}&gt;
-                </p>
-              </div>
+              ))}
+            </div>
+            <div className="relative mt-3">
+              <Search
+                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400"
+                aria-hidden
+              />
+              <input
+                type="search"
+                aria-label={`Search ${folderLabel.toLowerCase()}`}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={`Search ${folderLabel.toLowerCase()}…`}
+                className={cn(fieldClass, "bg-slate-50 py-2 pr-3 pl-9 text-sm")}
+              />
+            </div>
+            <div className="flex min-h-11 items-center justify-between gap-2 px-1 text-xs text-slate-500">
+              <span aria-live="polite">
+                {query.trim()
+                  ? `${filtered.length} of ${messages.length}`
+                  : messages.length}{" "}
+                {messages.length === 1 ? "email" : "emails"}
+                {folder === "inbox" && unreadCount > 0 ? (
+                  <span className="ml-2 font-medium text-blue-600">
+                    {unreadCount} unread
+                  </span>
+                ) : null}
+              </span>
               <button
                 type="button"
-                onClick={() => setComposing(false)}
-                className={cn(adminSecondaryButtonClass, "px-2.5")}
+                disabled={loadingList}
+                onClick={() => void loadFolder(folder, true)}
+                aria-label="Refresh emails"
+                title="Refresh emails"
+                className={cn(toolbarButtonClass, "h-8 px-2")}
               >
-                <X className="size-3.5" aria-hidden />
-                Close
+                <RefreshCw
+                  className={cn("size-3.5", loadingList && "animate-spin")}
+                  aria-hidden
+                />
               </button>
-            </header>
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-              <div className="mx-auto max-w-4xl space-y-4">
-                <label className="block">
-                  <span className="mb-1.5 block text-xs font-medium text-slate-700">
-                    To
-                  </span>
-                  <input
-                    type="email"
-                    value={composeTo}
-                    onChange={(event) => setComposeTo(event.target.value)}
-                    placeholder="name@example.com"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-200/80"
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-1.5 block text-xs font-medium text-slate-700">
-                    Subject
-                  </span>
-                  <input
-                    type="text"
-                    value={composeSubject}
-                    onChange={(event) => setComposeSubject(event.target.value)}
-                    maxLength={500}
-                    placeholder="Email subject"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-200/80"
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-1.5 block text-xs font-medium text-slate-700">
-                    Message
-                  </span>
-                  <textarea
-                    value={composeBody}
-                    onChange={(event) => setComposeBody(event.target.value)}
-                    maxLength={20_000}
-                    rows={14}
-                    placeholder="Write your email…"
-                    className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm leading-6 text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-200/80"
-                  />
-                </label>
-              </div>
             </div>
+          </div>
+          <div
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
+            data-inbox-list
+          >
+            {loadingList && messages.length === 0 ? (
+              <div className="flex items-center justify-center gap-2 p-8 text-sm text-slate-500">
+                <Loader2 className="size-4 animate-spin" aria-hidden /> Loading
+                emails…
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="px-6 py-12 text-center">
+                <Inbox className="mx-auto size-8 text-slate-300" aria-hidden />
+                <p className="mt-3 text-sm font-medium text-slate-700">
+                  {query.trim()
+                    ? "No matching emails"
+                    : folder === "archived"
+                      ? "No archived emails"
+                      : folder === "sent"
+                        ? "No sent emails yet"
+                        : "Your inbox is empty"}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  {query.trim()
+                    ? "Try another sender, subject or phrase."
+                    : folder === "archived"
+                      ? "Emails you archive will appear here."
+                      : folder === "sent"
+                        ? "Emails you send will appear here."
+                        : "New messages will appear here."}
+                </p>
+                {query.trim() ? (
+                  <button
+                    type="button"
+                    className="mt-3 cursor-pointer text-sm font-medium text-blue-600 hover:underline"
+                    onClick={() => setQuery("")}
+                  >
+                    Clear search
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              filtered.map((message) => {
+                const active = selectedId === message.id && !composing;
+                const unread =
+                  message.direction === "inbound" && !message.readAt;
+                return (
+                  <button
+                    key={message.id}
+                    type="button"
+                    disabled={navigationBusy}
+                    aria-current={active ? "true" : undefined}
+                    onClick={() => selectMessage(message.id)}
+                    className={cn(
+                      "relative block w-full cursor-pointer border-b border-slate-100 px-4 py-4 text-left transition-colors hover:bg-slate-50",
+                      active &&
+                        "bg-blue-50/80 shadow-[inset_3px_0_0_#2563eb] hover:bg-blue-50",
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span
+                        className={cn(
+                          "min-w-0 truncate text-[13px] text-slate-700",
+                          unread && "font-semibold text-slate-950",
+                        )}
+                        title={
+                          folder === "sent"
+                            ? message.toAddresses.join(", ")
+                            : message.fromAddress
+                        }
+                      >
+                        {folder === "sent"
+                          ? message.toAddresses[0] || "Recipient"
+                          : displaySender(message)}
+                      </span>
+                      <span className="shrink-0 text-[11px] tabular-nums text-slate-500">
+                        {whenLabel(message.occurredAt)}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 flex items-start gap-2">
+                      {unread ? (
+                        <span
+                          className="mt-1.5 size-1.5 shrink-0 rounded-full bg-blue-600"
+                          aria-label="Unread"
+                        />
+                      ) : null}
+                      <p
+                        className={cn(
+                          "line-clamp-2 min-w-0 text-sm leading-5 text-slate-800",
+                          unread ? "font-semibold" : "font-medium",
+                        )}
+                      >
+                        {message.subject || "(no subject)"}
+                      </p>
+                    </div>
+                    {message.preview ? (
+                      <p className="mt-1.5 line-clamp-2 break-words text-[13px] leading-5 text-slate-500">
+                        {message.preview}
+                      </p>
+                    ) : null}
+                    {folder === "sent" ? (
+                      <div className="mt-2">
+                        <DeliveryStatusBadge
+                          status={message.deliveryStatus}
+                          compact
+                        />
+                      </div>
+                    ) : null}
+                  </button>
+                );
+              })
+            )}
+            {filtered.length > 0 ? (
+              <p className="px-4 py-4 text-center text-[11px] text-slate-400">
+                {query.trim()
+                  ? "End of search results"
+                  : `All ${messages.length} emails shown`}
+              </p>
+            ) : null}
+          </div>
+        </aside>
 
-            <div className="shrink-0 border-t border-slate-200 bg-slate-50/70 px-6 py-4">
-              <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
-                <button
-                  type="button"
-                  disabled={
-                    checkingGrammar !== null || sending || !composeBody.trim()
-                  }
-                  onClick={() => void checkGrammar("compose")}
-                  className={adminSecondaryButtonClass}
-                  title="Only correct spelling, grammar and punctuation"
-                >
-                  {checkingGrammar === "compose" ? (
-                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
+        <section
+          aria-label={composing ? "Compose email" : "Email reader"}
+          className={cn(
+            "min-h-0 min-w-0 flex-1 flex-col bg-slate-50/70",
+            readerOpen || composing ? "flex" : "hidden lg:flex",
+          )}
+        >
+          {composing ? (
+            <EmailComposer
+              identities={identities}
+              identity={activeIdentity}
+              to={composeTo}
+              subject={composeSubject}
+              body={composeBody}
+              busy={navigationBusy}
+              sending={sending}
+              checkingGrammar={checkingGrammar === "compose"}
+              onIdentityChange={(key) => {
+                if (key === identityKey) return;
+                ++listRequestRef.current;
+                ++messageRequestRef.current;
+                setIdentityKey(key);
+                setMessages([]);
+                setSelectedId(null);
+                setSelected(null);
+                setNotice(null);
+                setError(null);
+              }}
+              onToChange={setComposeTo}
+              onSubjectChange={setComposeSubject}
+              onBodyChange={setComposeBody}
+              onClose={() => {
+                setComposing(false);
+                setReaderOpen(Boolean(selectedId));
+              }}
+              onDiscard={() => {
+                setComposeTo("");
+                setComposeSubject("");
+                setComposeBody("");
+                setComposing(false);
+                setReaderOpen(Boolean(selectedId));
+                setNotice(null);
+                setError(null);
+              }}
+              onCheckGrammar={() => void checkGrammar("compose")}
+              onSend={() => void sendNewEmail()}
+            />
+          ) : (
+            <>
+              <div className="flex min-h-14 shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 sm:px-4">
+                <div className="flex min-w-0 items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReaderOpen(false);
+                      setExpandedReader(false);
+                    }}
+                    className={cn(toolbarButtonClass, "lg:hidden")}
+                    aria-label="Back to email list"
+                  >
+                    <ArrowLeft className="size-4" aria-hidden />
+                    <span className="hidden sm:inline">Back</span>
+                  </button>
+                  {selected?.direction === "inbound" ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={
+                          navigationBusy ||
+                          (selected.senderBlocked &&
+                            Boolean(selected.archivedAt))
+                        }
+                        onClick={() =>
+                          void updateSelectedState({
+                            archived: !selected.archivedAt,
+                          })
+                        }
+                        className={toolbarButtonClass}
+                        title={
+                          selected.senderBlocked && selected.archivedAt
+                            ? "Unblock the sender before restoring"
+                            : undefined
+                        }
+                      >
+                        {selected.archivedAt ? (
+                          <ArchiveRestore className="size-4" aria-hidden />
+                        ) : (
+                          <Archive className="size-4" aria-hidden />
+                        )}
+                        {selected.archivedAt ? "Restore" : "Archive"}
+                      </button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          disabled={navigationBusy}
+                          aria-label="More email actions"
+                          className={toolbarButtonClass}
+                        >
+                          <MoreHorizontal className="size-5" aria-hidden />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="min-w-48">
+                          <DropdownMenuItem
+                            className="p-2.5"
+                            onClick={() =>
+                              void updateSelectedState({
+                                read: !selected.readAt,
+                              })
+                            }
+                          >
+                            {selected.readAt ? (
+                              <Mail className="size-4" aria-hidden />
+                            ) : (
+                              <MailOpen className="size-4" aria-hidden />
+                            )}
+                            {selected.readAt ? "Mark unread" : "Mark read"}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="p-2.5"
+                            variant={
+                              selected.senderBlocked ? "default" : "destructive"
+                            }
+                            onClick={() => void updateSenderBlocked()}
+                          >
+                            <Ban className="size-4" aria-hidden />
+                            {selected.senderBlocked
+                              ? "Unblock sender"
+                              : "Block sender"}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </>
                   ) : (
-                    <Sparkles className="size-3.5" aria-hidden />
+                    <span className="px-2 text-xs text-slate-500">
+                      {selected ? "Sent email" : "Select an email"}
+                    </span>
                   )}
-                  {checkingGrammar === "compose"
-                    ? "Checking…"
-                    : "Check grammar"}
-                </button>
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] text-slate-400">
-                    {composeBody.length.toLocaleString()}/20,000
-                  </span>
+                </div>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  {selectedIndex >= 0 ? (
+                    <span className="mr-2 text-xs tabular-nums text-slate-500">
+                      {selectedIndex + 1} of {filtered.length}
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    disabled={selectedIndex <= 0 || navigationBusy}
+                    onClick={() =>
+                      selectMessage(filtered[selectedIndex - 1].id)
+                    }
+                    aria-label="Previous email"
+                    title="Previous email"
+                    className={toolbarButtonClass}
+                  >
+                    <ChevronLeft className="size-4" aria-hidden />
+                  </button>
                   <button
                     type="button"
                     disabled={
-                      sending ||
-                      !composeTo.trim() ||
-                      !composeSubject.trim() ||
-                      !composeBody.trim()
+                      selectedIndex < 0 ||
+                      selectedIndex >= filtered.length - 1 ||
+                      navigationBusy
                     }
-                    onClick={() => void sendNewEmail()}
-                    className={adminPrimaryButtonClass}
+                    onClick={() =>
+                      selectMessage(filtered[selectedIndex + 1].id)
+                    }
+                    aria-label="Next email"
+                    title="Next email"
+                    className={toolbarButtonClass}
                   >
-                    {sending ? (
-                      <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                    ) : (
-                      <Send className="size-3.5" aria-hidden />
+                    <ChevronRight className="size-4" aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedReader(!expandedReader)}
+                    aria-label={
+                      expandedReader ? "Show email list" : "Expand email"
+                    }
+                    title={expandedReader ? "Show email list" : "Expand email"}
+                    className={cn(
+                      toolbarButtonClass,
+                      "ml-1 hidden lg:inline-flex",
                     )}
-                    {sending ? "Sending…" : "Send email"}
+                  >
+                    {expandedReader ? (
+                      <Minimize2 className="size-4" aria-hidden />
+                    ) : (
+                      <Maximize2 className="size-4" aria-hidden />
+                    )}
                   </button>
                 </div>
               </div>
-            </div>
-          </div>
-        ) : !selectedId ? (
-          <div className="flex min-h-0 flex-1 items-center justify-center p-8 text-center">
-            <div>
-              <Mail className="mx-auto size-7 text-slate-300" aria-hidden />
-              <p className="mt-3 text-sm font-medium text-slate-700">
-                Select an email or start a new one
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                Inbox mail updates automatically while this tab is open.
-              </p>
-            </div>
-          </div>
-        ) : loadingMessage && !selected ? (
-          <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-slate-500">
-            <Loader2 className="size-4 animate-spin" aria-hidden />
-            Opening email…
-          </div>
-        ) : selected ? (
-          <>
-            <header className="shrink-0 border-b border-slate-100 px-6 py-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="break-words text-lg font-semibold text-slate-950">
-                    {selected.subject || "(no subject)"}
-                  </h2>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-                    <span>
-                      <strong className="font-medium text-slate-700">
-                        {selected.direction === "inbound" ? "From" : "To"}:
-                      </strong>{" "}
-                      {selected.direction === "inbound"
-                        ? selected.fromName
-                          ? `${selected.fromName} <${selected.fromAddress}>`
-                          : selected.fromAddress
-                        : selected.toAddresses.join(", ")}
-                    </span>
-                    <span>{fullWhenLabel(selected.occurredAt)}</span>
-                  </div>
-                  {selected.direction === "inbound" ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      To {selected.toAddresses.join(", ") || activeIdentity.email}
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      From {selected.fromName || activeIdentity.name} &lt;
-                      {selected.fromAddress || activeIdentity.email}&gt;
-                    </p>
-                  )}
+
+              {loadingMessage ? (
+                <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-slate-500">
+                  <Loader2 className="size-5 animate-spin" aria-hidden />
+                  Opening email…
                 </div>
-
-                {selected.direction === "inbound" ? (
-                  <div className="flex shrink-0 flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={changingState}
-                      onClick={() =>
-                        void updateSelectedState({ read: !selected.readAt })
-                      }
-                      className={adminSecondaryButtonClass}
-                    >
-                      {selected.readAt ? (
-                        <Mail className="size-3.5" aria-hidden />
-                      ) : (
-                        <MailOpen className="size-3.5" aria-hidden />
-                      )}
-                      {selected.readAt ? "Mark unread" : "Mark read"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={changingState}
-                      onClick={() => void updateSenderBlocked()}
-                      className={cn(
-                        adminSecondaryButtonClass,
-                        selected.senderBlocked
-                          ? "text-slate-700"
-                          : "text-red-700 hover:border-red-200 hover:bg-red-50 hover:text-red-800",
-                      )}
-                    >
-                      <Ban className="size-3.5" aria-hidden />
-                      {selected.senderBlocked ? "Unblock sender" : "Block sender"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={
-                        changingState ||
-                        (selected.senderBlocked && Boolean(selected.archivedAt))
-                      }
-                      title={
-                        selected.senderBlocked && selected.archivedAt
-                          ? "Unblock this sender before restoring the email"
-                          : undefined
-                      }
-                      onClick={() =>
-                        void updateSelectedState({
-                          archived: !selected.archivedAt,
-                        })
-                      }
-                      className={adminSecondaryButtonClass}
-                    >
-                      {selected.archivedAt ? (
-                        <ArchiveRestore className="size-3.5" aria-hidden />
-                      ) : (
-                        <Archive className="size-3.5" aria-hidden />
-                      )}
-                      {selected.archivedAt ? "Restore" : "Archive"}
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            </header>
-
-            <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/50">
-              <article className="mx-auto max-w-4xl px-6 py-6">
-                {selected.direction === "outbound" ? (
-                  <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <div className="grid grid-cols-3 divide-x divide-slate-100">
-                      {deliveryStages(selected).map((stage) => (
-                        <div
-                          key={stage.label}
-                          className="flex items-center justify-center gap-2 px-4 py-3.5"
-                        >
+              ) : selected ? (
+                <>
+                  <div
+                    key={selected.id}
+                    className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
+                    data-inbox-reader
+                  >
+                    <article className="mx-auto w-full max-w-[1000px] px-4 py-5 sm:px-6 sm:py-6">
+                      <header className="mb-6">
+                        <h2 className="break-words text-xl font-semibold leading-snug tracking-tight text-slate-950 sm:text-2xl">
+                          {selected.subject || "(no subject)"}
+                        </h2>
+                        <div className="mt-5 flex items-start gap-3">
                           <span
-                            className={cn(
-                              "inline-flex size-5 shrink-0 items-center justify-center rounded-full border",
-                              stage.complete
-                                ? "border-slate-900 bg-slate-900 text-white"
-                                : "border-slate-300 bg-white text-transparent",
-                            )}
+                            className="flex size-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-sm font-semibold text-slate-600"
+                            aria-hidden
                           >
-                            <CheckCircle2 className="size-3.5" aria-hidden />
+                            {(selected.fromName || selected.fromAddress || "?")
+                              .charAt(0)
+                              .toUpperCase()}
                           </span>
-                          <span
-                            className={cn(
-                              "text-xs font-medium",
-                              stage.complete
-                                ? "text-slate-800"
-                                : "text-slate-400",
-                            )}
-                          >
-                            {stage.label}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                    {deliveryFailed(selected.deliveryStatus) ? (
-                      <div className="border-t border-red-100 bg-red-50 px-4 py-2 text-center text-[11px] font-medium text-red-700">
-                        This email was not delivered successfully.
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-                <div className="mb-3 flex min-h-9 items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                      Message
-                    </p>
-                    {selected.direction === "inbound" &&
-                    selected.htmlBody &&
-                    emailHasExternalImages(selected.htmlBody) &&
-                    !allowExternalImages ? (
-                      <button
-                        type="button"
-                        onClick={() => setAllowExternalImages(true)}
-                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:text-slate-900"
-                        title="Remote images are blocked by default to prevent tracking pixels and external requests."
-                      >
-                        <Eye className="size-3" aria-hidden />
-                        Load external images
-                      </button>
-                    ) : null}
-                  </div>
-                  <div className="inline-flex shrink-0 rounded-lg border border-slate-200 bg-slate-100 p-1">
-                    <button
-                      type="button"
-                      disabled={!selected.htmlBody}
-                      onClick={() => setMessageView("formatted")}
-                      className={cn(
-                        "cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-                        selected.htmlBody && messageView === "formatted"
-                          ? "bg-white text-slate-950 shadow-sm"
-                          : "text-slate-500 hover:text-slate-900",
-                      )}
-                    >
-                      Formatted
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMessageView("plain")}
-                      className={cn(
-                        "cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                        messageView === "plain" || !selected.htmlBody
-                          ? "bg-white text-slate-950 shadow-sm"
-                          : "text-slate-500 hover:text-slate-900",
-                      )}
-                    >
-                      Plain text
-                    </button>
-                  </div>
-                </div>
-
-                <div className="min-h-[360px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                  {selected.htmlBody && messageView === "formatted" ? (
-                    <div className="p-4">
-                      <div className="overflow-hidden rounded-lg bg-white">
-                        <EmailHtmlFrame
-                          html={selected.htmlBody}
-                          stripOpenTrackingPixel={
-                            selected.direction === "outbound"
-                          }
-                          allowExternalImages={
-                            selected.direction === "outbound" ||
-                            allowExternalImages
-                          }
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="whitespace-pre-wrap break-words p-6 text-[14px] leading-6 text-slate-800">
-                      {selected.textBody}
-                    </div>
-                  )}
-                </div>
-
-                {selected.attachments.length > 0 ? (
-                  <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <p className="text-xs font-medium text-slate-700">
-                      {selected.attachments.length} attachment
-                      {selected.attachments.length === 1 ? "" : "s"}
-                    </p>
-                    <p className="mt-1 text-[11px] leading-5 text-slate-500">
-                      Attachments are quarantined. Preview and download stay disabled
-                      unless the file type is allowed and a malware scan records a
-                      clean result.
-                    </p>
-                    <div className="mt-2 space-y-1">
-                      {selected.attachments.map((attachment, index) => (
-                        <p
-                          key={String(attachment.id ?? index)}
-                          className="truncate text-xs text-slate-500"
-                        >
-                          {String(
-                            attachment.filename ??
-                              attachment.name ??
-                              `Attachment ${index + 1}`,
-                          )}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                {selected.replies.length > 0 ? (
-                  <div className="mt-8 border-t border-slate-200 pt-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Replies from {activeIdentity.name}
-                    </p>
-                    <div className="mt-3 space-y-3">
-                      {selected.replies.map((sent) => (
-                        <div
-                          key={sent.id}
-                          className="rounded-lg border border-slate-200 bg-slate-50 p-4"
-                        >
-                          <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
-                            <span>
-                              {sent.fromName || activeIdentity.name} &lt;
-                              {sent.fromAddress || activeIdentity.email}&gt; →{" "}
-                              {sent.toAddresses[0] || "recipient"}
-                            </span>
-                            <span className="shrink-0">
-                              {fullWhenLabel(sent.occurredAt)}
-                            </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                              <p className="break-all text-sm font-semibold text-slate-900">
+                                {selected.fromName || selected.fromAddress}
+                              </p>
+                              <time
+                                dateTime={selected.occurredAt}
+                                className="text-xs text-slate-500"
+                              >
+                                {fullWhenLabel(selected.occurredAt)}
+                              </time>
+                            </div>
+                            <details className="mt-1 text-xs text-slate-500">
+                              <summary className="cursor-pointer break-words leading-5 [overflow-wrap:anywhere]">
+                                To{" "}
+                                {selected.toAddresses.join(", ") ||
+                                  activeIdentity.email}
+                              </summary>
+                              <dl className="mt-2 space-y-1 rounded-lg border border-slate-200 bg-white p-3 text-xs leading-5 [overflow-wrap:anywhere]">
+                                <div>
+                                  <dt className="inline font-medium text-slate-700">
+                                    From:{" "}
+                                  </dt>
+                                  <dd className="inline">
+                                    {selected.fromName
+                                      ? `${selected.fromName} <${selected.fromAddress}>`
+                                      : selected.fromAddress}
+                                  </dd>
+                                </div>
+                                <div>
+                                  <dt className="inline font-medium text-slate-700">
+                                    To:{" "}
+                                  </dt>
+                                  <dd className="inline">
+                                    {selected.toAddresses.join(", ")}
+                                  </dd>
+                                </div>
+                                {selected.ccAddresses.length > 0 ? (
+                                  <div>
+                                    <dt className="inline font-medium text-slate-700">
+                                      Cc:{" "}
+                                    </dt>
+                                    <dd className="inline">
+                                      {selected.ccAddresses.join(", ")}
+                                    </dd>
+                                  </div>
+                                ) : null}
+                                {selected.replyToAddresses.length > 0 ? (
+                                  <div>
+                                    <dt className="inline font-medium text-slate-700">
+                                      Reply to:{" "}
+                                    </dt>
+                                    <dd className="inline">
+                                      {selected.replyToAddresses.join(", ")}
+                                    </dd>
+                                  </div>
+                                ) : null}
+                              </dl>
+                            </details>
                           </div>
-                          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                            {sent.preview}
+                        </div>
+                        {selected.senderBlocked ? (
+                          <p className="mt-3 text-xs text-red-700">
+                            This sender is blocked. New emails from this address
+                            go to Archived.
+                          </p>
+                        ) : null}
+                      </header>
+                      {selected.direction === "outbound" ? (
+                        <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4">
+                          <div className="flex flex-wrap items-center gap-4">
+                            {deliveryStages(selected).map((stage) => (
+                              <span
+                                key={stage.label}
+                                className={cn(
+                                  "flex items-center gap-1.5 text-xs",
+                                  stage.complete
+                                    ? "font-medium text-slate-700"
+                                    : "text-slate-400",
+                                )}
+                              >
+                                <CheckCircle2
+                                  className={cn(
+                                    "size-4",
+                                    stage.complete && "text-emerald-600",
+                                  )}
+                                  aria-hidden
+                                />
+                                {stage.label}
+                              </span>
+                            ))}
+                            <DeliveryStatusBadge
+                              status={selected.deliveryStatus}
+                            />
+                          </div>
+                          {deliveryFailed(selected.deliveryStatus) ? (
+                            <p className="mt-3 text-sm text-red-700">
+                              This email was not delivered successfully.
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      <EmailMessageBody
+                        key={selected.id}
+                        html={selected.htmlBody}
+                        text={selected.textBody}
+                        stripOpenTrackingPixel={
+                          selected.direction === "outbound"
+                        }
+                      />
+                      {selected.attachments.length > 0 ? (
+                        <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
+                          <p className="flex items-center gap-2 text-sm font-medium text-slate-800">
+                            <Paperclip className="size-4" aria-hidden />
+                            {selected.attachments.length} attachment
+                            {selected.attachments.length === 1 ? "" : "s"}
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {selected.attachments.map((attachment, index) => (
+                              <span
+                                key={String(attachment.id ?? index)}
+                                className="max-w-full break-all rounded-md bg-slate-100 px-3 py-2 text-xs text-slate-600"
+                              >
+                                {String(
+                                  attachment.filename ??
+                                    attachment.name ??
+                                    `Attachment ${index + 1}`,
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                          <p className="mt-3 text-xs leading-5 text-slate-500">
+                            Attachments are quarantined until their file type
+                            and malware scan are cleared.
                           </p>
                         </div>
-                      ))}
+                      ) : null}
+                      {selected.replies.length > 0 ? (
+                        <section
+                          className="mt-7 border-t border-slate-200 pt-5"
+                          aria-label="Sent replies"
+                        >
+                          <h3 className="text-sm font-semibold text-slate-800">
+                            Sent replies{" "}
+                            <span className="ml-1 font-normal text-slate-400">
+                              {selected.replies.length}
+                            </span>
+                          </h3>
+                          <div className="mt-3 space-y-3">
+                            {selected.replies.map((sent) => (
+                              <button
+                                type="button"
+                                key={sent.id}
+                                disabled={navigationBusy}
+                                onClick={() => selectMessage(sent.id)}
+                                className="block w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300"
+                              >
+                                <span className="flex flex-wrap justify-between gap-2 text-xs text-slate-500">
+                                  <span className="font-medium text-slate-700">
+                                    {sent.fromName || activeIdentity.name} →{" "}
+                                    {sent.toAddresses[0] || "recipient"}
+                                  </span>
+                                  <span>{fullWhenLabel(sent.occurredAt)}</span>
+                                </span>
+                                <span className="mt-2 block line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-slate-600">
+                                  {sent.preview}
+                                </span>
+                                <span className="mt-2 block text-xs font-medium text-blue-600">
+                                  Read full reply →
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </section>
+                      ) : null}
+                    </article>
+                  </div>
+                  {selected.direction === "inbound" && !selected.archivedAt ? (
+                    <div className="max-h-[50%] shrink-0 overflow-y-auto border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
+                      {replyOpen ? (
+                        <div className="mx-auto max-w-[950px]">
+                          <div className="mb-2 flex items-center justify-between gap-3">
+                            <label
+                              htmlFor="inbox-reply"
+                              className="min-w-0 truncate text-xs font-medium text-slate-600"
+                            >
+                              Reply to{" "}
+                              {selected.replyToAddresses[0] ||
+                                selected.fromAddress}
+                            </label>
+                            <button
+                              type="button"
+                              className={cn(toolbarButtonClass, "h-7 px-1")}
+                              onClick={() => setReplyOpen(false)}
+                              aria-label="Minimize reply"
+                            >
+                              <ChevronDown className="size-4" aria-hidden />
+                            </button>
+                          </div>
+                          <textarea
+                            id="inbox-reply"
+                            autoFocus
+                            value={reply}
+                            disabled={sending || checkingGrammar === "reply"}
+                            onChange={(event) => {
+                              setReply(event.target.value);
+                              replyDraftsRef.current.set(
+                                selected.id,
+                                event.target.value,
+                              );
+                            }}
+                            maxLength={20_000}
+                            rows={4}
+                            placeholder="Write your reply…"
+                            className={cn(
+                              fieldClass,
+                              "min-h-24 resize-y leading-6",
+                            )}
+                          />
+                          <div className="mt-2 flex items-center justify-between gap-2">
+                            <button
+                              type="button"
+                              disabled={
+                                checkingGrammar !== null ||
+                                navigationBusy ||
+                                !reply.trim()
+                              }
+                              onClick={() => void checkGrammar("reply")}
+                              className={toolbarButtonClass}
+                            >
+                              {checkingGrammar === "reply" ? (
+                                <Loader2
+                                  className="size-4 animate-spin"
+                                  aria-hidden
+                                />
+                              ) : (
+                                <Sparkles className="size-4" aria-hidden />
+                              )}
+                              {checkingGrammar === "reply"
+                                ? "Checking…"
+                                : "Check grammar"}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={navigationBusy || !reply.trim()}
+                              onClick={() => void sendReply()}
+                              className={cn(
+                                adminPrimaryButtonClass,
+                                "rounded-lg py-2",
+                              )}
+                            >
+                              <Send className="size-4" aria-hidden />
+                              {sending ? "Sending…" : "Send reply"}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setReplyOpen(true)}
+                            className={cn(
+                              adminSecondaryButtonClass,
+                              "rounded-lg px-4 py-2",
+                            )}
+                          >
+                            <Reply className="size-4" aria-hidden />
+                            {reply.trim() ? "Continue reply" : "Reply"}
+                          </button>
+                          <p className="min-w-0 truncate text-xs text-slate-500">
+                            Reply as {activeIdentity.email}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ) : null}
-              </article>
-            </div>
-
-            {selected.direction === "inbound" && !selected.archivedAt ? (
-              <div className="shrink-0 border-t border-slate-200 bg-slate-50/70 px-6 py-4">
-                <div className="mx-auto max-w-4xl">
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <p className="text-xs font-medium text-slate-700">
-                      Reply as {activeIdentity.name} &lt;{activeIdentity.email}&gt;
-                    </p>
-                    <span className="text-[10px] text-slate-400">
-                      {reply.length.toLocaleString()}/20,000
+                  ) : null}
+                </>
+              ) : (
+                <div className="flex min-h-0 flex-1 items-center justify-center p-8 text-center">
+                  <div>
+                    <span className="mx-auto flex size-16 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400">
+                      <MailOpen className="size-7" aria-hidden />
                     </span>
-                  </div>
-                  <textarea
-                    value={reply}
-                    onChange={(event) => setReply(event.target.value)}
-                    maxLength={20_000}
-                    rows={4}
-                    placeholder="Write a reply…"
-                    className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm leading-6 text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-200/80"
-                  />
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <button
-                      type="button"
-                      disabled={
-                        checkingGrammar !== null || sending || !reply.trim()
-                      }
-                      onClick={() => void checkGrammar("reply")}
-                      className={adminSecondaryButtonClass}
-                      title="Only correct spelling, grammar and punctuation"
-                    >
-                      {checkingGrammar === "reply" ? (
-                        <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                      ) : (
-                        <Sparkles className="size-3.5" aria-hidden />
-                      )}
-                      {checkingGrammar === "reply"
-                        ? "Checking…"
-                        : "Check grammar"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={sending || !reply.trim()}
-                      onClick={() => void sendReply()}
-                      className={adminPrimaryButtonClass}
-                    >
-                      {sending ? (
-                        <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                      ) : (
-                        <Send className="size-3.5" aria-hidden />
-                      )}
-                      {sending ? "Sending…" : "Send reply"}
-                    </button>
+                    <p className="mt-5 text-base font-semibold text-slate-700">
+                      Select an email to read
+                    </p>
+                    <p className="mt-2 max-w-xs text-sm leading-6 text-slate-500">
+                      Choose an email from the list, or start a new
+                      conversation.
+                    </p>
                   </div>
                 </div>
-              </div>
-            ) : null}
-          </>
-        ) : null}
-      </section>
+              )}
+            </>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

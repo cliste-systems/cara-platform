@@ -1,3 +1,4 @@
+import type { StatusVariant } from "@/components/dashboard/dashboard-surface";
 import {
   ENGINEER_TEST_CALL_LIST_LABEL,
   ENGINEER_TEST_CALL_SUMMARY,

@@ -33,13 +33,18 @@ async function signSupportPayload(
   return bytesToHex(new Uint8Array(sig));
 }
 
-export async function createSupportDashboardCookieValue(): Promise<string | null> {
+export type SupportDashboardScope = { userId: string; accountId: string; organizationId: string };
+const SCOPE_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export async function createSupportDashboardCookieValue(scope?: SupportDashboardScope): Promise<string | null> {
   const secret = getSupportDashboardSigningSecret();
   if (!secret) return null;
   const expiresAt = Math.floor(Date.now() / 1000) + SUPPORT_DASHBOARD_COOKIE_TTL_SECONDS;
-  const payload = `${SUPPORT_DASHBOARD_COOKIE_PREFIX}:${expiresAt}`;
+  if (scope && ![scope.userId, scope.accountId, scope.organizationId].every((id) => SCOPE_UUID_RE.test(id))) return null;
+  const fields = scope ? `${expiresAt}.${scope.userId}.${scope.accountId}.${scope.organizationId}` : `${expiresAt}`;
+  const payload = `${SUPPORT_DASHBOARD_COOKIE_PREFIX}:${fields}`;
   const sig = await signSupportPayload(payload, secret);
-  return `${expiresAt}.${sig}`;
+  return `${fields}.${sig}`;
 }
 
 export function supportDashboardCookieOptions(): {
@@ -56,4 +61,20 @@ export function supportDashboardCookieOptions(): {
     path: "/",
     maxAge: SUPPORT_DASHBOARD_COOKIE_TTL_SECONDS,
   };
+}
+
+/** Scope is authenticated and must additionally match the current user and account. */
+export async function readSupportDashboardCookieValue(value: string | null | undefined): Promise<SupportDashboardScope | null> {
+  const secret = getSupportDashboardSigningSecret();
+  if (!secret || !value) return null;
+  const [expiresRaw, userId, accountId, organizationId, signature, extra] = value.split(".");
+  if (extra !== undefined || !signature || !/^[0-9a-f]{64}$/.test(signature)) return null;
+  if (![userId, accountId, organizationId].every((id) => SCOPE_UUID_RE.test(id ?? ""))) return null;
+  const expiresAt = Number(expiresRaw);
+  const now = Math.floor(Date.now() / 1000);
+  if (!Number.isSafeInteger(expiresAt) || expiresAt <= now || expiresAt > now + SUPPORT_DASHBOARD_COOKIE_TTL_SECONDS) return null;
+  const expected = await signSupportPayload(`${SUPPORT_DASHBOARD_COOKIE_PREFIX}:${expiresRaw}.${userId}.${accountId}.${organizationId}`, secret);
+  let difference = 0;
+  for (let index = 0; index < expected.length; index += 1) difference |= expected.charCodeAt(index) ^ signature.charCodeAt(index);
+  return difference === 0 ? { userId, accountId, organizationId } : null;
 }

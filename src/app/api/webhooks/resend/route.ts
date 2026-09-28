@@ -1,19 +1,10 @@
 import { NextResponse } from "next/server";
-import { Resend } from "resend";
+import { Resend, type WebhookEventPayload } from "resend";
 
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type ResendWebhookEvent = {
-  type?: string;
-  created_at?: string;
-  data?: {
-    email_id?: string;
-    [key: string]: unknown;
-  };
-};
 
 const TRACKED_EVENTS = new Set([
   "email.sent",
@@ -80,10 +71,10 @@ export async function POST(request: Request) {
     return new NextResponse("Missing webhook signature.", { status: 400 });
   }
 
-  let event: ResendWebhookEvent;
+  let event: WebhookEventPayload;
   try {
     const resend = new Resend(process.env.RESEND_API_KEY?.trim());
-    event = (await resend.webhooks.verify({
+    event = resend.webhooks.verify({
       payload,
       headers: {
         id: svixId,
@@ -91,7 +82,7 @@ export async function POST(request: Request) {
         signature: svixSignature,
       },
       webhookSecret: await webhookSecret(),
-    })) as ResendWebhookEvent;
+    });
   } catch {
     return new NextResponse("Invalid webhook signature.", { status: 400 });
   }
@@ -101,7 +92,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, ignored: true });
   }
 
-  const resendEmailId = event.data?.email_id?.trim();
+  const resendEmailId = event.data && "email_id" in event.data && typeof event.data.email_id === "string"
+    ? event.data.email_id.trim()
+    : null;
   if (!resendEmailId) {
     return new NextResponse("Missing email ID.", { status: 400 });
   }

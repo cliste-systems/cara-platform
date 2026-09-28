@@ -2,6 +2,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "supabase";
 import * as cheerio from "cheerio";
+import { retryCatalogWrite, clean, currentOfferWeek, normalizeCards, promoRows, readStorefrontPage, storefrontCoverageReport, mergeStorefrontCoverageReports, type StorefrontCoverageReport, readLeafletCampaignLinks } from "./storefront.ts";
+import { campaignPageUrl, campaignDocument, fetchCampaignMembership } from "./campaigns.ts";
 
 const DEFAULT_STORE_ID = "992";
 const TAKE = 100;
@@ -21,6 +23,7 @@ type Capability = {
   source_store_id: string;
   sync_batch_id: string | null;
   work_limit: number;
+  refresh_kind: "full" | "offers";
 };
 type CategoryJob = {
   id: string;
@@ -36,31 +39,6 @@ type CategoryJob = {
   unique_skus_seen: number;
 };
 
-function clean(s: string | null | undefined) {
-  return String(s ?? "").replace(/\s+/g, " ").trim();
-}
-function eur(s: string | null | undefined): number | null {
-  const text = String(s ?? "");
-  const euro = text.match(/€\s*([0-9]+(?:[.,][0-9]{1,2})?)/);
-  if (euro) {
-    const n = Number(euro[1].replace(",", "."));
-    return Number.isFinite(n) ? n : null;
-  }
-  const cents = text.match(/\b([0-9]{1,2})\s*c\b/i);
-  if (cents) {
-    const n = Number(cents[1]) / 100;
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
-function currentOfferWeek(d = new Date()) {
-  const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  const diff = (x.getUTCDay() - 4 + 7) % 7;
-  x.setUTCDate(x.getUTCDate() - diff);
-  const end = new Date(x);
-  end.setUTCDate(end.getUTCDate() + 6);
-  return { start: x.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
-}
 function publicCategoryUrl(storeId: string, href: string, page = 1, skip = 0) {
   let path: string;
   if (href.startsWith("http")) {
@@ -71,143 +49,11 @@ function publicCategoryUrl(storeId: string, href: string, page = 1, skip = 0) {
   if (!path.startsWith("/")) path = "/" + path;
   return `https://shop.supervalu.ie/sm/pickup/rsid/${encodeURIComponent(storeId)}${path}?page=${page}&skip=${skip}&take=${TAKE}`;
 }
-function classify(categoryName: string, href: string) {
-  const x = `${categoryName} ${href}`.toLowerCase();
-  let serviceArea = "grocery";
-  if (/wine|beer|spirits|off.?licen|cider/.test(x)) serviceArea = "off_licence";
-  else if (/deli/.test(x)) serviceArea = "deli";
-  else if (/fish|seafood/.test(x)) serviceArea = "fish";
-  else if (/\/categories\/prepack\//.test(x)) serviceArea = "butcher";
-  else if (/meat|poultry|butcher|beef|pork|lamb|sausage|rasher/.test(x)) serviceArea = "butcher";
-  else if (
-    /\/categories\/(?:fruit|vegetables|fruit-vegetables)(?:\/|-)|fresh.?fruit.?veg/.test(x)
-  ) serviceArea = "produce";
-  else if (/bakery|bread|cake/.test(x)) serviceArea = "bakery";
-  else if (/fresh.?milk|yogurt|yoghurt|everyday-yogurts|cheese|butter|dairy/.test(x)) serviceArea = "dairy";
-  const explicitlyPrepack = /pre.?pack|packaged/.test(x);
-  const counterPath =
-    /\/butcher(?:\/|-)|\/deli-counter(?:\/|-)|\/fish-counter(?:\/|-)|\bcounter\b|\bloose\b|by.?weight/.test(x);
-  const fulfilment = !explicitlyPrepack && counterPath ? "counter" : "prepack";
-  return { serviceArea, fulfilment };
-}
-function parseCards(html: string, categoryName: string, href: string) {
-  const $ = cheerio.load(html);
-  const classification = classify(categoryName, href);
-  const cards: any[] = [];
-  $('article[data-testid^="ProductCardWrapper-"]').each((_i, el) => {
-    const article = $(el);
-    const sku = clean((article.attr("data-testid") ?? "").replace(/^ProductCardWrapper-/, ""));
-    if (!sku) return;
-    const nameNode = article.find(`[data-testid="${sku}-ProductNameTestId"]`).first().clone();
-    nameNode.children().remove();
-    const name = clean(nameNode.text()) || clean(article.find("img[alt]").first().attr("alt"));
-    if (!name) return;
-    const brand = clean(article.find('[data-testid="ProductCardAQABrand"]').first().text()) || null;
-    const sourceUrl = article.find('a[href*="/product/"]').first().attr("href") || null;
-    const titleText = clean(article.find(`#productCard_title__${sku} p`).first().text());
-    const displayPrice = eur(titleText);
-    const cardText = clean(article.text());
-    const wasMatch = cardText.match(/\bwas\s*€\s*([0-9]+(?:[.,][0-9]{1,2})?)/i);
-    const wasPrice = wasMatch ? Number(wasMatch[1].replace(",", ".")) : null;
-    const regularPrice =
-      (Number.isFinite(wasPrice) && wasPrice! > 0 ? wasPrice : null) ??
-      eur(article.find('[class*="ProductPrice--"]').first().text()) ??
-      displayPrice;
-    const unitPrice = clean(article.find('[class*="ProductUnitPrice--"]').first().text()) || null;
-    const badges = article.find('[data-testid^="promotionBadge-"]').toArray()
-      .map((b) => clean($(b).attr("title") || $(b).text()))
-      .filter(Boolean);
-    cards.push({
-      sku, name, brand, sourceUrl, displayPrice, regularPrice, unitPrice, badges,
-      isAlcohol: classification.serviceArea === "off_licence",
-      searchText: clean([name, brand, categoryName, href, sku].filter(Boolean).join(" ")).toLowerCase(),
-      ...classification,
-    });
-  });
-  return cards;
-}
-function promoRows(card: any, storeProductId: string, week: {start:string,end:string}, now: string) {
-  return card.badges.map((label: string) => {
-    const loyalty = /rewards?\s+price|real\s+rewards?/i.test(label);
-    const multi = label.match(
-      /\b(\d+)\s+for\s+(?:€\s*)?([0-9]+(?:[.,][0-9]{1,2})?)(?:\s*euro)?\b/i,
-    );
-    let promotionType = "standard_offer";
-    if (multi) promotionType = "multibuy";
-    else if (loyalty) promotionType = "loyalty";
-    else if (/save\s+\d+\s*%/i.test(label)) promotionType = "percentage";
-
-    // Badge amounts are not always selling prices. For example "Save €2"
-    // means a €2 saving, while the actual selling price is the card's display
-    // price. Only loyalty badges explicitly encode a separate offer price.
-    const saveAmountEuroMatch = label.match(
-      /\bsave\s*€\s*([0-9]+(?:[.,][0-9]{1,2})?)/i,
-    );
-    const saveAmountCentsMatch = label.match(/\bsave\s*([0-9]{1,2})\s*c\b/i);
-    const savePercentMatch = label.match(/\bsave\s*([0-9]+(?:[.,][0-9]+)?)\s*%/i);
-    const badgePrice = eur(label);
-    let offerPrice: number | null = null;
-    if (multi) {
-      offerPrice = null;
-    } else if (loyalty) {
-      offerPrice = badgePrice;
-      if (offerPrice == null && card.displayPrice != null && card.displayPrice !== card.regularPrice) {
-        offerPrice = card.displayPrice;
-      }
-    } else {
-      offerPrice = card.displayPrice;
-    }
-
-    const metadata: Record<string, unknown> = { source: "supervalu_public_storefront" };
-    if (saveAmountEuroMatch) {
-      metadata.save_amount_eur = Number(saveAmountEuroMatch[1].replace(",", "."));
-    } else if (saveAmountCentsMatch) {
-      metadata.save_amount_eur = Number(saveAmountCentsMatch[1]) / 100;
-    }
-    if (savePercentMatch) {
-      metadata.save_percent = Number(savePercentMatch[1].replace(",", "."));
-    }
-    if (multi) {
-      metadata.multibuy_quantity = Number(multi[1]);
-      metadata.multibuy_total_eur = Number(multi[2].replace(",", "."));
-    }
-    metadata.mechanic =
-      multi
-        ? "multibuy"
-        : loyalty
-          ? "loyalty"
-          : savePercentMatch
-            ? "save_percent"
-            : (saveAmountEuroMatch || saveAmountCentsMatch)
-              ? "save_amount"
-              : /half\s+price/i.test(label)
-                ? "half_price"
-                : /^only\b/i.test(label)
-                  ? "fixed_price"
-                  : "named_or_generic";
-    return {
-      store_product_id: storeProductId,
-      promotion_key: [promotionType, week.start, label].join(":").slice(0, 240),
-      promotion_type: promotionType,
-      loyalty_required: loyalty,
-      loyalty_program: loyalty ? "Real Rewards" : null,
-      offer_price_eur: offerPrice,
-      regular_price_eur: card.regularPrice,
-      label,
-      description: null,
-      valid_from: week.start,
-      valid_to: week.end,
-      synced_at: now,
-      source_metadata: metadata,
-      updated_at: now,
-    };
-  });
-}
 async function consumeCapability(requestId: string): Promise<Capability> {
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from("retail_catalog_bootstrap_requests")
-    .select("id,mode,source_store_id,sync_batch_id,work_limit,expires_at,used_at")
+    .select("id,mode,source_store_id,sync_batch_id,work_limit,refresh_kind,expires_at,used_at")
     .eq("id", requestId)
     .is("used_at", null)
     .gt("expires_at", now)
@@ -227,14 +73,17 @@ async function consumeCapability(requestId: string): Promise<Capability> {
 }
 async function upsertCards(cards: any[], job: CategoryJob, batchId: string) {
   if (!cards.length) return { unique: 0, promotions: 0 };
+  cards = [...new Map(cards.map(c => [c.sku, c])).values()].sort((a, b) => a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0);
   const now = new Date().toISOString();
   const productRows = cards.map((c) => ({
     retail_banner: "supervalu",
     sku: c.sku,
     product_name: c.name,
     brand: c.brand,
-    department: job.category_name,
-    category_breadcrumb: job.category_href,
+    department: c.department,
+    category_breadcrumb: c.breadcrumb,
+    sell_by: c.sellBy,
+    price_unit_type: c.priceUnitType,
     service_area: c.serviceArea,
     fulfilment: c.fulfilment,
     is_alcohol: c.isAlcohol,
@@ -243,15 +92,16 @@ async function upsertCards(cards: any[], job: CategoryJob, batchId: string) {
     last_seen_at: now,
     updated_at: now,
   }));
-  const { error: pe } = await supabase.from("retail_catalog_products")
-    .upsert(productRows, { onConflict: "retail_banner,sku" });
+  const { error: pe } = await retryCatalogWrite(() => supabase.from("retail_catalog_products")
+    .upsert(productRows, { onConflict: "retail_banner,sku" }));
   if (pe) throw new Error("product upsert: " + pe.message);
 
   const skus = [...new Set(cards.map((c) => c.sku))];
   const { data: ids, error: ie } = await supabase.from("retail_catalog_products")
     .select("id,sku").eq("retail_banner", "supervalu").in("sku", skus);
   if (ie) throw new Error("product id lookup: " + ie.message);
-  const idBySku = new Map((ids ?? []).map((r:any) => [String(r.sku), String(r.id)]));
+  const idBySku = new Map<string, string>((ids ?? []).map((r:any) => [String(r.sku), String(r.id)]));
+  if (idBySku.size !== skus.length) throw new Error("Incomplete product ID lookup");
 
   const listings = cards.flatMap((c) => {
     const productId = idBySku.get(c.sku);
@@ -271,23 +121,17 @@ async function upsertCards(cards: any[], job: CategoryJob, batchId: string) {
       updated_at: now,
     }];
   });
-  const { error: le } = await supabase.from("retail_store_products")
-    .upsert(listings, { onConflict: "source_store_id,product_id" });
+  const { error: le } = await retryCatalogWrite(() => supabase.from("retail_store_products")
+    .upsert(listings.sort((a,b) => a.product_id.localeCompare(b.product_id)), { onConflict: "source_store_id,product_id" }));
   if (le) throw new Error("listing upsert: " + le.message);
 
   const productIds = listings.map((x:any) => x.product_id);
   const { data: storeRows, error: se } = await supabase.from("retail_store_products")
     .select("id,product_id").eq("source_store_id", job.source_store_id).in("product_id", productIds);
   if (se) throw new Error("store listing lookup: " + se.message);
-  const spByProduct = new Map((storeRows ?? []).map((r:any) => [String(r.product_id), String(r.id)]));
+  const spByProduct = new Map<string, string>((storeRows ?? []).map((r:any) => [String(r.product_id), String(r.id)]));
+  if (spByProduct.size !== productIds.length) throw new Error("Incomplete store product ID lookup");
   const week = currentOfferWeek();
-  const affected = (storeRows ?? []).map((r:any) => String(r.id));
-  if (affected.length) {
-    const { error: de } = await supabase.from("retail_promotions")
-      .delete().in("store_product_id", affected)
-      .gte("valid_to", week.start).lte("valid_from", week.end);
-    if (de) throw new Error("promotion clear: " + de.message);
-  }
   const promotions: any[] = [];
   for (const card of cards) {
     const productId = idBySku.get(card.sku);
@@ -295,15 +139,99 @@ async function upsertCards(cards: any[], job: CategoryJob, batchId: string) {
     if (storeProductId) promotions.push(...promoRows(card, storeProductId, week, now));
   }
   if (promotions.length) {
-    const { error: pre } = await supabase.from("retail_promotions")
-      .upsert(promotions, { onConflict: "store_product_id,promotion_key" });
+    const { error: pre } = await retryCatalogWrite(() => supabase.from("retail_promotions")
+      .upsert(promotions.sort((a,b) => `${a.store_product_id}:${a.promotion_key}`.localeCompare(`${b.store_product_id}:${b.promotion_key}`)), { onConflict: "store_product_id,promotion_key" }));
     if (pre) throw new Error("promotion upsert: " + pre.message);
   }
+  // Obsolete promotions remain until the complete source run passes coverage
+  // checks. finalize_supervalu_catalog_run removes them atomically at publication.
   return { unique: skus.length, promotions: promotions.length };
 }
-async function discover(storeId: string) {
+async function discoverCampaignJobs(storeId: string, leafletLinks: Array<{url: string}>) {
+  const pending = new Set<string>([
+    ...leafletLinks.map((link) => campaignPageUrl(link.url)).filter((url): url is string => Boolean(url)),
+    "https://shop.supervalu.ie/selected-offers",
+  ]);
+  const visited = new Set<string>();
+  const references = new Map<string, { listing_reference: string; source_url: string }>();
+  const unresolved: Array<{ source_url: string; reason: string }> = [];
+  const deadline = Date.now() + 60000;
+  while (pending.size && visited.size < 60 && Date.now() < deadline) {
+    const urls = [...pending].slice(0, Math.min(4, 60 - visited.size));
+    urls.forEach((url) => { pending.delete(url); visited.add(url); });
+    await Promise.all(urls.map(async (sourceUrl) => {
+      try {
+        const scopedUrl = `https://shop.supervalu.ie/sm/pickup/rsid/${encodeURIComponent(storeId)}${new URL(sourceUrl).pathname}`;
+        const response = await fetch(scopedUrl, { headers: H, signal: AbortSignal.timeout(15000) });
+        if (!response.ok) throw new Error(`Campaign page HTTP ${response.status}`);
+        const document = campaignDocument(await response.text(), sourceUrl);
+        for (const reference of document.references) {
+          if (!references.has(reference)) references.set(reference, { listing_reference: reference, source_url: sourceUrl });
+        }
+        for (const linked of document.links) if (!visited.has(linked)) pending.add(linked);
+        if (!document.references.length && !document.links.length) unresolved.push({ source_url: sourceUrl, reason: "No explicit product-list membership was published in this page" });
+      } catch (error) {
+        unresolved.push({ source_url: sourceUrl, reason: error instanceof Error ? error.message : String(error) });
+      }
+    }));
+  }
+  for (const sourceUrl of pending) unresolved.push({ source_url: sourceUrl, reason: "Campaign discovery safety or time limit reached" });
+  return { widget_references: [...references.values()], pages_checked: visited.size, unresolved_pages: unresolved, discovery_truncated: pending.size > 0 };
+}
+
+async function processCampaignJob(job: CategoryJob, batchId: string) {
+  const coverage = storefrontCoverageReport();
+  coverage.supported_sources.push("published_campaign_membership_only");
+  try {
+    const reference = job.category_id.slice("CAMPAIGN:".length);
+    const membership = await fetchCampaignMembership({ storeId: job.source_store_id, reference, sourceUrl: job.category_href });
+    const observedAt = new Date().toISOString();
+    // Replace only this uncommitted batch's staging rows after complete source
+    // pagination. Prior completed membership remains until atomic finalization.
+    const { error: stagingError } = await supabase.from("retail_campaign_memberships").delete()
+      .eq("retail_banner", "supervalu").eq("source_store_id", job.source_store_id)
+      .eq("campaign_key", membership.campaignKey).eq("sync_batch_id", batchId);
+    if (stagingError) throw new Error("campaign staging reset: " + stagingError.message);
+    const rows = membership.skus.map((sku) => ({
+      retail_banner: "supervalu", source_store_id: job.source_store_id, sku,
+      campaign_key: membership.campaignKey, campaign_name: membership.name,
+      source_url: membership.sourceUrl, listing_reference: reference,
+      source_listing_id: membership.listingId, sync_batch_id: batchId,
+      observed_at: observedAt,
+      source_metadata: { source: "supervalu_public_listing", evidence: "membership_only", gateway_prices_discarded: true, source_total: membership.total },
+    }));
+    for (let i = 0; i < rows.length; i += 500) {
+      const { error } = await supabase.from("retail_campaign_memberships").upsert(rows.slice(i, i + 500), {
+        onConflict: "retail_banner,source_store_id,campaign_key,sku,sync_batch_id",
+      });
+      if (error) throw new Error("campaign membership staging: " + error.message);
+    }
+    const { count, error: countError } = await supabase.from("retail_campaign_memberships")
+      .select("sku", { count: "exact", head: true }).eq("retail_banner", "supervalu")
+      .eq("source_store_id", job.source_store_id).eq("campaign_key", membership.campaignKey).eq("sync_batch_id", batchId);
+    if (countError || count !== membership.total) throw new Error("Campaign persisted membership count differs from complete source");
+    const { error: completeError } = await supabase.from("retail_catalog_category_queue").update({
+      status: "completed", category_name: membership.name, pages_fetched: membership.pages,
+      product_cards_seen: membership.total, unique_skus_seen: membership.total,
+      completed_at: observedAt, updated_at: observedAt, last_error: null,
+    }).eq("id", job.id).eq("sync_batch_id", batchId);
+    if (completeError) throw new Error("campaign completion: " + completeError.message);
+    return { category_id: job.category_id, pages: [], campaign_name: membership.name, membership_count: membership.total, coverage_report: coverage };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const { error: failedError } = await supabase.from("retail_catalog_category_queue").update({
+      status: "failed", last_error: message, completed_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }).eq("id", job.id).eq("sync_batch_id", batchId);
+    if (failedError) throw new Error("record campaign failure: " + failedError.message);
+    coverage.unsupported_observations.failed_campaign_membership = 1;
+    coverage.warnings.push(message);
+    return { category_id: job.category_id, pages: [], error: message, coverage_report: coverage };
+  }
+}
+
+async function discover(storeId: string, refreshKind: "full" | "offers") {
   const navUrl = `https://shop.supervalu.ie/sm/pickup/rsid/${encodeURIComponent(storeId)}/categories/milk-yogurt-butter-eggs-id-O100025`;
-  const response = await fetch(navUrl, { headers: H });
+  const response = await fetch(navUrl, { headers: H, signal: AbortSignal.timeout(30000) });
   if (!response.ok) throw new Error("navigation HTTP " + response.status);
   const html = await response.text();
   const $ = cheerio.load(html);
@@ -322,6 +250,34 @@ async function discover(storeId: string) {
       });
     }
   });
+  if (found.size < 100) throw new Error(`Incomplete storefront navigation: only ${found.size} categories`);
+  if (refreshKind === "offers") found.clear();
+  found.set("PROMOTIONS", { category_id: "PROMOTIONS", category_name: "All promotions", category_href: "/promotions" });
+  // Follow the current leaflet linked by the official storefront. This is
+  // campaign-discovery evidence only; no hotspot price is applied to a SKU.
+  const leafletHref = $('a[href*="supervalu.ie/offers/leaflet/"]').first().attr("href")?.trim();
+  let campaignDiscovery: Record<string, unknown> = { verified: false, reason: "Official storefront did not expose a current leaflet link" };
+  if (leafletHref) {
+    try {
+      const leafletUrl = new URL(leafletHref);
+      if (leafletUrl.protocol !== "https:" || leafletUrl.hostname !== "supervalu.ie" || !/^\/offers\/leaflet\/\d+\/?$/.test(leafletUrl.pathname)) {
+        throw new Error("Unrecognized official leaflet link");
+      }
+      const leafletResponse = await fetch(leafletUrl, { headers: H, signal: AbortSignal.timeout(15000) });
+      if (!leafletResponse.ok) throw new Error(`Leaflet HTTP ${leafletResponse.status}`);
+      campaignDiscovery = { verified: false, ...readLeafletCampaignLinks(await leafletResponse.text(), leafletUrl.toString()) };
+    } catch (error) {
+      campaignDiscovery = { verified: false, source_url: leafletHref, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+  const campaignJobs = await discoverCampaignJobs(storeId, (campaignDiscovery.links ?? []) as Array<{url: string}>);
+  campaignDiscovery = { ...campaignDiscovery, ...campaignJobs };
+  for (const campaign of campaignJobs.widget_references) {
+    found.set(`CAMPAIGN:${campaign.listing_reference}`, {
+      category_id: `CAMPAIGN:${campaign.listing_reference}`,
+      category_name: "Official campaign membership", category_href: campaign.source_url,
+    });
+  }
   const batchId = crypto.randomUUID();
   const now = new Date().toISOString();
   const { error: runError } = await supabase.from("retail_catalog_sync_runs").insert({
@@ -330,7 +286,7 @@ async function discover(storeId: string) {
     sync_batch_id: batchId,
     status: "running",
     started_at: now,
-    metadata: { source: "supervalu_public_storefront", category_count: found.size },
+    metadata: { source: "supervalu_public_storefront", category_count: found.size, refresh_kind: refreshKind, coverage_report: storefrontCoverageReport(), campaign_discovery: campaignDiscovery },
   });
   if (runError) throw new Error("sync run insert: " + runError.message);
 
@@ -340,6 +296,9 @@ async function discover(storeId: string) {
     sync_batch_id: batchId,
     ...c,
     status: "pending",
+    retry_count: 0,
+    next_page: 1,
+    next_skip: 0,
     pages_fetched: 0,
     product_cards_seen: 0,
     unique_skus_seen: 0,
@@ -353,61 +312,70 @@ async function discover(storeId: string) {
       .upsert(queueRows.slice(i, i + 200), { onConflict: "source_store_id,category_id" });
     if (error) throw new Error("queue upsert: " + error.message);
   }
-  return { batch_id: batchId, categories: queueRows.length };
+  return { batch_id: batchId, categories: queueRows.length, campaign_discovery: campaignDiscovery, coverage_report: storefrontCoverageReport() };
 }
 async function processJob(job: CategoryJob, batchId: string) {
+  if (job.category_id.startsWith("CAMPAIGN:")) return processCampaignJob(job, batchId);
+  const results = [];
+  const coverageReports: StorefrontCoverageReport[] = [];
+  const deadline = Date.now() + 45000;
+  // Promotion-only passes need just one queue entry. Consume several pages
+  // while holding its claim, so 2,000 offers do not take 20 scheduler ticks.
+  const maxPages = job.category_id === "PROMOTIONS" ? 4 : 1;
   try {
-    const page = Number(job.next_page || 1);
-    const skip = Number(job.next_skip || 0);
-    const url = publicCategoryUrl(job.source_store_id, job.category_href, page, skip);
-    const response = await fetch(url, { headers: H });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const html = await response.text();
-    const cards = parseCards(html, job.category_name, job.category_href);
-    const saved = await upsertCards(cards, job, batchId);
-    const $ = cheerio.load(html);
-    const next = $('link[rel="next"]').attr("href");
-    const hasNext = Boolean(next) && cards.length > 0;
-    const now = new Date().toISOString();
-    await supabase.from("retail_catalog_category_queue").update({
-      status: hasNext ? "pending" : "completed",
-      pages_fetched: Number(job.pages_fetched || 0) + 1,
-      product_cards_seen: Number(job.product_cards_seen || 0) + cards.length,
-      unique_skus_seen: Number(job.unique_skus_seen || 0) + saved.unique,
-      next_page: hasNext ? page + 1 : page,
-      next_skip: hasNext ? skip + TAKE : skip,
-      completed_at: hasNext ? null : now,
-      updated_at: now,
-      last_error: null,
-    }).eq("id", job.id);
-    return {
-      category_id: job.category_id,
-      page,
-      cards: cards.length,
-      promotions: saved.promotions,
-      has_next: hasNext,
-    };
+    for (let step = 0; step < maxPages; step++) {
+      const page = Number(job.next_page || 1);
+      const skip = Number(job.next_skip || 0);
+      const url = publicCategoryUrl(job.source_store_id, job.category_href, page, skip);
+      const response = await fetch(url, { headers: H, signal: AbortSignal.timeout(30000) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const html = await response.text();
+      const sourcePage = readStorefrontPage(html, { categoryId: job.category_id, page, skip, take: TAKE });
+      coverageReports.push(storefrontCoverageReport(sourcePage.state, sourcePage.products));
+      const cards = normalizeCards(sourcePage.products, job.category_name, job.category_href, html);
+      const saved = await upsertCards(cards, job, batchId);
+      const hasNext = sourcePage.hasNext;
+      const keepClaim = hasNext && step + 1 < maxPages && Date.now() < deadline;
+      const now = new Date().toISOString();
+      const progress = {
+        status: !hasNext ? "completed" : keepClaim ? "running" : "pending",
+        pages_fetched: Number(job.pages_fetched || 0) + 1,
+        product_cards_seen: Number(job.product_cards_seen || 0) + cards.length,
+        unique_skus_seen: Number(job.unique_skus_seen || 0) + saved.unique,
+        next_page: hasNext ? page + 1 : page,
+        next_skip: hasNext ? skip + sourcePage.take : skip,
+        completed_at: hasNext ? null : now, updated_at: now, last_error: null,
+      };
+      const { error: queueError } = await supabase.from("retail_catalog_category_queue")
+        .update(progress).eq("id", job.id).eq("sync_batch_id", batchId);
+      if (queueError) throw new Error("queue progress: " + queueError.message);
+      results.push({ total: sourcePage.total, page, cards: cards.length, promotions: saved.promotions, has_next: hasNext, coverage_report: storefrontCoverageReport(sourcePage.state, sourcePage.products) });
+      Object.assign(job, progress);
+      if (!keepClaim) break;
+    }
+    return { category_id: job.category_id, pages: results, coverage_report: mergeStorefrontCoverageReports(coverageReports) };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await supabase.from("retail_catalog_category_queue").update({
-      status: "failed",
-      last_error: message,
-      completed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }).eq("id", job.id);
-    return { category_id: job.category_id, error: message };
+    const { error: failedError } = await supabase.from("retail_catalog_category_queue").update({
+      status: "failed", last_error: message,
+      completed_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }).eq("id", job.id).eq("sync_batch_id", batchId);
+    if (failedError) throw new Error("record category failure: " + failedError.message);
+    return { category_id: job.category_id, pages: results, error: message, coverage_report: mergeStorefrontCoverageReports(coverageReports) };
   }
 }
-async function work(storeId: string, batchId: string, _limit: number) {
+async function work(storeId: string, batchId: string, limit: number) {
   const { data, error } = await supabase.rpc("claim_retail_catalog_categories", {
     p_source_store_id: storeId,
     p_sync_batch_id: batchId,
-    p_limit: 1,
+    p_limit: Math.max(1, Math.min(limit, 10)),
   });
   if (error) throw new Error("category claim: " + error.message);
   const jobs = (data ?? []) as CategoryJob[];
   const results = [];
-  for (const job of jobs) results.push(await processJob(job, batchId));
+  for (let i = 0; i < jobs.length; i += 4) {
+    results.push(...await Promise.all(jobs.slice(i, i + 4).map((job) => processJob(job, batchId))));
+  }
 
   const { count: remaining, error: remainingError } = await supabase
     .from("retail_catalog_category_queue")
@@ -417,46 +385,18 @@ async function work(storeId: string, batchId: string, _limit: number) {
     .in("status", ["pending", "running"]);
   if (remainingError) throw new Error("queue completion check: " + remainingError.message);
 
+  const coverageReport = mergeStorefrontCoverageReports(results.map((result) => result.coverage_report));
   let nationalRefresh: unknown = null;
   if ((remaining ?? 0) === 0) {
-    const { count: failed, error: failedError } = await supabase
-      .from("retail_catalog_category_queue")
-      .select("id", { count: "exact", head: true })
-      .eq("source_store_id", storeId)
-      .eq("sync_batch_id", batchId)
-      .eq("status", "failed");
-    if (failedError) throw new Error("queue failure check: " + failedError.message);
-
-    const completedAt = new Date().toISOString();
-    if ((failed ?? 0) === 0) {
-      const { data: refresh, error: refreshError } = await supabase.rpc(
-        "refresh_supervalu_national_scope",
-      );
-      if (refreshError) throw new Error("national refresh: " + refreshError.message);
-      nationalRefresh = refresh;
-
-      const { count: productCount } = await supabase
-        .from("retail_store_products")
-        .select("id", { count: "exact", head: true })
-        .eq("source_store_id", storeId)
-        .eq("is_listed", true);
-
-      await supabase.from("retail_catalog_sync_runs").update({
-        status: "completed",
-        product_count: productCount ?? 0,
-        completed_at: completedAt,
-        error_message: null,
-      }).eq("sync_batch_id", batchId);
-    } else {
-      await supabase.from("retail_catalog_sync_runs").update({
-        status: "failed",
-        completed_at: completedAt,
-        error_message: `${failed} category jobs failed`,
-      }).eq("sync_batch_id", batchId);
-    }
+    const { data: finalized, error: finalizeError } = await supabase.rpc(
+      "finalize_supervalu_catalog_run", { p_sync_batch_id: batchId },
+    );
+    if (finalizeError) throw Object.assign(new Error("finalize national crawl: " + finalizeError.message), { coverageReport });
+    nationalRefresh = finalized;
+    if (finalized?.ok === false) throw Object.assign(new Error(String(finalized.message ?? finalized.error ?? "Catalogue coverage check failed")), { coverageReport });
   }
 
-  return { claimed: jobs.length, results, remaining: remaining ?? 0, national_refresh: nationalRefresh };
+  return { claimed: jobs.length, results, remaining: remaining ?? 0, national_refresh: nationalRefresh, coverage_report: coverageReport };
 }
 
 Deno.serve(async (req) => {
@@ -468,7 +408,7 @@ Deno.serve(async (req) => {
     const capability = await consumeCapability(requestId);
     let result: any;
     if (capability.mode === "discover") {
-      result = await discover(capability.source_store_id || DEFAULT_STORE_ID);
+      result = await discover(capability.source_store_id || DEFAULT_STORE_ID, capability.refresh_kind ?? "full");
     } else {
       if (!capability.sync_batch_id) throw new Error("work capability missing sync batch");
       result = await work(capability.source_store_id, capability.sync_batch_id, capability.work_limit);
@@ -483,7 +423,7 @@ Deno.serve(async (req) => {
     if (requestId) {
       await supabase.from("retail_catalog_bootstrap_requests").update({
         result_status: 500,
-        result_summary: { error: message },
+        result_summary: { error: message, coverage_report: (error as { coverageReport?: StorefrontCoverageReport })?.coverageReport ?? storefrontCoverageReport() },
       }).eq("id", requestId);
     }
     return Response.json({ ok: false, error: message }, { status: 500 });

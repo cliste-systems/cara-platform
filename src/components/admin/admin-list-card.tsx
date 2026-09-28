@@ -11,7 +11,7 @@ type AdminListCardProps = {
   banner?: ReactNode;
   children: ReactNode;
   className?: string;
-  /** Grow to fill remaining viewport below the page header. Default true. */
+  /** Grow to fill remaining viewport below the page header. Default false. */
   fillRemaining?: boolean;
 };
 
@@ -22,7 +22,7 @@ export function AdminListCard({
   banner,
   children,
   className,
-  fillRemaining = true,
+  fillRemaining = false,
 }: AdminListCardProps) {
   return (
     <AdminSectionCard
@@ -33,8 +33,8 @@ export function AdminListCard({
       )}
       contentClassName="flex min-h-0 flex-1 flex-col p-0"
     >
-      <header className="flex min-w-0 shrink-0 flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="shrink-0 text-sm font-medium text-gray-700">{countLabel}</p>
+      <header className="flex min-w-0 shrink-0 flex-col gap-3 border-b border-[#e3e9e5] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="shrink-0 text-sm font-semibold text-[#35443f]">{countLabel}</p>
         {toolbar ? (
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
             {toolbar}
@@ -42,12 +42,12 @@ export function AdminListCard({
         ) : null}
       </header>
       {stats ? (
-        <div className="shrink-0 border-b border-gray-100 px-5 py-4">
+        <div className="shrink-0 border-b border-[#e3e9e5] px-5 py-4">
           {stats}
         </div>
       ) : null}
       {banner ? (
-        <div className="shrink-0 border-b border-gray-100 px-5 py-4">
+        <div className="shrink-0 border-b border-[#e3e9e5] px-5 py-4">
           {banner}
         </div>
       ) : null}

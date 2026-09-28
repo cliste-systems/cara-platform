@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { userNeedsPassword } from "@/lib/invite-onboarding";
 
 import { canAccessAdminConsole } from "@/lib/admin-session";
 import { redirectIfEmailUnconfirmed } from "@/lib/require-email-confirmed";
@@ -13,11 +14,15 @@ async function stampAdminInviteAccepted(userId: string, email: string) {
     const normalizedEmail = email.trim().toLowerCase();
     const { data: profile } = await admin
       .from("profiles")
-      .select("organization_id")
+      .select("account_id")
       .eq("id", userId)
       .maybeSingle();
-
-    if (!profile?.organization_id) return;
+    if (!profile?.account_id) return;
+    const [{ data: membership }, { data: organizations }] = await Promise.all([
+      admin.from("account_memberships").select("account_id").eq("user_id", userId).eq("account_id", profile.account_id).maybeSingle(),
+      admin.from("organizations").select("id").eq("account_id", profile.account_id),
+    ]);
+    if (!membership || !organizations?.length) return;
 
     await admin
       .from("admin_invites")
@@ -25,7 +30,8 @@ async function stampAdminInviteAccepted(userId: string, email: string) {
         accepted_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-      .eq("organization_id", profile.organization_id)
+      .eq("user_id", userId)
+      .in("organization_id", organizations.map((organization) => organization.id))
       .ilike("email", normalizedEmail)
       .is("accepted_at", null);
   } catch (err) {
@@ -55,6 +61,8 @@ export default async function PostLoginRoutePage() {
   if (canAccessAdminConsole(user)) {
     redirect("/admin");
   }
+
+  if (userNeedsPassword(user)) redirect("/dashboard/set-password");
 
   // Gate on the salon's lifecycle. SaaS signups land here while still
   // onboarding (status != 'active') and are routed into the wizard so they

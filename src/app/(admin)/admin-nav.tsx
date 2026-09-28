@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
 
 import {
+  ClipboardCheck,
   Headphones,
   LayoutGrid,
   LifeBuoy,
@@ -14,8 +14,8 @@ import {
   Users,
 } from "lucide-react";
 
-import { isPublicSignupEnabled } from "@/lib/public-signup";
 import {
+  adminCallAnalysisPath,
   adminCustomersPath,
   adminDemoCallsPath,
   adminInboxPath,
@@ -51,6 +51,12 @@ const baseNav = [
     exact: true,
   },
   {
+    href: adminCallAnalysisPath(),
+    label: "Call analysis",
+    icon: ClipboardCheck,
+    exact: false,
+  },
+  {
     href: adminTextRehearsalPath(),
     label: "Text rehearsal",
     icon: MessageSquareText,
@@ -79,24 +85,16 @@ function isActive(pathname: string, href: string, exact: boolean): boolean {
 
 export function AdminNav({ loggedInAs }: { loggedInAs: string }) {
   const pathname = usePathname() ?? "";
-  const [publicSignup, setPublicSignup] = useState(false);
-
-  useEffect(() => {
-    setPublicSignup(isPublicSignupEnabled());
-  }, []);
-
-  const nav = baseNav.filter(
-    (item) => !("requiresPublicSignup" in item && item.requiresPublicSignup) || publicSignup,
-  );
   const initial = loggedInAs.trim().charAt(0).toUpperCase() || "A";
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <nav
-        className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-4"
+        className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 py-5"
         aria-label="Admin"
       >
-        {nav.map(({ href, label, icon: Icon, exact }) => {
+        <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#91a099]">Workspace</p>
+        {baseNav.map(({ href, label, icon: Icon, exact }) => {
           const active = isActive(pathname, href, exact);
           return (
             <Link
@@ -104,10 +102,10 @@ export function AdminNav({ loggedInAs }: { loggedInAs: string }) {
               href={href}
               className={cn(
                 adminNavLinkBaseClass,
-                "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px]",
+                "group relative flex min-h-10 items-center gap-3 rounded-lg px-3 py-2.5 text-[13px]",
                 active
-                  ? "bg-slate-100 font-medium text-[#0b1220]"
-                  : "font-normal text-slate-600 hover:bg-slate-50 hover:text-[#0b1220]",
+                  ? "bg-[#353d42] font-semibold text-white"
+                  : "font-medium text-[#5f6f68] hover:bg-[#eef2ef] hover:text-[#11181d]",
               )}
               aria-current={active ? "page" : undefined}
             >
@@ -115,8 +113,8 @@ export function AdminNav({ loggedInAs }: { loggedInAs: string }) {
                 className={cn(
                   "size-4 shrink-0 transition-colors",
                   active
-                    ? "text-[#0b1220]"
-                    : "text-slate-400 group-hover:text-slate-600",
+                    ? "text-white"
+                    : "text-[#8b9c94] group-hover:text-[#353d42]",
                 )}
                 strokeWidth={1.5}
                 aria-hidden
@@ -128,16 +126,16 @@ export function AdminNav({ loggedInAs }: { loggedInAs: string }) {
         <AdminPaymentsNavGroup />
       </nav>
 
-      <div className="shrink-0 border-t border-slate-100 p-4">
+      <div className="shrink-0 border-t border-[#d9e2dd] bg-[#f7f9f7] p-4">
         <div className="mb-3 flex items-center gap-2.5 px-1">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-[#d9e2dd] bg-white text-xs font-semibold text-[#353d42]">
             {initial}
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-[#0b1220]">
+            <p className="truncate text-sm font-medium text-[#11181d]">
               {loggedInAs}
             </p>
-            <p className="text-[11px] text-slate-500">Staff session</p>
+            <p className="text-[11px] text-[#8b9c94]">Staff session</p>
           </div>
         </div>
         <AdminSignOutButton />

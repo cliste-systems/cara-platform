@@ -18,6 +18,7 @@ import {
 import { regenerateCaraCustomPrompt } from "@/lib/cara-prompt-from-org";
 import { AGENT_CONFIG_REVALIDATE_PATHS } from "@/lib/dashboard-routes";
 import { requireDashboardSession } from "@/lib/dashboard-session";
+import { requireDashboardAdmin } from "@/lib/dashboard-admin";
 import { listServicesForOrg } from "@/lib/service-catalog";
 
 import { parseAgentFaqs } from "./agent-faqs";
@@ -47,7 +48,7 @@ export async function uploadBusinessFile(
 ): Promise<
   ActionResult & { file?: BusinessFileListItem; overlapSendOnlyDefault?: boolean }
 > {
-  const { organizationId, supabase } = await requireDashboardSession();
+  const { organizationId, supabase } = await requireDashboardAdmin();
   const file = formData.get("file");
   const rawKind = String(formData.get("documentKind") ?? "").trim();
   const documentKind = isBusinessFileKind(rawKind) ? rawKind : null;
@@ -94,7 +95,7 @@ export async function updateBusinessFileToggles(
   fileId: string,
   patch: { answerEnabled?: boolean; sendEnabled?: boolean },
 ): Promise<ActionResult> {
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId } = await requireDashboardAdmin();
   const result = await updateBusinessFileTogglesForOrg(
     supabase,
     organizationId,
@@ -117,7 +118,7 @@ export async function updateBusinessFileMetadata(
     whenToUse?: string;
   },
 ): Promise<ActionResult & { file?: BusinessFileListItem }> {
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId } = await requireDashboardAdmin();
   const result = await updateBusinessFileMetadataForOrg(
     supabase,
     organizationId,
@@ -132,7 +133,7 @@ export async function updateBusinessFileMetadata(
 }
 
 export async function deleteBusinessFile(fileId: string): Promise<ActionResult> {
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId } = await requireDashboardAdmin();
   const result = await deleteBusinessFileForOrg(
     supabase,
     organizationId,

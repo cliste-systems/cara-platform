@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 
 import { isSignupOnboardingDevRelaxed } from "@/lib/onboarding-dev";
 import {
+  emailRateLimitFingerprint,
   getRateLimitStatus,
   rateLimitFingerprint,
   recordRateLimitFailure,
@@ -25,10 +26,14 @@ export async function resendSignupConfirmationEmail(
   }
 
   const h = await headers();
-  const fp = rateLimitFingerprint(h, `signup-resend:${email}`);
+  const fingerprints = [
+    rateLimitFingerprint(h, "signup-resend"),
+    emailRateLimitFingerprint(email, "signup-resend-email"),
+  ];
   if (!isSignupOnboardingDevRelaxed()) {
-    const status = await getRateLimitStatus("authenticate", fp);
-    if (!status.allowed) {
+    const statuses = await Promise.all(fingerprints.map((fp) => getRateLimitStatus("authenticate", fp)));
+    const status = statuses.find((entry) => !entry.allowed);
+    if (status) {
       return {
         ok: false,
         message: `Please wait ${status.retryAfterSeconds}s before requesting another email.`,
@@ -37,6 +42,17 @@ export async function resendSignupConfirmationEmail(
     }
   }
 
+  // Count every send attempt, including successful sends and unknown accounts.
+  // Reserve before calling the email provider, and fail closed if storage is unavailable.
+  if (!isSignupOnboardingDevRelaxed()) {
+    const reserved = await Promise.all(fingerprints.map((fp) => recordRateLimitFailure("authenticate", fp)));
+    const denied = reserved.find((entry) => !entry.allowed);
+    if (denied) return {
+      ok: false,
+      message: `Please wait ${denied.retryAfterSeconds}s before requesting another email.`,
+      retryAfterSeconds: denied.retryAfterSeconds,
+    };
+  }
   const sent = await sendSignupConfirmationEmail({ email });
   if (!sent.ok) {
     const lower = sent.message.toLowerCase();
@@ -47,7 +63,6 @@ export async function resendSignupConfirmationEmail(
     ) {
       return { ok: true };
     }
-    await recordRateLimitFailure("authenticate", fp);
     return sent;
   }
 

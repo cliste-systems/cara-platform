@@ -60,6 +60,14 @@ export type CallCloseDiagnosticsPayload = {
   recommendedChecks?: string[];
   toolLines?: string[];
   transcriptCompleteness?: CallTestTranscriptCompleteness;
+  transcriptCapture?: {
+    status: "captured" | "partial";
+    expectedEventCount: number;
+    persistedEventCount: number;
+    sequenceContinuous: boolean;
+    hasCaller: boolean;
+    hasAssistant: boolean;
+  };
   costEstimate?: Record<string, unknown> | null;
   pipelineIncidents?: CallTestPipelineIncident[];
   postprocessRan?: boolean;

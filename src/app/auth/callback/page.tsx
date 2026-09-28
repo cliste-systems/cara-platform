@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ArrowRight, LoaderCircle, ShieldCheck } from "lucide-react";
+import { ClisteLogoMark } from "@/components/cliste-logo-mark";
 
 import { createSupabaseCallbackClient } from "@/utils/supabase/callback-client";
 
@@ -29,6 +32,7 @@ function mergeAuthParamsFromUrl(href: string): Record<string, string> {
 }
 
 const CALLBACK_CLAIM_PREFIX = "cliste_auth_cb:";
+const callbacksInFlight = new Set<string>();
 
 /** One-time Supabase params; React Strict Mode runs this effect twice in dev and would consume the link twice. */
 function getCallbackClaimKey(params: Record<string, string>): string | null {
@@ -52,16 +56,17 @@ function tryBeginAuthCallback(claimKey: string | null): CallbackGate {
   try {
     const state = sessionStorage.getItem(claimKey);
     if (state === "done") return "skip_done";
-    if (state === "processing") return "skip_wait";
-    sessionStorage.setItem(claimKey, "processing");
+    if (callbacksInFlight.has(claimKey)) return "skip_wait";
   } catch {
     /* private mode / blocked storage — still try once */
   }
+  callbacksInFlight.add(claimKey);
   return "proceed";
 }
 
 function finishAuthCallback(claimKey: string | null, success: boolean) {
   if (!claimKey) return;
+  callbacksInFlight.delete(claimKey);
   try {
     if (success) {
       sessionStorage.setItem(claimKey, "done");
@@ -81,7 +86,8 @@ function finishAuthCallback(claimKey: string | null, success: boolean) {
  */
 export default function AuthCallbackPage() {
   const router = useRouter();
-  const [message, setMessage] = useState("Signing you in…");
+  const [message, setMessage] = useState("We’re confirming your invitation and preparing your account.");
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let claimKey: string | null = null;
@@ -98,9 +104,7 @@ export default function AuthCallbackPage() {
             params.error ||
             "Sign-in link is invalid or expired.";
           setMessage(String(msg));
-          router.replace(
-            `/authenticate?error=${encodeURIComponent(String(msg).slice(0, 200))}`
-          );
+          setFailed(true);
           return;
         }
 
@@ -137,12 +141,11 @@ export default function AuthCallbackPage() {
           if (error) {
             finishAuthCallback(claimKey, false);
             setMessage(error.message);
-            router.replace(
-              `/authenticate?error=${encodeURIComponent(error.message)}`
-            );
+            setFailed(true);
             return;
           }
           finishAuthCallback(claimKey, true);
+          window.history.replaceState(window.history.state, "", window.location.pathname);
           router.replace("/auth/post-login");
           router.refresh();
           return;
@@ -151,16 +154,15 @@ export default function AuthCallbackPage() {
         const search = window.location.search;
         if (search.includes("code=")) {
           const { error } =
-            await supabase.auth.exchangeCodeForSession(search);
+            await supabase.auth.exchangeCodeForSession(params.code);
           if (error) {
             finishAuthCallback(claimKey, false);
             setMessage(error.message);
-            router.replace(
-              `/authenticate?error=${encodeURIComponent(error.message)}`
-            );
+            setFailed(true);
             return;
           }
           finishAuthCallback(claimKey, true);
+          window.history.replaceState(window.history.state, "", window.location.pathname);
           router.replace("/auth/post-login");
           router.refresh();
           return;
@@ -176,9 +178,7 @@ export default function AuthCallbackPage() {
           if (error) {
             finishAuthCallback(claimKey, false);
             setMessage(error.message);
-            router.replace(
-              `/authenticate?error=${encodeURIComponent(error.message)}`
-            );
+            setFailed(true);
             return;
           }
           finishAuthCallback(claimKey, true);
@@ -203,23 +203,24 @@ export default function AuthCallbackPage() {
 
         finishAuthCallback(claimKey, false);
         setMessage("Could not complete sign-in.");
-        router.replace(
-          "/authenticate?error=session&message=" +
-            encodeURIComponent(
-              "This sign-in link could not be completed. Try opening it in the same browser you use for the app, or request a new invite."
-            )
-        );
+        setFailed(true);
       } catch {
         finishAuthCallback(claimKey, false);
         setMessage("Something went wrong.");
-        router.replace("/authenticate?error=unknown");
+        setFailed(true);
       }
     })();
   }, [router]);
 
   return (
-    <div className="flex min-h-dvh items-center justify-center p-6">
-      <p className="text-muted-foreground text-sm">{message}</p>
-    </div>
+    <main className="flex min-h-dvh items-center justify-center bg-[#f3f6f4] p-6">
+      <div className="w-full max-w-md rounded-2xl border border-[#dce5df] bg-white p-8 text-center shadow-sm">
+        <div className="mb-7 flex items-center justify-center gap-2.5"><ClisteLogoMark size={32} priority /><span className="text-xl font-semibold tracking-tight text-[#20392c]">HelloCara</span></div>
+        {failed ? <ShieldCheck className="mx-auto mb-5 size-8 text-[#617367]" /> : <LoaderCircle className="mx-auto mb-5 size-7 animate-spin text-[#294c37]" />}
+        <h1 className="text-2xl font-semibold tracking-tight text-[#20392c]">{failed ? "Let’s get you a fresh link" : "You’re in the right place"}</h1>
+        <p role="status" className="mt-3 text-sm leading-6 text-[#617367]">{failed ? "This invitation may have expired or already been used. Your account details are safe." : message}</p>
+        {failed ? <div className="mt-6 space-y-4"><a href="mailto:support@hellocara.ie?subject=Please%20resend%20my%20HelloCara%20invitation" className="flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[#294c37] px-5 py-3 text-sm font-medium text-white">Request a new invitation<ArrowRight className="size-4" /></a><Link href="/authenticate" className="inline-block py-2 text-sm font-medium text-[#294c37] underline-offset-4 hover:underline">Already set a password? Sign in</Link></div> : <p className="mt-6 text-xs text-[#617367]">Secure account setup</p>}
+      </div>
+    </main>
   );
 }

@@ -301,12 +301,10 @@ export async function startAdminDemoCall(
   const { apiKey, apiSecret } = resolveLiveKitCredentials();
   const host = livekitHttpHostFromEnv();
   const livekitUrl = resolveLiveKitWsUrl();
-  const agentName = resolveAgentName();
   const roomName = `admin-demo-${randomUUID()}`;
   const metadata = buildDispatchMetadata(line);
 
   const roomClient = new RoomServiceClient(host, apiKey, apiSecret);
-  const dispatchClient = new AgentDispatchClient(host, apiKey, apiSecret);
 
   await roomClient.createRoom({
     name: roomName,
@@ -316,7 +314,10 @@ export async function startAdminDemoCall(
     maxParticipants: 4,
   });
 
-  await dispatchClient.createDispatch(roomName, agentName, { metadata });
+  const presence = await createAdminClient().from("admin_live_call_sessions").insert({
+    room_name: roomName, organization_id: line.orgId, caller_number: ADMIN_SIM_CALLER_E164,
+  });
+  if (presence.error) console.warn("[admin-demo] session tracking will retry on connect");
 
   const identity = `admin-${input.staffIdentity.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 40)}-${randomUUID().slice(0, 8)}`;
 
@@ -341,6 +342,25 @@ export async function startAdminDemoCall(
     callerNumber: ADMIN_SIM_CALLER_E164,
     orgName: line.orgName,
   };
+}
+
+/** Dispatch Cara after the browser mic is live — avoids GPT-Live subscribing to a stale track. */
+export async function dispatchAdminDemoCallAgent(input: {
+  roomName: string;
+  calledNumber: string;
+}): Promise<void> {
+  const line = await resolveAdminDemoCallLine(input.calledNumber);
+  if (!line) {
+    throw new Error("Invalid demo line — choose an assigned store number.");
+  }
+
+  const { apiKey, apiSecret } = resolveLiveKitCredentials();
+  const host = livekitHttpHostFromEnv();
+  const agentName = resolveAgentName();
+  const metadata = buildDispatchMetadata(line);
+  const dispatchClient = new AgentDispatchClient(host, apiKey, apiSecret);
+
+  await dispatchClient.createDispatch(input.roomName.trim(), agentName, { metadata });
 }
 
 export type AdminDemoCallLogSummary = {

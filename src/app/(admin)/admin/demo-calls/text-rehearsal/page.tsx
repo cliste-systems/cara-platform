@@ -27,7 +27,7 @@ export default async function TextRehearsalAdminPage() {
   return (
     <AdminPageShell icon={MessageSquareText} title="Text rehearsal" fillViewport>
       {loadError ? (
-        <AdminErrorCard title="Could not load demo lines">{loadError}</AdminErrorCard>
+        <AdminErrorCard message="Could not load demo lines" hint={loadError} />
       ) : (
         <TextRehearsalView lines={lines} />
       )}

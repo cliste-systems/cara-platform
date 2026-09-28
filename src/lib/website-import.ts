@@ -12,6 +12,7 @@ import {
   mergeMultiLocationFaq,
 } from "@/lib/website-import-locations";
 import { normalisePublicWebsiteUrl } from "@/lib/website-import-ssrf";
+import { requestPublicWebsite } from "@/lib/public-website-request";
 import { isRegulatedBusinessText } from "@/lib/classify-business-description";
 
 export type {
@@ -76,23 +77,24 @@ export function htmlToText(html: string): string {
 async function fetchPublicPageHtmlDetailed(
   url: string,
   hops = 0,
+  deadline = Date.now() + FETCH_TIMEOUT_MS,
 ): Promise<{ ok: true; html: string } | { ok: false; failure: PageFetchFailure; httpStatus?: number }> {
   if (hops > 5) {
     return { ok: false, failure: "redirect_loop" };
   }
-  const parsed = await normalisePublicWebsiteUrl(url);
-  if (!parsed) {
-    return { ok: false, failure: "connection_failed" };
-  }
-
+  const remainingMs = deadline - Date.now();
+  if (remainingMs <= 0) return { ok: false, failure: "timeout" };
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), remainingMs);
   try {
-    const res = await fetch(parsed.toString(), {
+    const parsed = await normalisePublicWebsiteUrl(url, controller.signal);
+    controller.signal.throwIfAborted();
+    if (!parsed) {
+      return { ok: false, failure: "connection_failed" };
+    }
+    const res = await requestPublicWebsite(parsed, {
       signal: controller.signal,
-      redirect: "manual",
-      headers: { "User-Agent": `HelloCaraBot/1.0 (+${MARKETING_SITE_URL})` },
-      cache: "no-store",
+      userAgent: `HelloCaraBot/1.0 (+${MARKETING_SITE_URL})`,
     });
     if (res.status >= 300 && res.status < 400) {
       const location = res.headers.get("location");
@@ -100,9 +102,9 @@ async function fetchPublicPageHtmlDetailed(
         return { ok: false, failure: "http_error", httpStatus: res.status };
       }
       const next = new URL(location, parsed).toString();
-      return fetchPublicPageHtmlDetailed(next, hops + 1);
+      return fetchPublicPageHtmlDetailed(next, hops + 1, deadline);
     }
-    if (!res.ok) {
+    if (res.status < 200 || res.status >= 300) {
       return { ok: false, failure: "http_error", httpStatus: res.status };
     }
     const contentType = res.headers.get("content-type") ?? "";

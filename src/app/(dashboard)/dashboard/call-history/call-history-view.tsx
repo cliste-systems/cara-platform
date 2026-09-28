@@ -447,16 +447,14 @@ function CallListRow({
   const time = callListTimeLabel(row.createdAt);
   const engineerTestCall = row.engineerTestCall;
   const callerDataErased = isCallerDataErased(row);
-  const callStatus = engineerTestCall
-    ? ({ tone: "neutral" as const } as const)
-    : resolveCallHistoryListStatus({
-        outcome: row.outcome,
-        aiSummary: row.aiSummary,
-        postCallStatus: row.postCallStatus,
-        followUpSummary: row.followUp?.summary ?? null,
-        hasOpenAction: row.hasOpenAction,
-        callResolution: row.callResolution,
-      });
+  const callStatus = resolveCallHistoryListStatus({
+    outcome: row.outcome,
+    aiSummary: row.aiSummary,
+    postCallStatus: row.postCallStatus,
+    followUpSummary: row.followUp?.summary ?? null,
+    hasOpenAction: row.hasOpenAction,
+    callResolution: row.callResolution,
+  });
   const statusAccent = engineerTestCall
     ? {
         rowAccentClass: "border-l-2 border-l-slate-200",

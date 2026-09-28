@@ -1,17 +1,17 @@
 import * as Sentry from "@sentry/nextjs";
 
 /**
- * Next.js instrumentation hook — loads Sentry when SENTRY_DSN is set.
+ * Start local background work and load Sentry when configured.
  */
 export async function register() {
-  const dsn = process.env.SENTRY_DSN?.trim();
-  if (!dsn) return;
-
-  if (process.env.NEXT_RUNTIME === "nodejs") {
-    await import("../sentry.server.config");
+  if (process.env.NEXT_RUNTIME === "nodejs" && process.env.NODE_ENV === "development") {
+    const { startDevelopmentCallAnalysisWorker } = await import("@/lib/call-analysis-dev-worker");
+    startDevelopmentCallAnalysisWorker();
   }
-  if (process.env.NEXT_RUNTIME === "edge") {
-    await import("../sentry.edge.config");
+
+  if (process.env.SENTRY_DSN?.trim()) {
+    if (process.env.NEXT_RUNTIME === "nodejs") await import("../sentry.server.config");
+    if (process.env.NEXT_RUNTIME === "edge") await import("../sentry.edge.config");
   }
 }
 

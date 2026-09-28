@@ -27,7 +27,7 @@ export default async function DemoCallsAdminPage() {
   return (
     <AdminPageShell icon={Headphones} title="Demo calls">
       {loadError ? (
-        <AdminErrorCard title="Could not load demo lines">{loadError}</AdminErrorCard>
+        <AdminErrorCard message="Could not load demo lines" hint={loadError} />
       ) : (
         <DemoCallsView lines={lines} />
       )}

@@ -12,6 +12,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 export type AdminClientRow = {
   orgId: string;
   accountId: string | null;
+  accountName: string | null;
   name: string;
   slug: string;
   niche: string | null;
@@ -28,6 +29,7 @@ export type AdminClientRow = {
 };
 
 type AccountJoin = {
+  name: string | null;
   provision_source?: string | null;
   status: string | null;
   plan_tier: string | null;
@@ -68,18 +70,17 @@ function inferProvisionSource(
 }
 
 const ACCOUNT_SELECT_WITH_SOURCE =
-  "provision_source, status, plan_tier, platform_subscription_id, signup_ip";
+  "name, provision_source, status, plan_tier, platform_subscription_id, signup_ip";
 const ACCOUNT_SELECT_LEGACY =
-  "status, plan_tier, platform_subscription_id, signup_ip";
+  "name, status, plan_tier, platform_subscription_id, signup_ip";
 
-async function loadPrimaryOrganizations(admin: ReturnType<typeof createAdminClient>) {
+async function loadClientOrganizations(admin: ReturnType<typeof createAdminClient>) {
   const withSource = await admin
     .from("organizations")
     .select(
       `id, account_id, name, slug, niche, created_at, status, onboarding_step, phone_number, is_primary_location,
        accounts ( ${ACCOUNT_SELECT_WITH_SOURCE} )`,
     )
-    .eq("is_primary_location", true)
     .order("created_at", { ascending: false })
     .limit(500);
 
@@ -100,7 +101,6 @@ async function loadPrimaryOrganizations(admin: ReturnType<typeof createAdminClie
       `id, account_id, name, slug, niche, created_at, status, onboarding_step, phone_number, is_primary_location,
        accounts ( ${ACCOUNT_SELECT_LEGACY} )`,
     )
-    .eq("is_primary_location", true)
     .order("created_at", { ascending: false })
     .limit(500);
 
@@ -156,7 +156,7 @@ export async function loadAdminClients(
   filter: ClientProvisionFilter = "all",
 ): Promise<AdminClientRow[]> {
   const admin = createAdminClient();
-  const orgs = await loadPrimaryOrganizations(admin);
+  const orgs = await loadClientOrganizations(admin);
   const orgIds = orgs.map((o) => o.id);
 
   const [{ data: invites }, stageByOrg] = await Promise.all([
@@ -188,6 +188,7 @@ export async function loadAdminClients(
     return {
       orgId: org.id,
       accountId: org.account_id,
+      accountName: account?.name ?? null,
       name: org.name,
       slug: org.slug,
       niche: org.niche,
@@ -240,6 +241,7 @@ export async function loadAdminClientDetail(
   return {
     orgId: orgRow.id,
     accountId: orgRow.account_id,
+    accountName: account?.name ?? null,
     name: orgRow.name,
     slug: orgRow.slug,
     niche: orgRow.niche,

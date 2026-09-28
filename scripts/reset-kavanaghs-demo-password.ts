@@ -1,5 +1,5 @@
 /**
- * Reset presenter password for live demo login issues.
+ * Local/test-only: reset the selected presenter password using secure environment credentials.
  *   npx tsx scripts/reset-kavanaghs-demo-password.ts
  */
 
@@ -10,9 +10,9 @@ config({ path: ".env.local" });
 import { createClient } from "@supabase/supabase-js";
 
 import { createAdminClient } from "../src/utils/supabase/admin";
+import { readTestSeedCredentials } from "../src/lib/test-seed-credentials";
 
-const EMAIL = "kavanaghs@cliste.test";
-const PASSWORD = "KavanaghsDemo2026!";
+const { email: EMAIL, password: PASSWORD } = readTestSeedCredentials();
 
 async function main() {
   const admin = createAdminClient();
@@ -55,7 +55,7 @@ async function main() {
 
   console.log("\n✓ Kavanaghs demo login reset\n");
   console.log(`  Email:    ${EMAIL}`);
-  console.log(`  Password: ${PASSWORD}`);
+  console.log("  Password: use the unique value supplied through CLISTE_SEED_PASSWORD.");
   console.log("  URL:      http://localhost:3001/login");
   console.log("  (On phone use your ngrok URL + /login, not localhost)\n");
 }

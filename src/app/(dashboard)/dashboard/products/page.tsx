@@ -329,7 +329,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       const { data, error } = await admin
         .from("retail_store_products")
         .select(
-          "product_id, regular_price_eur, display_price_eur, price_per_unit, source_price_label, synced_at, retail_promotions(promotion_type, loyalty_required, loyalty_program, offer_price_eur, regular_price_eur, label, valid_from, valid_to)",
+          "product_id, regular_price_eur, display_price_eur, price_per_unit, source_price_label, synced_at, retail_promotions(promotion_type, loyalty_required, loyalty_program, offer_price_eur, regular_price_eur, label, valid_from, valid_to, synced_at)",
         )
         .eq("source_store_id", sourceStoreId)
         .eq("is_listed", true)

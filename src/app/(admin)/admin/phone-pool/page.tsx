@@ -102,7 +102,6 @@ export default async function PhonePoolAdminPage() {
       icon={Phone}
       title="Phone pool"
       description="Irish DIDs Cliste owns. Pool refills nightly when IE-available drops below the low-water mark."
-      fillViewport
     >
       <PhonePoolListCard countLabel={countLabel} stats={stats} notice={notice}>
         <table className={`${adminTableClass} text-sm`}>

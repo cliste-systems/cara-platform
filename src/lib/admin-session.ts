@@ -87,7 +87,8 @@ async function resolveAdminAuth(): Promise<ResolveAdminAuth> {
   return { tag: "ok", user };
 }
 
-export const requireAdminSessionUser = cache(async (): Promise<User> => {
+/** AAL1 is allowed only while enrolling or challenging the admin second factor. */
+export const requireAdminMfaSetupSessionUser = cache(async (): Promise<User> => {
   const r = await resolveAdminAuth();
   if (r.tag === "ok") return r.user;
   if (r.tag === "forbidden") {
@@ -102,7 +103,7 @@ export const requireAdminSessionUser = cache(async (): Promise<User> => {
 
 
 export const requireAdminMfaSessionUser = cache(async (): Promise<User> => {
-  const user = await requireAdminSessionUser();
+  const user = await requireAdminMfaSetupSessionUser();
 
   // Local shell-only development may run without Supabase auth.
   // Production always requires AAL2.
@@ -120,6 +121,9 @@ export const requireAdminMfaSessionUser = cache(async (): Promise<User> => {
 
   return user;
 });
+
+/** All privileged admin entry points enforce MFA, including legacy callers. */
+export const requireAdminSessionUser = requireAdminMfaSessionUser;
 
 export async function adminMfaAssuranceLevel(): Promise<"aal1" | "aal2" | null> {
   if (allowAdminDevWithoutSupabase()) return "aal2";

@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { regenerateCaraCustomPrompt } from "@/lib/cara-prompt-from-org";
 import {
   ONBOARDING_STEPS,
-  requireOnboardingSession,
+  requireOnboardingAdminSession,
 } from "@/lib/onboarding-session";
 import { provisionOrganizationPhoneNumber } from "@/lib/phone-pool";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -27,7 +27,7 @@ export type RetryNumberProvisionResult =
   | { ok: false; message: string };
 
 export async function retryNumberProvision(): Promise<RetryNumberProvisionResult> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
   const result = await provisionOrganizationPhoneNumber(session.organizationId);
   if (!result.ok) return { ok: false, message: result.message };
   revalidatePath("/onboarding/number");
@@ -37,7 +37,7 @@ export async function retryNumberProvision(): Promise<RetryNumberProvisionResult
 export async function saveOnboardingNumber(
   input: SaveOnboardingNumberInput,
 ): Promise<{ ok: false; message: string } | never> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
 
   if (!isCallRoutingMode(input.mode)) {
     return { ok: false, message: "Pick how calls should reach Cara." };

@@ -1,13 +1,13 @@
 # Kavanaghs 5-call demo — script card
 
-**Line:** +353749759508  
-**Dashboard:** kavanaghs@cliste.test / KavanaghsDemo2026!  
-**URL:** http://localhost:3001/dashboard  
+**Line:** +353749759508
+**Dashboard:** kavanaghs@cliste.test / [use the unique test credential from your password manager]
+**URL:** http://localhost:3001/dashboard
 
 Run readiness:
 
 ```bash
-cd code-base-1
+cd cara-platform
 npx tsx scripts/rehearse-kavanaghs-demo.ts --manager-phone +353872715938 --probe-webhooks
 npx tsx scripts/regenerate-kavanaghs-prompt.ts
 npx tsx scripts/rehearse-kavanaghs-demo.ts --simulate-five-part --app-url http://localhost:3001
@@ -17,8 +17,8 @@ npx tsx scripts/rehearse-kavanaghs-demo.ts --simulate-five-part --app-url http:/
 
 ## Before Garreth arrives
 
-1. `npm run dev -- -p 3001` (code-base-1 dashboard + voice webhooks)
-2. Voice worker deployed on LiveKit Cloud (code-base-2) with latest intake changes
+1. `npm run dev -- -p 3001` (cara-platform dashboard + voice webhooks)
+2. Voice worker deployed on LiveKit Cloud (cara-voice-platform) with latest intake changes
 3. `npx tsx scripts/regenerate-kavanaghs-prompt.ts` — SuperValu + Real Rewards in compiled prompt
 4. Confirm `notification_phone` = your test mobile (SMS on complaint ticket)
 5. National offers synced (`retail_weekly_offers` — 2000+ rows)

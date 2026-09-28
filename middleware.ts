@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { userNeedsPassword } from "./src/lib/invite-onboarding";
 
 import { DEFAULT_APP_SITE_URL } from "./src/lib/company-details";
 import { LEGACY_AUTH_REDIRECTS } from "./src/lib/auth-routes";
 import { LEGACY_DASHBOARD_REDIRECTS } from "./src/lib/dashboard-routes";
-import { DASHBOARD_LEGAL_ACCEPT_PATH, LEGAL_DOCUMENT_VERSIONS } from "./src/lib/legal-documents";
+import { DASHBOARD_LEGAL_ACCEPT_PATH } from "./src/lib/legal-documents";
 import { dashboardPathNeedsLegalAcceptance } from "./src/lib/legal-acceptance-middleware";
 import { onboardingPathNeedsLegalAcceptance } from "./src/lib/onboarding-legal-middleware";
 import { isPublicSignupEnabled } from "./src/lib/public-signup";
@@ -128,9 +129,6 @@ function buildForwardRequestHeaders(request: NextRequest): Headers {
   return headers;
 }
 
-const LEGAL_OK_COOKIE = "cliste_legal_ok";
-const LEGAL_OK_VERSION = Object.values(LEGAL_DOCUMENT_VERSIONS).join("|");
-
 async function legalAcceptRedirect(
   request: NextRequest,
   response: NextResponse,
@@ -141,19 +139,15 @@ async function legalAcceptRedirect(
   const pathname = request.nextUrl.pathname;
   if (pathname.startsWith("/api/")) return null;
 
-  if (request.cookies.get(LEGAL_OK_COOKIE)?.value === LEGAL_OK_VERSION) {
-    return null;
-  }
-
   try {
     const admin = createAdminClient();
     const { data: profile } = await admin
       .from("profiles")
-      .select("organization_id")
+      .select("organization_id, active_organization_id")
       .eq("id", userId)
       .maybeSingle();
 
-    const organizationId = profile?.organization_id;
+    const organizationId = profile?.active_organization_id ?? profile?.organization_id;
     if (!organizationId) return null;
 
     const onboardingNeeds = await onboardingPathNeedsLegalAcceptance({
@@ -181,14 +175,6 @@ async function legalAcceptRedirect(
       copySessionCookies(response, redirectRes);
       return redirectRes;
     }
-
-    response.cookies.set(LEGAL_OK_COOKIE, LEGAL_OK_VERSION, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 60,
-      path: "/",
-    });
   } catch (err) {
     // Missing service-role key or a Supabase timeout must not 500 sign-in.
     console.error("[middleware] legal acceptance check failed", err);
@@ -206,6 +192,12 @@ export async function middleware(request: NextRequest) {
 
   const gatedSignup = signupGateRedirect(request, response, user?.id);
   if (gatedSignup) return gatedSignup;
+
+  if (user && userNeedsPassword(user) && request.nextUrl.pathname.startsWith("/dashboard") && request.nextUrl.pathname !== "/dashboard/set-password") {
+    const passwordRedirect = NextResponse.redirect(new URL("/dashboard/set-password", request.url));
+    copySessionCookies(response, passwordRedirect);
+    return passwordRedirect;
+  }
 
   const legalRedirect = await legalAcceptRedirect(request, response, user?.id);
   if (legalRedirect) return legalRedirect;

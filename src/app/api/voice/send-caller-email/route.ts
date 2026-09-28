@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { deliverVoiceEmail } from "@/lib/voice-email-delivery";
 
 import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
 import { isResendConfigured, sendTransactionalEmail } from "@/lib/resend-mail";
@@ -15,6 +16,7 @@ const MAX_EMAIL_BODY_LENGTH = 8000;
 
 type SendCallerEmailBody = {
   called_number?: string;
+  call_session_id?: string;
   to: string;
   subject: string;
   body: string;
@@ -51,6 +53,11 @@ export async function POST(request: Request) {
     );
   }
 
+  const callSessionId = typeof body.call_session_id === "string" ? body.call_session_id.trim() : "";
+  if (!callSessionId || callSessionId.length > 256 || /[\x00-\x1f\x7f]/.test(callSessionId)) {
+    return NextResponse.json({ ok: false, code: "invalid_call_session", error: "An active call session is required" }, { status: 400 });
+  }
+
   const calledNumberRaw = String(body.called_number ?? "").trim();
   if (!calledNumberRaw) {
     return NextResponse.json(
@@ -69,7 +76,7 @@ export async function POST(request: Request) {
 
   const subject = String(body.subject ?? "").trim();
   const text = String(body.body ?? "").trim();
-  if (!subject || !text) {
+  if (!subject || subject.length > 300 || !text || to.length > 254) {
     return NextResponse.json(
       { ok: false, error: "subject and body are required" },
       { status: 400 },
@@ -148,18 +155,36 @@ export async function POST(request: Request) {
   }
 
   const businessName = String(orgRow?.name ?? "").trim() || "Your business";
-  const mail = await sendTransactionalEmail({
+  const delivery = await deliverVoiceEmail({
+    organizationId: orgId,
+    callSessionId,
     to,
     subject: subject.includes(businessName) ? subject : `${businessName}: ${subject}`,
     text,
+  }, {
+    claim: async (input) => {
+      const { data, error } = await admin.rpc("claim_voice_email_delivery", {
+        p_organization_id: input.organizationId,
+        p_call_session_id: input.callSessionId,
+        p_recipient_hash: input.recipientHash,
+        p_content_hash: input.contentHash,
+      });
+      if (error) throw new Error("Email budget unavailable");
+      return data;
+    },
+    send: sendTransactionalEmail,
+    finish: async (id, leaseToken, status) => {
+      const { data, error } = await admin.from("voice_email_deliveries")
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq("id", id).eq("lease_token", leaseToken).select("id").maybeSingle();
+      if (error || !data) throw new Error("Email completion unavailable");
+    },
   });
-
-  if (!mail.ok) {
-    return NextResponse.json(
-      { ok: false, code: "send_failed", error: mail.message },
-      { status: 502 },
-    );
+  if (!delivery.ok) {
+    return NextResponse.json({ ok: false, code: delivery.code, error: "Email could not be sent for this call" }, {
+      status: delivery.status,
+      headers: delivery.status === 429 ? { "Retry-After": "3600" } : {},
+    });
   }
-
-  return NextResponse.json({ ok: true, to });
+  return NextResponse.json({ ...delivery, to });
 }

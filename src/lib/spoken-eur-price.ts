@@ -108,7 +108,10 @@ export function formatSpokenDiscountLabel(label: string | null | undefined): str
   const trimmed = String(label ?? "").trim();
   if (!trimmed) return null;
 
-  let out = trimmed.replace(
+  let out = trimmed.replace(/\b(?:bogof|bogo)\b/gi, "buy one get one free")
+    .replace(/\bmix\s*(?:&|and)\s*match\b/gi, "mix and match")
+    .replace(/\b(buy|get)[ -]+(\d+)\b/gi, (_, word: string, count: string) => `${word} ${formatSpokenInteger(Number(count))}`)
+    .replace(
     /(\d+)\s+for\s+(?:€\s*)?(\d+(?:[.,]\d{1,2})?)/gi,
     (_, count: string, amount: string) => {
       const parsed = Number(amount.replace(",", "."));

@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireDashboardSession } from "@/lib/dashboard-session";
+import { requireDashboardAdmin } from "@/lib/dashboard-admin";
 import { createSupportTicket } from "@/app/(dashboard)/dashboard/support/actions";
 
 export async function requestPhoneSetupReview(): Promise<
   { ok: true; ticketId: string } | { ok: false; message: string }
 > {
-  const { organizationId } = await requireDashboardSession();
+  const { organizationId } = await requireDashboardAdmin();
 
   const result = await createSupportTicket({
     subject: "Phone setup review requested",

@@ -3,7 +3,7 @@ import {
   CLISTE_DEFAULT_ELEVENLABS_VOICE_ID,
 } from "@/lib/onboarding-voice-presets";
 
-/** Voice settings aligned with code-base-2 LiveKit worker (`agent.ts` / blocklist TTS). */
+/** Voice settings aligned with cara-voice-platform LiveKit worker (`agent.ts` / blocklist TTS). */
 export const CLISTE_ELEVENLABS_VOICE_SETTINGS = {
   stability: 0.5,
   similarity_boost: 0.75,
@@ -12,7 +12,7 @@ export const CLISTE_ELEVENLABS_VOICE_SETTINGS = {
 } as const;
 
 /**
- * Resolve ElevenLabs voice id — same order as code-base-2 `resolveOrgVoiceId` +
+ * Resolve ElevenLabs voice id — same order as cara-voice-platform `resolveOrgVoiceId` +
  * worker fallback chain.
  */
 export function resolveOrgElevenLabsVoiceId(
@@ -27,7 +27,7 @@ export function resolveOrgElevenLabsVoiceId(
   return CLISTE_DEFAULT_ELEVENLABS_VOICE_ID;
 }
 
-/** TTS model — same default as code-base-2 (`ELEVEN_TTS_MODEL` or flash v2.5). */
+/** TTS model — same default as cara-voice-platform (`ELEVEN_TTS_MODEL` or flash v2.5). */
 export function resolveElevenLabsModelId(): string {
   return (
     process.env.ELEVEN_TTS_MODEL?.trim() || CLISTE_DEFAULT_ELEVENLABS_MODEL_ID

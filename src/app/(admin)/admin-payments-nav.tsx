@@ -10,12 +10,17 @@ import {
   adminNavLinkBaseClass,
 } from "@/components/admin/admin-interactive";
 import {
+  adminPaymentsPlatformIncomePath,
   adminPaymentsPlatformSpendPath,
   isAdminPaymentsPath,
 } from "@/lib/admin-route-paths";
 import { cn } from "@/lib/utils";
 
 const PAYMENTS_CHILDREN = [
+  {
+    href: adminPaymentsPlatformIncomePath(),
+    label: "Platform income",
+  },
   {
     href: adminPaymentsPlatformSpendPath(),
     label: "Platform spend",
@@ -54,10 +59,10 @@ export function AdminPaymentsNavGroup() {
         }}
         className={cn(
           adminNavLinkBaseClass,
-          "group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px]",
+          "group flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px]",
           sectionActive
-            ? "bg-slate-100 font-medium text-[#0b1220]"
-            : "font-normal text-slate-600 hover:bg-slate-50 hover:text-[#0b1220]",
+            ? "bg-[#353d42] font-semibold text-white"
+            : "font-medium text-[#5f6f68] hover:bg-[#eef2ef] hover:text-[#11181d]",
         )}
         aria-expanded={expanded}
       >
@@ -65,8 +70,8 @@ export function AdminPaymentsNavGroup() {
           className={cn(
             "size-4 shrink-0 transition-colors",
             sectionActive
-              ? "text-[#0b1220]"
-              : "text-slate-400 group-hover:text-slate-600",
+              ? "text-white"
+              : "text-[#8b9c94] group-hover:text-[#353d42]",
           )}
           strokeWidth={1.5}
           aria-hidden
@@ -74,7 +79,7 @@ export function AdminPaymentsNavGroup() {
         <span className="min-w-0 flex-1 truncate text-left">Payments</span>
         <ChevronDown
           className={cn(
-            "size-4 shrink-0 text-slate-400 transition-transform duration-200 ease-out",
+            "size-4 shrink-0 text-[#8b9c94] transition-transform duration-200 ease-out",
             expanded ? "rotate-0" : "-rotate-90",
           )}
           aria-hidden
@@ -90,10 +95,10 @@ export function AdminPaymentsNavGroup() {
               href={item.href}
               className={cn(
                 adminNavLinkBaseClass,
-                "ml-6 flex items-center rounded-lg px-2.5 py-2 text-[13px]",
+                "ml-6 flex min-h-9 items-center rounded-lg px-3 py-2 text-[13px]",
                 active
-                  ? "bg-slate-100 font-medium text-[#0b1220]"
-                  : "font-normal text-slate-600 hover:bg-slate-50 hover:text-[#0b1220]",
+                  ? "bg-[#e8eeea] font-semibold text-[#11181d]"
+                  : "font-medium text-[#6b7c75] hover:bg-[#eef2ef] hover:text-[#11181d]",
               )}
               aria-current={active ? "page" : undefined}
             >

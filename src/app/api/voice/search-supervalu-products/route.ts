@@ -178,11 +178,13 @@ export async function POST(request: Request) {
       ? requestedServiceArea
       : inferWeeklyOfferServiceAreaFromQuery(query);
 
-  const latestOfferWeekEnd = await loadLatestRetailOfferWeekEnd(admin, retailBanner);
+  const reference = new Date();
+  const latestOfferWeekEnd = await loadLatestRetailOfferWeekEnd(admin, retailBanner, reference);
   const offersFreshness = assessSyncedOffersFreshness({
     syncedAt:
       typeof orgRow.offers_synced_at === "string" ? orgRow.offers_synced_at : null,
     offerWeekEnd: latestOfferWeekEnd,
+    reference,
   });
 
   const sourceStoreId =
@@ -197,6 +199,7 @@ export async function POST(request: Request) {
       fulfilment,
       serviceArea,
       storeId: sourceStoreId ?? undefined,
+      reference,
     },
   );
 
@@ -211,6 +214,7 @@ export async function POST(request: Request) {
     service_area: match.serviceArea ?? null,
     fulfilment: match.fulfilment ?? null,
     is_alcohol: match.isAlcohol === true,
+    campaign_names: match.campaignNames ?? [],
     score: match.score,
     quote_text: match.quoteText,
     source: match.source ?? null,
@@ -321,9 +325,11 @@ export async function POST(request: Request) {
     };
   });
 
-  let noMatchQuote: string | null =
+  const noMatchQuote: string | null =
     mappedMatches.length === 0 || (responseMatches.length === 0 && !clarificationHint)
-      ? ownBrandFallbackQuote ?? formatCatalogStockNoMatchQuote(query)
+      ? ownBrandFallbackQuote ?? (intent === "offer"
+        ? `I couldn't confirm a current national offer matching "${query}" from the latest verified offers. That does not mean there are no offers in store; a team member can check locally.`
+        : formatCatalogStockNoMatchQuote(query))
       : null;
 
   return NextResponse.json({

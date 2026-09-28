@@ -26,6 +26,10 @@
     {
       "path": "/api/cron/sub-processor-notify",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/call-analysis",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

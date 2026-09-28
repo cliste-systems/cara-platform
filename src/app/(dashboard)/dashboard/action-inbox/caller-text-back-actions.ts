@@ -5,7 +5,7 @@ import {
   isTwilioSmsCapableError,
   sendCallerFacingSms,
 } from "@/lib/booking-confirmation-sms";
-import { requireDashboardSession } from "@/lib/dashboard-session";
+import { requireDashboardAdmin } from "@/lib/dashboard-admin";
 import { resolveOrgAssignedPhoneE164 } from "@/lib/org-assigned-phone";
 import { getCallerSmsQuotaStatus } from "@/lib/sms-quota";
 import {
@@ -52,7 +52,7 @@ export async function sendCallerTextBackMessage(input: {
     return { ok: false, message: "Message is too long to send as a text." };
   }
 
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId } = await requireDashboardAdmin();
 
   const { data: ticket, error: ticketErr } = await supabase
     .from("action_tickets")
@@ -171,7 +171,7 @@ export async function reviewCallerTextBackMessage(
     return { ok: false, message: "Message is too long for a text." };
   }
 
-  await requireDashboardSession();
+  await requireDashboardAdmin();
 
   try {
     const raw = await completeOpenRouterChat({

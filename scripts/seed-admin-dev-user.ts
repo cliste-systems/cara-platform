@@ -1,5 +1,5 @@
 /**
- * Dev-only: grant platform admin console access and set a known password.
+ * Local/test-only: grant platform admin console access with explicitly supplied credentials.
  *
  *   npx tsx scripts/seed-admin-dev-user.ts
  */
@@ -9,9 +9,9 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 import { createAdminClient } from "../src/utils/supabase/admin";
+import { readTestSeedCredentials } from "../src/lib/test-seed-credentials";
 
-const EMAIL = "admin@cliste.test";
-const PASSWORD = "AdminCara2026!";
+const { email: EMAIL, password: PASSWORD } = readTestSeedCredentials();
 
 async function main() {
   const admin = createAdminClient();
@@ -50,7 +50,7 @@ async function main() {
   console.log("  Console:     http://localhost:3001/admin");
   console.log("  Auth:        http://localhost:3001/authenticate");
   console.log(`  Email:       ${EMAIL}`);
-  console.log(`  Password:    ${PASSWORD}`);
+  console.log("  Password: use the unique value supplied through CLISTE_SEED_PASSWORD.");
   console.log("\nUse CLISTE_ADMIN_SECRET from .env.local at the gate.\n");
 }
 

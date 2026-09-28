@@ -77,7 +77,7 @@ export const TENANT_PROVISIONING_STEP_ORDER: {
   { id: "live", label: "Live" },
 ];
 
-const GO_LIVE_STEP_IDS: TenantProvisioningStepId[] = ["phone_assigned"];
+const GO_LIVE_STEP_IDS: TenantProvisioningStepId[] = ["phone_assigned", "legal_acceptance"];
 
 export function buildTenantProvisioningStatus(
   input: TenantProvisioningInput,

@@ -50,3 +50,7 @@ next-env.d.ts
 # Fresha availability spike — captured network dumps may contain PII
 spikes/fresha-availability/captured/
 spikes/fresha-availability/node_modules/
+
+/.tmp/
+
+/supabase/.temp/

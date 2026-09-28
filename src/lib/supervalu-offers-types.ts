@@ -22,11 +22,12 @@ export type RetailWeeklyOfferRow = {
   offer_channel: SupervaluOfferChannel;
   service_area: SupervaluServiceArea;
   fulfilment: SupervaluFulfilment;
-  current_price_eur: number;
+  current_price_eur: number | null;
   was_price_eur: number | null;
   discount_label: string | null;
   price_per_unit: string | null;
   category_breadcrumb: string | null;
+  campaign_names?: string[] | null;
   sell_by: string | null;
   price_unit_type: string | null;
   is_alcohol: boolean;
@@ -89,6 +90,8 @@ export type SupervaluGatewayProduct = {
 
 export type SupervaluOffersSyncResult = {
   ok: true;
+  /** Refresh was accepted; counts describe the last published snapshot. */
+  queued?: boolean;
   syncBatchId: string;
   offerCount: number;
   organizationsUpdated: number;

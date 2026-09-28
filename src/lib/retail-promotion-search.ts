@@ -1,12 +1,14 @@
+import { isRetailOfferObservationFresh } from "@/lib/retail-offer-freshness";
+import { parseRetailMultibuyLabel } from "@/lib/retail-price-presentation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatInTimeZone } from "date-fns-tz";
 
 import {
   offerSearchProductIdentityTokens,
   resolveWeeklyOfferSearchFilters,
-  tokenizeSupervaluSearchQuery,
 } from "@/lib/retail-weekly-offers-search";
 import type {
+  RetailWeeklyOfferRow,
   SupervaluFulfilment,
   SupervaluServiceArea,
 } from "@/lib/supervalu-offers-types";
@@ -102,6 +104,16 @@ const PROMOTION_NOISE = new Set([
   "match",
   "bundle",
   "value",
+  "multibuy",
+  "multibuys",
+  "multi",
+  "buys",
+  "earn",
+  "collect",
+  "extra",
+  "bonus",
+  "points",
+  "point",
 ]);
 
 const AREA_NOISE = new Set([
@@ -230,9 +242,11 @@ function promotionScopeText(query: string): string {
     .replace(/save\s+\d+(?:[.,]\d+)?\s*%/gi, " ")
     .replace(/\d+(?:[.,]\d+)?\s*%\s*off/gi, " ")
     .replace(/only\s+(?:(?:€\s*)?\d+(?:[.,]\d{1,2})?|\d{1,2}\s*c)/gi, " ")
-    .replace(/half\s+price/gi, " ")
-    .replace(/super\s*7/gi, " ")
+    .replace(/half[ -]+price/gi, " ")
+    .replace(/super\s*7(?:[’']?s)?/gi, " ")
+    .replace(/super[ -]*fresh[ -]*(?:5|five)|super[ -]*stars?/gi, " ")
     .replace(/mix\s*(?:&|and)\s*match/gi, " ")
+    .replace(/\b(?:bogof|bogo)\b|\bbuy[ -]+\d+[ -]+(?:and[ -]+)?get[ -]+\d+[ -]+(?:free|half[ -]+price|\d+\s*%[ -]*off)/gi, " ")
     .replace(/\breal\s+rewards?\b|\brewards?\s+(?:price|offers?|deals?)\b/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -272,7 +286,7 @@ export function parseRetailPromotionQuery(
     /\breal\s+rewards?\b|\bwith\s+(?:real\s+)?rewards?\b|\brewards?\s+(?:price|offer|deal)s?\b|\bmembers?\s+(?:price|offer|deal)s?\b/i.test(
       normalized,
     );
-  const halfPrice = /\bhalf\s+price\b|\b50\s*%\s*off\b/i.test(normalized);
+  const halfPrice = /\bhalf[ -]+price\b|\b50\s*%\s*off\b/i.test(normalized);
   const savePercent = normalized.match(
     /(?:\bsave\s+)?(\d+(?:[.,]\d+)?)\s*%\s*(?:off)?/i,
   );
@@ -288,7 +302,11 @@ export function parseRetailPromotionQuery(
     /\brewards?\s+price(?:\s+only)?(?:\s+of)?\s+((?:€\s*)?\d+(?:[.,]\d{1,2})?|\d{1,2}\s*c)\b/i,
   );
   const mixMatch = /\bmix\s*(?:&|and)\s*match\b/i.test(normalized);
-  const namedPhrase = /\bsuper\s*7\b/i.test(normalized)
+  const namedPhrase = /\bpoints?\b/i.test(normalized)
+    ? "points"
+    : /\bsuper[ -]*(?:fresh[ -]*(?:5|five)|stars?)\b/i.test(normalized)
+      ? "super fresh 5"
+      : /\bsuper\s*7(?:[’']?s)?\b/i.test(normalized)
     ? "super 7"
     : /\bbundle\s+offer\b/i.test(normalized)
       ? "bundle offer"
@@ -299,11 +317,12 @@ export function parseRetailPromotionQuery(
           : null;
 
   let mechanic: RetailPromotionMechanic = "unstructured";
-  if (multibuy || mixMatch) mechanic = "multibuy";
+  if (multibuy || mixMatch || parseRetailMultibuyLabel(normalized)) mechanic = "multibuy";
   else if (halfPrice) mechanic = "half_price";
   else if (savePercent) mechanic = "save_percent";
   else if (saveAmount) mechanic = "save_amount";
   else if (fixedPrice) mechanic = "fixed_price";
+  else if (namedPhrase === "points") mechanic = "named";
   else if (loyaltyRequired) mechanic = "loyalty";
   else if (namedPhrase) mechanic = "named";
 
@@ -329,6 +348,68 @@ export function parseRetailPromotionQuery(
 
 export function shouldUseStructuredPromotionSearch(query: string): boolean {
   return parseRetailPromotionQuery(query).mechanic !== "unstructured";
+}
+
+/** Apply the same mechanic to synced offers; a campaign query must never
+ * fall through to unrelated generic offers when that campaign is absent. */
+export function filterWeeklyOffersByPromotionQuery<T extends Pick<RetailWeeklyOfferRow, "product_name" | "department" | "discount_label" | "current_price_eur"> & Partial<Pick<RetailWeeklyOfferRow, "category_breadcrumb" | "source_url" | "campaign_names">>>(
+  rows: T[],
+  query: string,
+): T[] {
+  const wanted = parseRetailPromotionQuery(query);
+  if (wanted.mechanic === "unstructured") return rows;
+  const close = (a: number | null, b: number | null) => b == null || (a != null && Math.abs(a - b) <= 0.02);
+  return rows.filter((row) => {
+    const label = String(row.discount_label ?? "");
+    const observed = parseRetailPromotionQuery(label);
+    if (wanted.loyaltyRequired && !observed.loyaltyRequired) return false;
+    const subject = `${row.product_name} ${row.department}`.toLowerCase();
+    if (!wanted.subjectTokens.every((token) => subject.includes(token.replace(/s$/, "")))) return false;
+    switch (wanted.mechanic) {
+      case "multibuy": {
+        const wantedBundle = parseRetailMultibuyLabel(query);
+        const observedBundle = parseRetailMultibuyLabel(label);
+        if (!observedBundle || observed.mechanic !== "multibuy") return false;
+        if (wantedBundle?.kind === "buy_get" && (
+          observedBundle.kind !== "buy_get" ||
+          observedBundle.buyQuantity !== wantedBundle.buyQuantity ||
+          observedBundle.getQuantity !== wantedBundle.getQuantity ||
+          observedBundle.benefit !== wantedBundle.benefit
+        )) return false;
+        if (wantedBundle?.mixMatch && !observedBundle.mixMatch) return false;
+        return close(observed.quantity, wanted.quantity) && close(observed.totalEur, wanted.totalEur);
+      }
+      case "loyalty":
+        return observed.loyaltyRequired && close(Number(row.current_price_eur), wanted.amountEur);
+      case "half_price":
+        return observed.mechanic === "half_price" || observed.percent === 50;
+      case "save_percent":
+        return close(observed.percent, wanted.percent) && observed.percent != null;
+      case "save_amount":
+        return observed.mechanic === "save_amount" && close(observed.amountEur, wanted.amountEur);
+      case "fixed_price":
+        return observed.mechanic === "fixed_price" && close(Number(row.current_price_eur), wanted.amountEur);
+      case "named": {
+        const evidence = normalizeNumberWords(`${label} ${row.category_breadcrumb ?? ""} ${row.source_url ?? ""} ${(row.campaign_names ?? []).join(" ")}`).replace(/super\s*7/g, "super 7").replace(/[^a-z0-9]+/g, " ");
+        if (wanted.namedPhrase === "super fresh 5") {
+          // The Super Stars landing page contains several independent widgets.
+          // Caller aliases do not make every SKU on that page a Fresh 5 member.
+          // Explicit membership wins; only a real Fresh 5 promotion label is
+          // accepted when structured campaign membership is unavailable.
+          const membership = row.campaign_names == null ? null : row.campaign_names.join(" ").trim();
+          const campaignEvidence = normalizeNumberWords(membership ?? label).replace(/[^a-z0-9]+/g, " ");
+          return /\bsuper\s*fresh\s*(?:5|five)\b/.test(campaignEvidence);
+        }
+        if (wanted.namedPhrase === "points") {
+          const wantedPoints = normalizeNumberWords(query).match(/\b(\d+)\s+(?:(?:extra|bonus)\s+)?points?\b/);
+          if (wantedPoints && !new RegExp(`\\b${wantedPoints[1]}\\s+(?:(?:extra|bonus)\\s+)?points?\\b`).test(evidence)) return false;
+        }
+        return wanted.namedPhrase != null && evidence.includes(wanted.namedPhrase);
+      }
+      default:
+        return true;
+    }
+  });
 }
 
 function parseLabelMultibuy(
@@ -400,10 +481,15 @@ export async function searchStructuredNationalPromotions(
     retailBanner: string;
     query: string;
     limit?: number;
+    fulfilment?: SupervaluFulfilment | null;
+    serviceArea?: SupervaluServiceArea | null;
+    reference?: Date;
   },
 ): Promise<SupervaluCatalogMatch[]> {
   const parsed = parseRetailPromotionQuery(input.query);
   if (parsed.mechanic === "unstructured") return [];
+  const reference = input.reference ?? new Date();
+  const today = formatInTimeZone(reference, DUBLIN, "yyyy-MM-dd");
 
   const { data, error } = await supabase.rpc(
     "search_retail_promotions_consensus",
@@ -415,11 +501,13 @@ export async function searchStructuredNationalPromotions(
       p_total_eur: parsed.totalEur,
       p_percent: parsed.percent,
       p_amount_eur: parsed.amountEur,
+      // SQL must select the actual campaign before applying its result limit.
+      // Caller aliases have already resolved to the canonical membership name.
       p_named_phrase: parsed.namedPhrase,
-      p_service_area: parsed.serviceArea,
-      p_fulfilment: parsed.fulfilment,
+      p_service_area: input.serviceArea ?? parsed.serviceArea,
+      p_fulfilment: input.fulfilment ?? parsed.fulfilment,
       p_subject_tokens: parsed.subjectTokens,
-      p_reference_date: formatInTimeZone(new Date(), DUBLIN, "yyyy-MM-dd"),
+      p_reference_date: today,
       p_limit: Math.max(
         1,
         Math.min(
@@ -450,9 +538,26 @@ export async function searchStructuredNationalPromotions(
     display_price_eur: number | string | null;
     price_per_unit: string | null;
     source_store_count: number | string;
+    valid_from: string;
+    valid_to: string;
+    source_observed_at?: string | null;
+    source_metadata?: {
+      source_observed_at?: string | null;
+      campaigns?: Array<string | { name?: string; source_url?: string; campaign_key?: string }>;
+    } | null;
   };
 
-  return ((data ?? []) as ConsensusRow[]).map((row) => {
+  const currentRows = ((data ?? []) as ConsensusRow[]).filter((row) =>
+    isRetailOfferObservationFresh(row.source_observed_at ?? row.source_metadata?.source_observed_at, reference) &&
+    row.valid_from <= today && row.valid_to >= today &&
+    filterWeeklyOffersByPromotionQuery([{
+    product_name: row.product_name, department: row.department,
+    discount_label: [row.loyalty_required ? "Real Rewards" : null, row.label, row.description].filter(Boolean).join(" "),
+    campaign_names: (row.source_metadata?.campaigns ?? []).map((campaign) => typeof campaign === "string" ? campaign : `${campaign.name ?? ""} ${campaign.campaign_key ?? ""}`),
+    current_price_eur: numberValue(row.offer_price_eur) ?? numberValue(row.display_price_eur),
+  }], input.query).length > 0);
+  return currentRows.map((row) => {
+    const offerTerms = [...new Set([row.label, row.description].map((value) => value?.trim()).filter(Boolean))].join(". ") || null;
     const offerPriceEur = numberValue(row.offer_price_eur);
     const regularPriceEur = numberValue(row.regular_price_eur);
     const displayPriceEur = numberValue(row.display_price_eur);
@@ -472,12 +577,12 @@ export async function searchStructuredNationalPromotions(
         regularPriceEur > offerPriceEur
           ? regularPriceEur
           : null,
-      discountLabel: row.label ?? row.description,
+      discountLabel: offerTerms,
       isOnOffer: true,
       score: Math.min(1, 0.7 + stores / 100),
       quoteText: formatPromotionQuote({
         productName: row.product_name,
-        label: row.label ?? row.description,
+        label: offerTerms,
         promotionType: row.promotion_type,
         loyaltyRequired: row.loyalty_required === true,
         offerPriceEur,
@@ -488,6 +593,7 @@ export async function searchStructuredNationalPromotions(
       serviceArea: row.service_area,
       fulfilment: row.fulfilment,
       isAlcohol: row.is_alcohol === true,
+      campaignNames: (row.source_metadata?.campaigns ?? []).map((campaign) => typeof campaign === "string" ? campaign : campaign.name ?? campaign.campaign_key ?? "").filter(Boolean),
       source: "synced" as const,
     };
   });

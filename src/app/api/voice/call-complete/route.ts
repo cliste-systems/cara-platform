@@ -10,13 +10,14 @@ import { generateBookingReference, normalizeCustomerPhoneE164 } from "@/lib/book
 import { shouldRunCallCompleteSideEffects } from "@/lib/blocked-callers";
 import { blockedCallDashboardSummary } from "@/lib/blocked-call-copy";
 import { normalizeCallOutcome } from "@/lib/call-history-types";
+import { enqueueCallAnalysis, runCallAnalysis } from "@/lib/call-analysis-server";
 import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
 import { ingestCallKnowledgeGaps } from "@/lib/cara-training-ingest";
 import type { KnowledgeGapPayload } from "@/lib/cara-training-types";
 import type { CallCloseDiagnosticsPayload } from "@/lib/call-testing-types";
 import { persistCallTestReport } from "@/lib/call-testing-persist";
 import { resolveTestCallContext } from "@/lib/call-testing-resolve";
-import { resolveEngineerTestCall } from "@/lib/engineer-test-call";
+import { isAdminDemoCallRow, resolveEngineerTestCall } from "@/lib/engineer-test-call";
 import { redactCallText } from "@/lib/transcript-redaction";
 import { stripToolLinesFromTranscript } from "@/lib/transcript-display";
 import { captureObservedError } from "@/lib/observability";
@@ -26,6 +27,7 @@ import { isValidCallRecordingStoragePath } from "@/lib/call-recordings";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -332,8 +334,9 @@ export async function POST(request: Request) {
   if (callSid) {
     const { data: existing } = await admin
       .from("call_logs")
-      .select("id, transcript_review, ai_summary, audio_storage_path")
+      .select("id, transcript, transcript_review, ai_summary, audio_storage_path, caller_data_erased_at")
       .eq("call_sid", callSid)
+      .eq("organization_id", orgId)
       .maybeSingle();
     if (existing?.id) {
       return await respondIdempotentCallComplete({
@@ -342,6 +345,8 @@ export async function POST(request: Request) {
         callLogId: String(existing.id),
         outcome,
         body,
+        existingTranscript: existing.transcript as string | null,
+        callerDataErased: Boolean(existing.caller_data_erased_at),
         existingReview: existing.transcript_review as string | null,
         existingSummary: existing.ai_summary as string | null,
         existingAudioPath: existing.audio_storage_path as string | null,
@@ -445,8 +450,9 @@ export async function POST(request: Request) {
     if (callSid && callErr.code === "23505") {
       const { data: existing } = await admin
         .from("call_logs")
-        .select("id, transcript_review, ai_summary, audio_storage_path")
+        .select("id, transcript, transcript_review, ai_summary, audio_storage_path, caller_data_erased_at")
         .eq("call_sid", callSid)
+        .eq("organization_id", orgId)
         .maybeSingle();
       if (existing?.id) {
         return await respondIdempotentCallComplete({
@@ -455,6 +461,8 @@ export async function POST(request: Request) {
           callLogId: String(existing.id),
           outcome,
           body,
+          existingTranscript: existing.transcript as string | null,
+          callerDataErased: Boolean(existing.caller_data_erased_at),
           existingReview: existing.transcript_review as string | null,
           existingSummary: existing.ai_summary as string | null,
           existingAudioPath: existing.audio_storage_path as string | null,
@@ -476,6 +484,11 @@ export async function POST(request: Request) {
   }
 
   const callLogId = insertedCall.id as string;
+
+  // Persist the original redacted transcript, including tool evidence, before
+  // any optional booking validation can return. Analysis itself runs after the
+  // response, once this request's other call-close writes have completed.
+  await queueCallAnalysis({ admin, orgId, callLogId, body });
 
   const audioStoragePath = resolveValidatedAudioStoragePath(
     body.audio_storage_path,
@@ -774,6 +787,8 @@ async function respondIdempotentCallComplete(input: {
   callLogId: string;
   outcome: string;
   body: VoiceCallCompleteBody;
+  existingTranscript: string | null;
+  callerDataErased: boolean;
   existingReview: string | null;
   existingSummary: string | null;
   existingAudioPath: string | null;
@@ -784,22 +799,33 @@ async function respondIdempotentCallComplete(input: {
   );
   const summaryRedacted = redactCallText(input.body.ai_summary ?? null);
   const patch: Record<string, string | boolean | object> = {};
-  if (!input.existingReview?.trim() && reviewRedacted.text) {
+  const transcriptRedacted = redactCallText(
+    stripToolLinesFromTranscript(input.body.transcript ?? null) || null,
+  );
+  if (!input.callerDataErased && !input.existingTranscript?.trim() && transcriptRedacted.text) {
+    patch.transcript = transcriptRedacted.text;
+  }
+  if (!input.callerDataErased && !input.existingReview?.trim() && reviewRedacted.text) {
     patch.transcript_review = reviewRedacted.text;
   }
-  if (!input.existingSummary?.trim() && summaryRedacted.text) {
+  if (!input.callerDataErased && !input.existingSummary?.trim() && summaryRedacted.text) {
     patch.ai_summary = summaryRedacted.text;
   }
-  if (input.body.post_call_status) {
+  // The worker's initial pending callback is fire-and-forget and can arrive
+  // after final enrichment. Duplicate pending payloads must never reset a
+  // completed/failed status, its errors, or its expected follow-up actions.
+  if (input.body.post_call_status && input.body.post_call_status !== "pending") {
     patch.post_call_status = input.body.post_call_status;
   }
-  if (Array.isArray(input.body.post_call_errors)) {
-    patch.post_call_errors = input.body.post_call_errors;
+  if (input.body.post_call_status !== "pending") {
+    if (Array.isArray(input.body.post_call_errors)) {
+      patch.post_call_errors = input.body.post_call_errors;
+    }
+    if (input.body.post_call_expected_ticket !== undefined) {
+      patch.post_call_expected_ticket = input.body.post_call_expected_ticket === true;
+    }
   }
-  if (input.body.post_call_expected_ticket !== undefined) {
-    patch.post_call_expected_ticket = input.body.post_call_expected_ticket === true;
-  }
-  if (!input.existingAudioPath?.trim()) {
+  if (!input.callerDataErased && !input.existingAudioPath?.trim()) {
     const isEngineerTestCall = resolveEngineerTestCall({
       engineerTestCall: input.body.engineer_test_call === true,
       callerNumber: input.body.caller_number,
@@ -819,7 +845,9 @@ async function respondIdempotentCallComplete(input: {
     const { error: patchErr } = await input.admin
       .from("call_logs")
       .update(patch)
-      .eq("id", input.callLogId);
+      .eq("id", input.callLogId)
+      .eq("organization_id", input.orgId)
+      .is("caller_data_erased_at", null);
     if (patchErr) {
       console.warn("[voice/call-complete] idempotent enrichment patch", patchErr.message);
     }
@@ -907,6 +935,15 @@ async function respondIdempotentCallComplete(input: {
       .eq("id", input.callLogId);
   }
 
+  if (!input.callerDataErased) {
+    await queueCallAnalysis({
+      admin: input.admin,
+      orgId: input.orgId,
+      callLogId: input.callLogId,
+      body: input.body,
+    });
+  }
+
   revalidateAfterWrite();
   return NextResponse.json({
     ok: true,
@@ -915,7 +952,68 @@ async function respondIdempotentCallComplete(input: {
   });
 }
 
+/** Analysis failures must never undo a successfully saved call. */
+async function queueCallAnalysis(input: {
+  admin: ReturnType<typeof createAdminClient>;
+  orgId: string;
+  callLogId: string;
+  body: VoiceCallCompleteBody;
+}) {
+  if (resolveEngineerTestCall({
+    engineerTestCall: input.body.engineer_test_call,
+    callerNumber: input.body.caller_number,
+    roomName: input.body.room_name,
+  }) && !isAdminDemoCallRow({ caller_number: input.body.caller_number, room_name: input.body.room_name })) return;
+
+  const diagnostics = {
+    ...(input.body.diagnostics ?? {}),
+    ...(typeof input.body.disclosure_confirmed === "boolean"
+      ? { disclosureConfirmed: input.body.disclosure_confirmed }
+      : {}),
+    ...(Array.isArray(input.body.knowledge_gaps)
+      ? { knowledgeGaps: parseKnowledgeGaps(input.body) }
+      : {}),
+  };
+  const source = {
+    admin: input.admin,
+    callLogId: input.callLogId,
+    organizationId: input.orgId,
+    rawTranscript: redactCallText(input.body.transcript).text ?? undefined,
+    ...(Object.keys(diagnostics).length > 0 ? { diagnostics } : {}),
+  };
+
+  let queued = false;
+  try {
+    await enqueueCallAnalysis(source);
+    queued = true;
+  } catch (error) {
+    await captureObservedError(error, {
+      route: "voice/call-complete",
+      sideEffect: "call_analysis_enqueue",
+      orgId: input.orgId,
+    });
+  }
+
+  after(async () => {
+    try {
+      if (!queued) await enqueueCallAnalysis(source);
+      // The worker sends an initial pending callback before post-processing.
+      // Its final callback or the durable retry job reviews the completed data.
+      if (input.body.post_call_status !== "pending") {
+        await runCallAnalysis(input.callLogId, { admin: input.admin });
+      }
+    } catch (error) {
+      await captureObservedError(error, {
+        route: "voice/call-complete",
+        sideEffect: "call_analysis",
+        orgId: input.orgId,
+      });
+    }
+  });
+}
+
 function revalidateAfterWrite() {
+  revalidatePath("/admin/call-analysis");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/activity");
   revalidatePath("/dashboard/calls");

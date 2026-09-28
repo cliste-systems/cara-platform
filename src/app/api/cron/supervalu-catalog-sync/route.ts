@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { syncSupervaluFullCatalog } from "@/lib/supervalu-catalog-sync";
 import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -22,23 +21,9 @@ export async function runSupervaluCatalogSyncCron(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const admin = createAdminClient();
-  const { data: orgs, error } = await admin
-    .from("organizations")
-    .select("retail_source_store_id")
-    .eq("niche", "retail")
-    .eq("retail_banner", "supervalu")
-    .eq("is_active", true);
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-
-  const storeIds = [...new Set((orgs ?? []).map((r) => String(r.retail_source_store_id ?? "").trim()).filter(Boolean))];
-  if (storeIds.length === 0) storeIds.push(process.env.SUPERVALU_STOREFRONT_STORE_ID?.trim() || "5550");
-
-  const results = [];
-  for (const storeId of storeIds) {
-    results.push({ storeId, ...(await syncSupervaluFullCatalog(admin, { storeId })) });
-  }
-  const ok = results.every((r) => r.ok);
-  return NextResponse.json({ ok, results }, { status: ok ? 200 : 502 });
+  const { data, error } = await admin.rpc("request_supervalu_catalog_refresh", { p_kind: "full" });
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 502 });
+  return NextResponse.json({ ok: data?.ok !== false, queued: true, result: data }, { status: data?.ok === false ? 502 : 202 });
 }
 
 export const GET = runSupervaluCatalogSyncCron;

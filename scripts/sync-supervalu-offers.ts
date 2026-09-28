@@ -29,7 +29,7 @@ async function main() {
 
   console.log(JSON.stringify(result, null, 2));
   console.log(
-    `\nNote: prompt recompile runs via cron/admin refresh — this script persists offers + JSON snapshot only.`,
+    `\nNational refresh queued. Search below shows the last published snapshot; the crawler publishes the new snapshot after source validation.`,
   );
 
   const query = searchQuery || "weekly offers";

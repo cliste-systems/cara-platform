@@ -4,9 +4,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   LEGAL_DOCUMENT_VERSIONS,
-  requiredLegalDocuments,
   type LegalDocumentType,
 } from "@/lib/legal-documents";
+import { findMissingAccountLegalDocuments } from "@/lib/legal-acceptance-query";
 import type { SecurityEventContext } from "@/lib/security-events";
 
 export type { LegalDocumentType } from "@/lib/legal-documents";
@@ -14,52 +14,15 @@ export {
   DASHBOARD_LEGAL_ACCEPT_PATH,
   isLegalAcceptanceBypassPath,
   orgNeedsDpaAcceptance,
-  requiredLegalDocuments,
 } from "@/lib/legal-documents";
 
 export { getMissingBaseLegalAcceptances } from "@/lib/onboarding-legal-middleware";
 
-function isCurrentAcceptance(
-  documentType: LegalDocumentType,
-  documentVersion: string,
-): boolean {
-  return documentVersion === LEGAL_DOCUMENT_VERSIONS[documentType];
-}
-
 export async function getMissingLegalAcceptances(
   admin: SupabaseClient,
-  params: {
-    userId: string;
-    organizationId: string;
-    needsDpa: boolean;
-  },
+  params: { userId: string; organizationId: string; needsDpa: boolean },
 ): Promise<LegalDocumentType[]> {
-  const required = requiredLegalDocuments(params.needsDpa);
-
-  const { data, error } = await admin
-    .from("legal_acceptances")
-    .select("document_type, document_version")
-    .eq("user_id", params.userId)
-    .eq("organization_id", params.organizationId)
-    .in("document_type", required);
-
-  if (error) {
-    console.warn("[legal] failed_to_load_acceptances", error.message);
-    return required;
-  }
-
-  const accepted = new Set<LegalDocumentType>();
-  for (const row of data ?? []) {
-    const type = row.document_type as LegalDocumentType;
-    if (
-      required.includes(type) &&
-      isCurrentAcceptance(type, row.document_version)
-    ) {
-      accepted.add(type);
-    }
-  }
-
-  return required.filter((doc) => !accepted.has(doc));
+  return findMissingAccountLegalDocuments(admin, params.userId, params.organizationId);
 }
 
 export async function recordLegalAcceptances(
@@ -69,6 +32,13 @@ export async function recordLegalAcceptances(
     organizationId: string;
     documents: LegalDocumentType[];
     context?: SecurityEventContext;
+    agreement?: {
+      accountId: string;
+      organisationName: string;
+      signatoryName: string;
+      signatoryRole: string;
+      authorityConfirmed: boolean;
+    };
   },
 ): Promise<void> {
   const rows = params.documents.map((documentType) => ({
@@ -78,6 +48,11 @@ export async function recordLegalAcceptances(
     document_version: LEGAL_DOCUMENT_VERSIONS[documentType],
     ip_hash: params.context?.ipHash ?? null,
     user_agent: params.context?.userAgent ?? null,
+    account_id: params.agreement?.accountId ?? null,
+    organisation_name: params.agreement?.organisationName ?? null,
+    signatory_name: params.agreement?.signatoryName ?? null,
+    signatory_role: params.agreement?.signatoryRole ?? null,
+    authority_confirmed: params.agreement?.authorityConfirmed ?? false,
   }));
 
   if (rows.length === 0) return;

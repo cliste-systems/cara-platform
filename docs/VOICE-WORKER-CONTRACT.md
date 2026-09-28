@@ -4,7 +4,7 @@ The LiveKit/voice worker reports each finished call to the Hello Cara app. This 
 the single integration point between the worker and the dashboard. Keep the
 worker aligned with this document.
 
-**Worker mode (v1):** `code-base-2` is **Cara-only** — routing links, Action
+**Worker mode (v1):** `cara-voice-platform` is **Cara-only** — routing links, Action
 Inbox webhooks, and dashboard SMS/email APIs. There is **no** in-worker native
 salon booking, Stripe checkout, or direct Twilio SMS. Org resolution is by
 dialed `phone_numbers.e164` first; AI disclosure is spoken **once** via
@@ -393,7 +393,7 @@ Example response:
 }
 ```
 
-**Worker tool:** register `searchBusinessFile` (see code-base-2
+**Worker tool:** register `searchBusinessFile` (see cara-voice-platform
 `src/lib/cara_tools.ts`). Invoke silently when the caller asks about menu or
 price details; quote only the returned excerpt.
 

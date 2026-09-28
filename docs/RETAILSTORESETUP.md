@@ -1,6 +1,6 @@
 # Retail store setup (SuperValu pilot)
 
-How a retail store gets stood up on Hello Cara: what Cliste does in `/admin`, what the store manager does in `/dashboard`, and what code-base-2 needs to know. Written for the SuperValu-style pilot — one physical store, staffed counters, a landline the public already dials.
+How a retail store gets stood up on Hello Cara: what Cliste does in `/admin`, what the store manager does in `/dashboard`, and what cara-voice-platform needs to know. Written for the SuperValu-style pilot — one physical store, staffed counters, a landline the public already dials.
 
 Companion docs: [VOICE-WORKER-CONTRACT.md](./VOICE-WORKER-CONTRACT.md), [CARA-ROUTING-RULES.md](./CARA-ROUTING-RULES.md), [VERTICALS.md](./VERTICALS.md).
 
@@ -76,4 +76,4 @@ Managers teach Cara via Training + FAQs. Hidden: call flow, locations, usage/bil
 7. Go-live + diagnostics
 8. Remove salon-era admin surfaces
 
-See [CODE-BASE-2-HANDOFF.md](./CODE-BASE-2-HANDOFF.md) for voice worker implementation checklist.
+See [CARA-VOICE-PLATFORM-HANDOFF.md](./CARA-VOICE-PLATFORM-HANDOFF.md) for voice worker implementation checklist.

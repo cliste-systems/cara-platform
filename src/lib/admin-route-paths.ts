@@ -25,6 +25,10 @@ export function adminDemoCallsPath(): string {
   return "/admin/demo-calls";
 }
 
+export function adminCallAnalysisPath(callLogId?: string): string {
+  return callLogId ? `/admin/call-analysis/${encodeURIComponent(callLogId.trim())}` : "/admin/call-analysis";
+}
+
 export function adminTextRehearsalPath(): string {
   return "/admin/demo-calls/text-rehearsal";
 }
@@ -39,6 +43,10 @@ export function adminSupportPath(): string {
 
 export function adminPaymentsPlatformSpendPath(): string {
   return "/admin/payments/platform-spend";
+}
+
+export function adminPaymentsPlatformIncomePath(): string {
+  return "/admin/payments/platform-income";
 }
 
 export function isAdminPaymentsPath(pathname: string): boolean {

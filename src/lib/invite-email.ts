@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
 import { buildInviteEmailBodies } from "@/lib/invite-email-bodies";
+import { prepareInviteAuthentication } from "@/lib/invite-auth-preparation";
 import { PUBLIC_ASSETS } from "@/lib/public-assets";
 import { isResendConfigured, sendTransactionalEmail } from "@/lib/resend-mail";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -23,148 +24,78 @@ export type SendInviteEmailInput = {
   recipientName?: string;
   businessName: string;
   productName: string;
-  /** Defaults to `/auth/callback` on the app origin. */
+  organizationName?: string;
+  billingMethod?: "invoice" | "manual_invoice" | "card";
+  managedOnboarding?: boolean;
+  /** Only pass after confirming this existing user belongs to the invited account. */
+  existingUserId?: string;
+  /** Recovery for an unlinked, never-signed-in invitation only. */
+  initializePendingSetup?: boolean;
   redirectTo?: string;
   admin?: SupabaseClient;
+};
+
+export type PreparedInviteEmail = Omit<SendInviteEmailInput, "admin" | "existingUserId" | "redirectTo"> & {
+  userId: string;
+  actionLink: string;
+  requiresPassword: boolean;
 };
 
 export type SendInviteEmailResult =
   | { ok: true; userId: string }
   | { ok: false; message: string };
 
-function isEmailAlreadyRegisteredError(message: string): boolean {
-  const m = message.toLowerCase();
-  return (
-    m.includes("already been registered") ||
-    m.includes("already registered") ||
-    m.includes("user already exists")
-  );
+export type PrepareInviteEmailResult =
+  | { ok: true; userId: string; prepared: PreparedInviteEmail }
+  | { ok: false; message: string };
+
+/** Prepare first, persist profile/membership/invite, then dispatch. Never deletes auth users. */
+export async function prepareInviteEmail(input: SendInviteEmailInput): Promise<PrepareInviteEmailResult> {
+  if (!isResendConfigured()) return { ok: false, message: "Email is not configured yet. Please try again later." };
+  const email = input.email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, message: "Enter a valid email address." };
+  const redirectTo = input.redirectTo?.trim() || `${inviteEmailRedirectOrigin()}/auth/callback`;
+  const recipientName = input.recipientName?.trim() || undefined;
+  try {
+    const admin = input.admin ?? createAdminClient();
+    const auth = await prepareInviteAuthentication(admin, { ...input, email, redirectTo, recipientName });
+    if (!auth.ok) return auth;
+    const { userId, actionLink, requiresPassword } = auth;
+    return {
+      ok: true,
+      userId,
+      prepared: {
+        email, recipientName, userId,
+        businessName: input.businessName,
+        productName: input.productName,
+        organizationName: input.organizationName,
+        billingMethod: input.billingMethod,
+        managedOnboarding: input.managedOnboarding,
+        actionLink,
+        requiresPassword,
+      },
+    };
+  } catch (error) {
+    console.error("[invite] preparation failed", error instanceof Error ? error.message : "Unknown error");
+    return { ok: false, message: "Could not prepare the invitation. Please try again." };
+  }
 }
 
-export async function sendInviteEmail(
-  input: SendInviteEmailInput,
-): Promise<SendInviteEmailResult> {
-  if (!isResendConfigured()) {
-    return {
-      ok: false,
-      message: "Email is not configured yet. Please try again later.",
-    };
-  }
-
-  const email = input.email.trim().toLowerCase();
-  const redirectTo =
-    input.redirectTo?.trim() ||
-    `${inviteEmailRedirectOrigin()}/auth/callback`;
-
-  let admin = input.admin;
+export async function sendPreparedInviteEmail(prepared: PreparedInviteEmail): Promise<SendInviteEmailResult> {
+  const bodies = buildInviteEmailBodies({ ...prepared, logoUrl: inviteEmailLogoUrl() });
   try {
-    admin ??= createAdminClient();
-  } catch (err) {
-    return {
-      ok: false,
-      message: err instanceof Error ? err.message : "Backend unavailable.",
-    };
-  }
-
-  const recipientName = input.recipientName?.trim() || undefined;
-  const userMetadata = {
-    full_name: recipientName,
-    needs_password: true,
-  };
-
-  let linkType: "invite" | "magiclink" = "invite";
-  let createdNewAuthUser = false;
-
-  let { data: linkData, error: linkError } =
-    await admin.auth.admin.generateLink({
-      type: "invite",
-      email,
-      options: {
-        redirectTo,
-        data: userMetadata,
-      },
+    const sent = await sendTransactionalEmail({
+      to: prepared.email, ...bodies,
+      replyTo: { email: "support@hellocara.ie", name: "HelloCara Support" },
     });
-
-  if (linkError && isEmailAlreadyRegisteredError(linkError.message)) {
-    ({ data: linkData, error: linkError } =
-      await admin.auth.admin.generateLink({
-        type: "magiclink",
-        email,
-        options: {
-          redirectTo,
-          data: userMetadata,
-        },
-      }));
-    linkType = "magiclink";
-  } else if (!linkError) {
-    createdNewAuthUser = true;
+    return sent.ok ? { ok: true, userId: prepared.userId } : sent;
+  } catch {
+    return { ok: false, message: "The invitation could not be sent. The account is saved; you can resend the invitation." };
   }
+}
 
-  if (linkError) {
-    return {
-      ok: false,
-      message:
-        linkError.message ??
-        "Could not create an invite link. Check Supabase Auth redirect URLs.",
-    };
-  }
-
-  const userId = linkData?.user?.id?.trim();
-  if (!userId) {
-    return {
-      ok: false,
-      message: "Could not create an invite for this email address.",
-    };
-  }
-
-  if (linkType === "magiclink") {
-    await admin.auth.admin.updateUserById(userId, {
-      user_metadata: {
-        ...(linkData.user?.user_metadata ?? {}),
-        ...userMetadata,
-      },
-    });
-  }
-
-  const hashedToken = linkData?.properties?.hashed_token?.trim();
-  const fallbackActionLink = linkData?.properties?.action_link?.trim();
-  const actionLink = hashedToken
-    ? `${redirectTo}?token_hash=${encodeURIComponent(hashedToken)}&type=${linkType}`
-    : fallbackActionLink;
-
-  if (!actionLink) {
-    return {
-      ok: false,
-      message:
-        "Could not create an invite link. Check Supabase Auth redirect URLs.",
-    };
-  }
-
-  const bodies = buildInviteEmailBodies({
-    actionLink,
-    recipientName,
-    businessName: input.businessName,
-    productName: input.productName,
-    logoUrl: inviteEmailLogoUrl(),
-  });
-
-  const sent = await sendTransactionalEmail({
-    to: email,
-    subject: bodies.subject,
-    text: bodies.text,
-    html: bodies.html,
-  });
-
-  if (!sent.ok) {
-    if (createdNewAuthUser) {
-      try {
-        await admin.auth.admin.deleteUser(userId);
-      } catch {
-        /* best effort rollback */
-      }
-    }
-    return sent;
-  }
-
-  return { ok: true, userId };
+export async function sendInviteEmail(input: SendInviteEmailInput): Promise<SendInviteEmailResult> {
+  const result = await prepareInviteEmail(input);
+  if (!result.ok) return result;
+  return sendPreparedInviteEmail(result.prepared);
 }

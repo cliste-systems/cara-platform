@@ -79,6 +79,21 @@ async function run(request: Request) {
     }
   }
 
+  await step("voice_email_deliveries", async () => {
+    const { error, count } = await admin.from("voice_email_deliveries").delete({ count: "exact" }).lt("created_at", iso(30 * 24 * 60 * 60 * 1000));
+    return { count: count ?? 0, error: error?.message };
+  });
+
+  await step("admin_live_call_sessions", async () => {
+    const { error, count } = await admin.from("admin_live_call_sessions").delete({ count: "exact" }).lt("last_seen_at", iso(24 * 60 * 60 * 1000));
+    return { count: count ?? 0, error: error?.message };
+  });
+
+  await step("admin_call_transport_samples", async () => {
+    const { error, count } = await admin.from("admin_call_transport_samples").delete({ count: "exact" }).lt("created_at", iso(30 * 24 * 60 * 60 * 1000));
+    return { count: count ?? 0, error: error?.message };
+  });
+
   await step("call_logs.transcript", async () => {
     const cutoff = iso(30 * 24 * 60 * 60 * 1000);
     const { data, error } = await admin
@@ -87,6 +102,18 @@ async function run(request: Request) {
       .lt("created_at", cutoff)
       .not("transcript", "is", null)
       .select("id");
+    return { count: data?.length ?? 0, error: error?.message };
+  });
+
+  // Reviews contain transcript excerpts and diagnostic payloads, so they share
+  // the 30-day transcript window even when the original transcript was empty.
+  await step("call_analysis", async () => {
+    const cutoff = iso(30 * 24 * 60 * 60 * 1000);
+    const { data, error } = await admin
+      .from("call_analysis")
+      .delete()
+      .lt("call_created_at", cutoff)
+      .select("call_log_id");
     return { count: data?.length ?? 0, error: error?.message };
   });
 

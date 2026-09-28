@@ -54,17 +54,29 @@ describe("buildTenantProvisioningStatus stages", () => {
     assert.equal(status.stage, "configuring");
   });
 
-  it("moves to ready when phone is assigned", () => {
+  it("moves to ready when the phone is assigned and agreements accepted", () => {
     const status = buildTenantProvisioningStatus(
       baseInput({
         inviteAcceptedAt: "2026-01-02T00:00:00.000Z",
         phoneNumber: "+353871234567",
         poolPhoneE164: "+353871234567",
         poolPhoneAssigned: true,
+        ownerUserId: "11111111-1111-4111-8111-111111111111",
+        ownerHasLegalAcceptances: true,
       }),
     );
     assert.equal(status.stage, "ready");
     assert.equal(status.readyForGoLive, true);
+  });
+
+  it("does not allow caller processing before the organisation agreements are accepted", () => {
+    const status = buildTenantProvisioningStatus(baseInput({
+      inviteAcceptedAt: "2026-01-02T00:00:00.000Z",
+      phoneNumber: "+353871234567", poolPhoneE164: "+353871234567", poolPhoneAssigned: true,
+      ownerUserId: "11111111-1111-4111-8111-111111111111", ownerHasLegalAcceptances: false,
+    }));
+    assert.equal(status.readyForGoLive, false);
+    assert.equal(status.stage, "configuring");
   });
 
   it("moves to live when cara_online_since is set", () => {

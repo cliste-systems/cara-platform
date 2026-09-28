@@ -34,7 +34,7 @@ export type TenantProvisioningPhoneRow = {
 } | null;
 
 export type TenantProvisioningInviteRow = {
-  sent_at: string;
+  sent_at: string | null;
   accepted_at: string | null;
   email: string;
 } | null;

@@ -1,5 +1,5 @@
 /**
- * Minimal TTS prep for dashboard voice previews — mirrors code-base-2
+ * Minimal TTS prep for dashboard voice previews — mirrors cara-voice-platform
  * pronunciation rules so the preview matches live calls.
  */
 const PRONUNCIATION_REPLACEMENTS: ReadonlyArray<[RegExp, string]> = [

@@ -8,7 +8,7 @@ import {
   type CallRoutingMode,
 } from "@/lib/call-routing";
 import { regenerateCaraCustomPrompt } from "@/lib/cara-prompt-from-org";
-import { requireDashboardSession } from "@/lib/dashboard-session";
+import { requireDashboardAdmin } from "@/lib/dashboard-admin";
 
 export type OrganizationSettingsPayload = {
   isActive: boolean;
@@ -25,7 +25,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export async function saveOrganizationSettings(
   payload: OrganizationSettingsPayload
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId } = await requireDashboardAdmin();
 
   const notificationEmail = String(payload?.notificationEmail ?? "").trim();
   const notificationPhone = String(payload?.notificationPhone ?? "").trim();
@@ -73,7 +73,7 @@ export async function saveOrganizationSettings(
 export async function toggleCaraActive(
   isActive: boolean,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId } = await requireDashboardAdmin();
 
   const { error } = await supabase
     .from("organizations")

@@ -56,7 +56,7 @@ import { geocodeIrelandLocation } from "@/lib/geocode-ireland";
 import { CLISTE_DEFAULT_ELEVENLABS_VOICE_ID } from "@/lib/onboarding-voice-presets";
 import {
   ONBOARDING_STEPS,
-  requireOnboardingSession,
+  requireOnboardingAdminSession,
   resolveCurrentStepPath,
 } from "@/lib/onboarding-session";
 import {
@@ -158,7 +158,7 @@ export type ImportWebsiteResult =
 export async function importWebsiteForProfile(
   url: string,
 ): Promise<ImportWebsiteResult> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
 
   const result = await importBusinessFromWebsite(url);
   if (!result.ok) {
@@ -261,7 +261,7 @@ export async function saveProfileStep(
   _: unknown,
   payload: SaveProfilePayload,
 ): Promise<SaveProfileResult> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
 
   const address = payload.address.trim();
   const eircode = payload.eircode.trim();
@@ -452,7 +452,7 @@ export type ValidateVoicePreviewResult =
 export async function validateVoiceGreetingPreviewStep(
   payload: SaveVoicePayload,
 ): Promise<ValidateVoicePreviewResult> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
 
   const admin = createAdminClient();
   const { data: org } = await admin
@@ -488,7 +488,7 @@ export async function validateVoiceGreetingPreviewStep(
 export async function reviewVoiceGreetingStep(
   payload: SaveVoicePayload,
 ): Promise<ReviewVoiceGreetingResult> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
 
   const admin = createAdminClient();
   const { data: org } = await admin
@@ -545,7 +545,7 @@ export async function saveVoiceStep(
   _: unknown,
   payload: SaveVoicePayload,
 ): Promise<SaveVoiceResult> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
 
   const admin = createAdminClient();
   const { data: org } = await admin
@@ -609,7 +609,7 @@ export async function startPlanCheckout(
   _: unknown,
   formData: FormData,
 ): Promise<{ ok: false; message: string }> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
 
   const rawPlan = String(formData.get("planTier") ?? "").trim();
   const interval = String(formData.get("interval") ?? "month") === "year" ? "year" : "month";
@@ -740,7 +740,7 @@ export type OnboardingEmbeddedCheckoutResult =
   | { ok: false; message: string };
 
 export async function prepareOnboardingEmbeddedCheckout(): Promise<OnboardingEmbeddedCheckoutResult> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
 
   const admin = createAdminClient();
   const missingDpa = await getMissingLegalAcceptances(admin, {
@@ -811,7 +811,7 @@ export type OnboardingElementsCheckoutResult =
   | { ok: false; message: string };
 
 export async function prepareOnboardingElementsCheckout(): Promise<OnboardingElementsCheckoutResult> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
 
   const admin = createAdminClient();
   const missingDpa = await getMissingLegalAcceptances(admin, {
@@ -880,7 +880,7 @@ export async function persistOnboardingElementsCheckout(
   subscriptionId: string,
   setupIntentId?: string,
 ): Promise<void> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
   const trimmed = subscriptionId.trim();
   if (!trimmed) {
     throw new Error("Missing subscription.");
@@ -905,7 +905,7 @@ export async function finaliseElementsCheckoutReturn(input: {
   subscriptionId: string;
   setupIntentId: string;
 }): Promise<void> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
   const subscriptionId = input.subscriptionId.trim();
   const setupIntentId = input.setupIntentId.trim();
   if (!subscriptionId || !setupIntentId) {
@@ -953,7 +953,7 @@ export async function finalizeOnboardingElementsCheckout(
  * subscription id + customer id, ensure a number, and activate the org.
  */
 export async function finalisePlanCheckout(checkoutSessionId: string): Promise<void> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
   if (!checkoutSessionId?.trim()) return;
 
   await persistPlatformCheckoutSession(
@@ -969,7 +969,7 @@ export async function finalisePlanCheckout(checkoutSessionId: string): Promise<v
  * (subscription + greeting + number), activates it, and opens the dashboard.
  */
 export async function completeOnboarding(): Promise<never> {
-  const session = await requireOnboardingSession();
+  const session = await requireOnboardingAdminSession();
   const admin = createAdminClient();
 
   const { data: org } = await admin
