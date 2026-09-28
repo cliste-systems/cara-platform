@@ -31,6 +31,7 @@ export function customerIncomingCallDetail(
       callerNumber: stringField(row, "caller_number"),
       startedAt: stringField(row, "started_at") ?? new Date().toISOString(),
       usageRecordId: stringField(row, "id"),
+      ...(sid ? { callSid: sid } : {}),
     };
   }
   return {
@@ -38,5 +39,6 @@ export function customerIncomingCallDetail(
     callLogId: stringField(row, "id"),
     callerNumber: stringField(row, "caller_number"),
     startedAt: stringField(row, "created_at") ?? new Date().toISOString(),
+    ...(sid ? { callSid: sid } : {}),
   };
 }

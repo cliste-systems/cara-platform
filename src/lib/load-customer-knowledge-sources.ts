@@ -3,6 +3,7 @@ import type { PostgrestSingleResponse, SupabaseClient } from "@supabase/supabase
 import type { CaraKnowledgeEventRow } from "@/lib/cara-knowledge-events";
 import { rowToTemporalUpdate, type TemporalUpdateRecord } from "@/lib/cara-knowledge-temporal";
 import {
+  customerCallFilters,
   customerTrainingFilters, CUSTOMER_TRAINING_JOINS,
   customerKnowledgeEventFilters, CUSTOMER_KNOWLEDGE_EVENT_JOINS,
   customerTemporalFilters, CUSTOMER_TEMPORAL_JOINS,
@@ -40,4 +41,31 @@ export async function loadCustomerTemporalUpdates(
     .overrideTypes<Record<string, unknown>[], { merge: false }>();
   if (error) throw new Error(`Could not load temporary updates: ${error.message}`);
   return (data ?? []).map(rowToTemporalUpdate);
+}
+
+export type CustomerKnowledgeCallLink = { id: string; ai_summary: string | null; created_at: string };
+export type CustomerKnowledgeCallFact = { id: string; created_at: string; duration_seconds: number; caller_number: string };
+
+export async function loadCustomerKnowledgeCallLinks(
+  supabase: SupabaseClient, organizationId: string, since: string,
+): Promise<CustomerKnowledgeCallLink[]> {
+  const columns: string = "id, ai_summary, created_at";
+  const { data, error } = await customerCallFilters(supabase.from("call_logs").select(columns))
+    .eq("organization_id", organizationId).gte("created_at", since)
+    .order("created_at", { ascending: false }).limit(100)
+    .overrideTypes<CustomerKnowledgeCallLink[], { merge: false }>();
+  if (error) throw new Error(`Could not load training call links: ${error.message}`);
+  return data ?? [];
+}
+
+export async function loadCustomerKnowledgeCallFacts(
+  supabase: SupabaseClient, organizationId: string, ids: string[],
+): Promise<CustomerKnowledgeCallFact[]> {
+  if (ids.length === 0) return [];
+  const columns: string = "id, created_at, duration_seconds, caller_number";
+  const { data, error } = await customerCallFilters(supabase.from("call_logs").select(columns))
+    .eq("organization_id", organizationId).in("id", ids)
+    .overrideTypes<CustomerKnowledgeCallFact[], { merge: false }>();
+  if (error) throw new Error(`Could not load training call details: ${error.message}`);
+  return data ?? [];
 }

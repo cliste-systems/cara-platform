@@ -8,7 +8,13 @@ import {
   mergeTemporalUpdatesIntoKnowledgeIndex,
   type CaraKnowledgeIndex,
 } from "@/lib/cara-knowledge-index";
-import { loadCustomerTemporalUpdates, loadCustomerTrainingRows } from "@/lib/load-customer-knowledge-sources";
+import {
+  loadCustomerTemporalUpdates,
+  loadCustomerTrainingRows,
+  loadCustomerKnowledgeCallLinks,
+  loadCustomerKnowledgeCallFacts,
+  type CustomerKnowledgeCallLink,
+} from "@/lib/load-customer-knowledge-sources";
 import {
   resolveBusinessTimezone,
   resolveTemporalLifecycle,
@@ -25,7 +31,6 @@ import { mergeDevelopmentTrainingDemos } from "@/lib/cara-training-demo-items";
 import { enrichTrainingItemsWithCallFacts, enrichTrainingItemsWithCallLinks } from "@/lib/cara-training-call-link";
 import { isOpenTrainingStatus } from "@/app/(dashboard)/dashboard/cara-training/cara-training-helpers";
 import { parseCaraTrainingPatch, type CaraTrainingItemRow } from "@/lib/cara-training-types";
-import { customerCallFilters } from "@/lib/dashboard-customer-data";
 import { loadCaraKnowledgeHistory, type CaraKnowledgeHistoryItem } from "./load-cara-knowledge-history";
 
 export type CaraKnowledgePageData = {
@@ -78,18 +83,15 @@ export async function loadCaraKnowledgePageData(): Promise<CaraKnowledgePageData
   const openItems = items.filter((item) => CARA_TRAINING_OPEN_STATUSES.includes(item.status));
   const appliedItems = items.filter((item) => item.status === "applied");
   const openItemsMissingCallLink = openItems.filter((item) => !item.call_log_id && item.source === "call_gap");
-  let recentCallsForTrainingLink: { id: string; ai_summary: string | null; created_at: string }[] = [];
+  let recentCallsForTrainingLink: CustomerKnowledgeCallLink[] = [];
   if (openItemsMissingCallLink.length > 0) {
     const earliestLastSeen = openItemsMissingCallLink.reduce((min, item) => {
       const ts = new Date(item.last_seen_at || item.created_at).getTime();
       return Number.isFinite(ts) ? Math.min(min, ts) : min;
     }, Date.now());
-    const { data: recentCalls } = await customerCallFilters(supabase.from("call_logs")
-      .select("id, ai_summary, created_at"))
-      .eq("organization_id", organizationId)
-      .gte("created_at", new Date(earliestLastSeen - 2 * 60 * 60 * 1000).toISOString())
-      .order("created_at", { ascending: false }).limit(100);
-    recentCallsForTrainingLink = (recentCalls ?? []) as typeof recentCallsForTrainingLink;
+    recentCallsForTrainingLink = await loadCustomerKnowledgeCallLinks(
+      supabase, organizationId, new Date(earliestLastSeen - 2 * 60 * 60 * 1000).toISOString(),
+    );
   }
   const linkedOpenItems = enrichTrainingItemsWithCallLinks(openItems, recentCallsForTrainingLink);
   const linkedOpenById = new Map(linkedOpenItems.map((item) => [item.id, item]));
@@ -97,13 +99,7 @@ export async function loadCaraKnowledgePageData(): Promise<CaraKnowledgePageData
     .map((item) => linkedOpenById.get(item.id) ?? item);
   const callLogIds = [...new Set(openTrainingItems.map((item) => item.call_log_id?.trim())
     .filter((id): id is string => Boolean(id)))];
-  let callLogsForFacts: { id: string; created_at: string; duration_seconds: number; caller_number: string }[] = [];
-  if (callLogIds.length > 0) {
-    const { data: callLogRows } = await customerCallFilters(supabase.from("call_logs")
-      .select("id, created_at, duration_seconds, caller_number"))
-      .eq("organization_id", organizationId).in("id", callLogIds);
-    callLogsForFacts = (callLogRows ?? []) as typeof callLogsForFacts;
-  }
+  const callLogsForFacts = await loadCustomerKnowledgeCallFacts(supabase, organizationId, callLogIds);
   const trainingItems = mergeDevelopmentTrainingDemos(
     enrichTrainingItemsWithCallFacts(openTrainingItems, callLogsForFacts),
   );

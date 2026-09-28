@@ -7,11 +7,13 @@ export type CallsIncomingPlaceholder = {
   callLogId: string | null;
   startedAt: string;
   usageRecordId?: string | null;
+  callSid?: string | null;
 };
 
 export function incomingCallPlaceholderKey(
-  placeholder: Pick<CallsIncomingPlaceholder, "callLogId" | "usageRecordId" | "startedAt">,
+  placeholder: Pick<CallsIncomingPlaceholder, "callLogId" | "usageRecordId" | "startedAt" | "callSid">,
 ): string {
+  if (placeholder.callSid) return `sid-${placeholder.callSid}`;
   if (placeholder.callLogId) return `call-${placeholder.callLogId}`;
   if (placeholder.usageRecordId) return `usage-${placeholder.usageRecordId}`;
   return `started-${placeholder.startedAt}`;
@@ -23,14 +25,17 @@ export function upsertIncomingCallPlaceholder(
 ): CallsIncomingPlaceholder[] {
   const customers = current.filter((row) => !isEngineerTestCallerNumber(row.callerNumber));
   if (isEngineerTestCallerNumber(detail.callerNumber)) return customers;
-  const linked = (detail.callLogId ? customers.find((row) => row.callLogId === detail.callLogId) : null)
+  const linked = (detail.callSid ? customers.find((row) => row.callSid === detail.callSid) : null)
+    ?? (detail.callLogId ? customers.find((row) => row.callLogId === detail.callLogId) : null)
     ?? (detail.usageRecordId ? customers.find((row) => row.usageRecordId === detail.usageRecordId) : null)
     ?? (detail.startedAt && detail.callerNumber ? customers.find((row) => {
       if (row.callLogId || row.callerNumber !== detail.callerNumber) return false;
+      // Never coalesce distinct identified calls, including repeat callers.
+      if (row.callSid && detail.callSid && row.callSid !== detail.callSid) return false;
+      if (row.usageRecordId && detail.usageRecordId && row.usageRecordId !== detail.usageRecordId) return false;
       return Math.abs(Date.parse(row.startedAt) - Date.parse(detail.startedAt!)) <= 5_000;
     }) : null);
   const map = new Map(customers.map((row) => [incomingCallPlaceholderKey(row), row]));
-  // Replace the in-progress entry rather than retaining a second Loading copy.
   if (linked) map.delete(incomingCallPlaceholderKey(linked));
   const merged = mergeIncomingCallEvent(linked ?? null, detail);
   map.set(incomingCallPlaceholderKey(merged), merged);
@@ -71,16 +76,22 @@ export function mergeIncomingCallEvent(
   event: DashboardIncomingCallDetail,
 ): CallsIncomingPlaceholder {
   const startedAt = event.startedAt ?? current?.startedAt ?? new Date().toISOString();
-  if (event.phase === "loading") {
+  const callSid = event.callSid ?? current?.callSid;
+  const sameIdentifiedCall = Boolean(event.callSid && current?.callSid === event.callSid);
+  const retainLoading = sameIdentifiedCall && current?.phase === "loading";
+  if (event.phase === "loading" || retainLoading) {
     return {
       phase: "loading", callerNumber: event.callerNumber ?? current?.callerNumber ?? null,
       callLogId: event.callLogId ?? current?.callLogId ?? null,
-      usageRecordId: current?.usageRecordId ?? event.usageRecordId ?? null, startedAt,
+      usageRecordId: current?.usageRecordId ?? event.usageRecordId ?? null,
+      startedAt: retainLoading ? current!.startedAt : startedAt,
+      ...(callSid ? { callSid } : {}),
     };
   }
   return {
     phase: "in_progress", callerNumber: event.callerNumber ?? current?.callerNumber ?? null,
-    callLogId: current?.callLogId ?? null,
-    usageRecordId: event.usageRecordId ?? current?.usageRecordId ?? null, startedAt,
+    callLogId: sameIdentifiedCall || !event.callSid ? current?.callLogId ?? null : null,
+    usageRecordId: event.usageRecordId ?? (sameIdentifiedCall || !event.callSid ? current?.usageRecordId : null) ?? null,
+    startedAt, ...(callSid ? { callSid } : {}),
   };
 }
