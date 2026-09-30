@@ -20,4 +20,3 @@ export async function prepareStaffInvitationAuthentication(admin: SupabaseClient
   url.searchParams.set("type", existing ? "magiclink" : "invite");
   return { userId: data.user.id, actionLink: url.toString(), requiresPassword: true };
 }
-
