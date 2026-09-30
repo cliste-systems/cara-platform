@@ -223,6 +223,7 @@ test("official leaflet campaign links are evidence, never inferred SKU eligibili
   assert.equal(report.product_membership_verified, false);
   assert.equal(report.price_and_conditions_verified, false);
   assert.ok(report.limitation.includes("not assigned"));
+  assert.equal(readLeafletCampaignLinks(`<script>var manifest = ${JSON.stringify(manifest)};</script>`, "https://supervalu.ie/offers/leaflet/613b").page_count, report.page_count);
   assert.throws(() => readLeafletCampaignLinks("", "https://example.com/offers/leaflet/614"), /Unrecognized/);
 });
 

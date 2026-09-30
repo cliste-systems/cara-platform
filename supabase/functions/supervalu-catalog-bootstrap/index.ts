@@ -241,7 +241,7 @@ async function discover(storeId: string, refreshKind: "full" | "offers") {
     const match = href.match(/-id-(O\d+)/);
     if (!match) return;
     const categoryId = match[1];
-    if (categoryId.startsWith("O1")) return;
+    // Include department roots too: products need not be assigned to a leaf.
     if (!found.has(categoryId)) {
       found.set(categoryId, {
         category_id: categoryId,
@@ -251,21 +251,22 @@ async function discover(storeId: string, refreshKind: "full" | "offers") {
     }
   });
   if (found.size < 100) throw new Error(`Incomplete storefront navigation: only ${found.size} categories`);
+  const departmentManifest = [...found.values()].filter(c => c.category_id.startsWith("O1"));
   if (refreshKind === "offers") found.clear();
   found.set("PROMOTIONS", { category_id: "PROMOTIONS", category_name: "All promotions", category_href: "/promotions" });
   // Follow the current leaflet linked by the official storefront. This is
   // campaign-discovery evidence only; no hotspot price is applied to a SKU.
-  const leafletHref = $('a[href*="supervalu.ie/offers/leaflet/"]').first().attr("href")?.trim();
+  const leafletHref = $('a[href*="supervalu.ie/offers/leaflet/"]').first().attr("href")?.trim() || "https://supervalu.ie/offers";
   let campaignDiscovery: Record<string, unknown> = { verified: false, reason: "Official storefront did not expose a current leaflet link" };
   if (leafletHref) {
     try {
       const leafletUrl = new URL(leafletHref);
-      if (leafletUrl.protocol !== "https:" || leafletUrl.hostname !== "supervalu.ie" || !/^\/offers\/leaflet\/\d+\/?$/.test(leafletUrl.pathname)) {
+      if (leafletUrl.protocol !== "https:" || leafletUrl.hostname !== "supervalu.ie" || !/^\/offers(?:\/leaflet(?:\/\d+[a-z]?)?)?\/?$/i.test(leafletUrl.pathname)) {
         throw new Error("Unrecognized official leaflet link");
       }
       const leafletResponse = await fetch(leafletUrl, { headers: H, signal: AbortSignal.timeout(15000) });
       if (!leafletResponse.ok) throw new Error(`Leaflet HTTP ${leafletResponse.status}`);
-      campaignDiscovery = { verified: false, ...readLeafletCampaignLinks(await leafletResponse.text(), leafletUrl.toString()) };
+      campaignDiscovery = { verified: false, ...readLeafletCampaignLinks(await leafletResponse.text(), leafletResponse.url) };
     } catch (error) {
       campaignDiscovery = { verified: false, source_url: leafletHref, error: error instanceof Error ? error.message : String(error) };
     }
@@ -286,7 +287,7 @@ async function discover(storeId: string, refreshKind: "full" | "offers") {
     sync_batch_id: batchId,
     status: "running",
     started_at: now,
-    metadata: { source: "supervalu_public_storefront", category_count: found.size, refresh_kind: refreshKind, coverage_report: storefrontCoverageReport(), campaign_discovery: campaignDiscovery },
+    metadata: { source: "supervalu_public_storefront", category_count: found.size, department_manifest: departmentManifest, refresh_kind: refreshKind, coverage_report: storefrontCoverageReport(), campaign_discovery: campaignDiscovery },
   });
   if (runError) throw new Error("sync run insert: " + runError.message);
 
@@ -386,17 +387,11 @@ async function work(storeId: string, batchId: string, limit: number) {
   if (remainingError) throw new Error("queue completion check: " + remainingError.message);
 
   const coverageReport = mergeStorefrontCoverageReports(results.map((result) => result.coverage_report));
-  let nationalRefresh: unknown = null;
-  if ((remaining ?? 0) === 0) {
-    const { data: finalized, error: finalizeError } = await supabase.rpc(
-      "finalize_supervalu_catalog_run", { p_sync_batch_id: batchId },
-    );
-    if (finalizeError) throw Object.assign(new Error("finalize national crawl: " + finalizeError.message), { coverageReport });
-    nationalRefresh = finalized;
-    if (finalized?.ok === false) throw Object.assign(new Error(String(finalized.message ?? finalized.error ?? "Catalogue coverage check failed")), { coverageReport });
-  }
-
-  return { claimed: jobs.length, results, remaining: remaining ?? 0, national_refresh: nationalRefresh, coverage_report: coverageReport };
+  // The database publisher validates and atomically finalizes complete queues.
+  // Running consensus through PostgREST exceeded its statement timeout even
+  // after lock contention was removed; pg_cron has a separate bounded budget.
+  return { claimed: jobs.length, results, remaining: remaining ?? 0,
+    ready_for_publication: (remaining ?? 0) === 0, coverage_report: coverageReport };
 }
 
 Deno.serve(async (req) => {

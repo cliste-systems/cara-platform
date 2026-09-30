@@ -52,7 +52,7 @@ export function readStorefrontState(html: string): Record<string, any> {
 /** Official leaflet links identify campaigns, not the eligibility of linked products. */
 export function readLeafletCampaignLinks(html: string, leafletUrl: string) {
   const source = new URL(leafletUrl);
-  if (source.protocol !== "https:" || source.hostname !== "supervalu.ie" || !/^\/offers\/leaflet\/\d+\/?$/.test(source.pathname)) {
+  if (source.protocol !== "https:" || source.hostname !== "supervalu.ie" || !/^\/offers\/leaflet\/\d+[a-z]?\/?$/i.test(source.pathname)) {
     throw new Error("Unrecognized official leaflet source");
   }
   const manifest = readJsonAssignment(html, /(?:var|let|const)\s+manifest\s*=\s*/, "Official leaflet manifest");
