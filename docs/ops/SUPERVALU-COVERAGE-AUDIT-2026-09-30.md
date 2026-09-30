@@ -60,15 +60,17 @@ Unclassified legacy paths are reported separately rather than counted as a ninet
 
 1. Full crawls now include top-level department pages as well as child categories, closing the root-only product gap. Each discovery records the department manifest.
 2. Leaflet discovery accepts letter-suffixed official editions and follows the live official redirect when navigation has no leaflet link.
-3. Finalization moved out of the short API request into a bounded database publisher. Busy publishers defer rather than wait for the shared publication lock. The scheduler no longer sends HTTP workers just to finalize already downloaded queues.
+3. Finalization moved out of the short API request into a bounded database publisher. Busy publishers defer rather than wait for the shared publication lock. Publication retries run every five minutes with a 90-second statement budget and a recovery window; the dispatcher remains every minute. The scheduler no longer sends HTTP workers just to finalize already downloaded queues.
 4. Publication retains the existing page-total, failed-job, prior-range and cross-store consensus guards. It stores publication outcomes separately from successful downloads.
 5. Consensus builds indexed/narrow temporary snapshots, avoids rewriting unchanged national product/promotion rows and materializes campaign evidence once. These changes address measured API and database publication timeouts; cron failures remain visible and are not declared successful.
 6. Explicit WK campaign names must match the current Thursday-based offer week. Future/expired product promotions remain excluded by their actual source dates.
 7. Added service-only `supervalu_public_department_audit()` and `scripts/audit-supervalu-public-coverage.ts`. The report compares live public navigation with a consistent aggregate database snapshot, counts fresh versus merely date-current offers, separates mechanics, and reports failed imports. It contains no call/customer data.
 
+8. The dispatcher now caps outstanding public-store requests at three across all stores and rotates oldest-served stores first. Previously it could dispatch 27 stores concurrently. This bounds shared ingestion pressure while retaining the refresh schedule; it is not evidence that all database performance problems are eliminated.
+
 ## Automatic Thursday and daily plan
 
-The existing database dispatcher is enabled and checks work every minute. Offer passes are due every 15 minutes on Thursday in Europe/Dublin and hourly on other days. A full catalogue pass is due daily at 20:00 Dublin. The independent publisher validates ready queues and retries unfinished publication every minute. Vercel's Thursday and Friday refresh requests remain additional entry points; the durable database schedule survives app deployments.
+The existing database dispatcher is enabled and checks work every minute. Offer passes are due every 15 minutes on Thursday in Europe/Dublin and hourly on other days. A full catalogue pass is due daily at 20:00 Dublin. The dispatcher limits shared ingestion to three outstanding requests, with fair rotation across stores. The independent publisher validates ready queues and retries unfinished publication every five minutes, with a 90-second budget and a recovery window. Vercel's Thursday and Friday refresh requests remain additional entry points; the durable database schedule survives app deployments.
 
 A due time is a polling/dispatch cadence, not a promise that a multi-store import completes instantaneously. Running crawls, source errors, changing source totals and database capacity can delay publication. Continue serving only date-current, sufficiently fresh verified evidence; preserve the prior snapshot on incomplete or implausible replacement data. Never weaken pagination checks to get a green status.
 
@@ -81,3 +83,7 @@ For a certified complete national list, the long-term dependency remains an auth
 All 977 dashboard tests passed, including the source, promotion, catalogue-search and schedule regressions. The Next.js 16.3.8 production build, type checks, changed-file lint and dependency audit passed. Production evidence confirmed recovered full imports and fresh national snapshot publication. The report explicitly retains the source failures and coverage limits; no live telephone call was used as verification.
 
 Live API checks returned HTTP 200 for meat 3-for-10 and deli-counter offers. The meat lookup took 14.7 seconds, so voice latency remains an operational concern. A generic “milk products” lookup exposed product-word noise; a retrieval regression and token fix were added. The dependency audit also required Next.js 16.3.8 and Axios 1.20.0 after newly published advisories.
+
+Final production release checks initially encountered a product-request timeout and a database lookup failure before matching. A global ingestion concurrency guard and a five-minute publisher recovery window were applied after those failures. Search reliability must be assessed with production responses, separately from passing unit tests and deployment readiness.
+
+After the active publisher finished with the new recovery window, live API checks returned HTTP 200: “milk products” produced five matches in 7.1 seconds; “deli counter offers” produced one match in 1.7 seconds. This verifies the deployed generic-product fix and counter retrieval. It does not establish performance during every publication attempt; search latency and publication timeouts remain operational concerns.
