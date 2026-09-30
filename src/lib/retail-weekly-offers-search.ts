@@ -631,6 +631,7 @@ const STOPWORDS = new Set([
   "any", "there", "some", "just", "hello", "yeah", "yep", "well", "also",
   "actually", "whats", "like", "right", "so", "wondering", "know", "tell", "best", "highlights", "surprise", "apart", "not", "non", "except",
   "could", "would", "thanks", "thank", "hi", "em", "uh", "um",
+  "product", "products", "item", "items", "range",
 ]);
 
 export function tokenizeSupervaluSearchQuery(query: string): string[] {

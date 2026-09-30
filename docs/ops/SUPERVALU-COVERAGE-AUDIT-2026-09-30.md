@@ -1,10 +1,10 @@
 # SuperValu public range and promotions audit — 30 September 2026
 
-Verified snapshot: 2026-09-30T16:59:39.876Z. These are database observations, not SuperValu-certified national totals. Counts change as validated source runs publish.
+Verified snapshot: 2026-09-30T17:09:03.686Z. These are database observations, not SuperValu-certified national totals. Counts change as validated source runs publish.
 
 ## Answer
 
-We cannot certify every national product or every national offer from public sources. The user has chosen public sources and has no national feed. Cara has 14,419 products with evidence in at least three public store catalogues and 2,281 date-current, fresh offer rows at this audit. All 18 departments in the official public navigation have products. Deli Counter and Newsagent & Tobacconist have no confirmed current offer rows; that does not establish that no offers exist there. Four configured sources still lacked a completed full crawl at the initial final audit. Two source category pages were still short of their own published totals.
+We cannot certify every national product or every national offer from public sources. The user has chosen public sources and has no national feed. Cara has 14,419 products with evidence in at least three public store catalogues and 3,346 date-current, fresh offer rows at this audit. All 18 departments in the official public navigation have products. Deli Counter and Newsagent & Tobacconist each have one confirmed current offer row in this snapshot. Sparse published coverage does not establish that no other offers exist. Four configured sources still lacked a completed full crawl at the initial final audit. 4 source category imports remained failed. Their errors are retained in the audit rather than ignored.
 
 The audit explicitly keeps `authoritative_national_range_complete=false` and `every_offer_type_verified=false`. Product presence is separate from local stock, a confirmed national master, an agreed price, and promotions.
 
@@ -14,24 +14,24 @@ A product can carry several mechanics. Multibuy/Rewards columns overlap and coun
 
 | Public department | Cross-store products | Fresh offers | Multibuy rows | Rewards rows |
 |---|---:|---:|---:|---:|
-| Fruit & Vegetables | 502 | 48 | 43 | 5 |
-| Bakery | 608 | 28 | 13 | 12 |
-| Meat & Poultry | 557 | 104 | 51 | 45 |
-| Fish & Seafood | 130 | 28 | 16 | 4 |
-| Deli Counter | 35 | 0 | 0 | 0 |
-| Cheese | 359 | 35 | 0 | 35 |
-| Milk, Yogurt, Butter & Eggs | 766 | 119 | 53 | 66 |
-| Health & Wellness | 970 | 55 | 10 | 51 |
-| Chilled Food | 637 | 155 | 133 | 22 |
-| Food Cupboard | 4170 | 739 | 218 | 555 |
-| Frozen Foods | 612 | 89 | 23 | 66 |
-| Drinks | 760 | 126 | 60 | 88 |
-| Beauty & Personal Care | 1126 | 200 | 32 | 168 |
-| Baby | 481 | 84 | 42 | 43 |
-| Household & Cleaning | 987 | 144 | 22 | 131 |
-| Pets | 252 | 54 | 14 | 40 |
-| Wine, Beer & Spirits | 1154 | 273 | 0 | 272 |
-| Newsagent & Tobacconist | 303 | 0 | 0 | 0 |
+| Fruit & Vegetables | 502 | 57 | 51 | 6 |
+| Bakery | 608 | 63 | 37 | 19 |
+| Meat & Poultry | 557 | 132 | 69 | 55 |
+| Fish & Seafood | 130 | 31 | 19 | 4 |
+| Deli Counter | 35 | 1 | 0 | 0 |
+| Cheese | 359 | 52 | 2 | 47 |
+| Milk, Yogurt, Butter & Eggs | 766 | 179 | 82 | 97 |
+| Health & Wellness | 970 | 126 | 25 | 113 |
+| Chilled Food | 637 | 201 | 163 | 38 |
+| Food Cupboard | 4170 | 997 | 282 | 761 |
+| Frozen Foods | 612 | 130 | 30 | 100 |
+| Drinks | 760 | 175 | 63 | 136 |
+| Beauty & Personal Care | 1126 | 422 | 49 | 372 |
+| Baby | 481 | 109 | 56 | 54 |
+| Household & Cleaning | 987 | 227 | 29 | 208 |
+| Pets | 252 | 89 | 24 | 65 |
+| Wine, Beer & Spirits | 1154 | 354 | 0 | 353 |
+| Newsagent & Tobacconist | 303 | 1 | 0 | 1 |
 
 Unclassified legacy paths are reported separately rather than counted as a nineteenth department. Counter deli is separate from packaged cooked meats in Chilled Food. Beer, lager, ale, stout, cider, wine, spirits and non-alcoholic products retain their actual category breadcrumbs.
 
@@ -78,4 +78,6 @@ For a certified complete national list, the long-term dependency remains an auth
 
 ## Verification
 
-124 source, promotion, catalogue-search and schedule regression tests passed. Type checks and changed-file lint passed. Production evidence confirmed recovered full imports and fresh national snapshot publication. The report explicitly retains the source failures and coverage limits; no live telephone call was used as verification.
+All 977 dashboard tests passed, including the source, promotion, catalogue-search and schedule regressions. The Next.js 16.3.8 production build, type checks, changed-file lint and dependency audit passed. Production evidence confirmed recovered full imports and fresh national snapshot publication. The report explicitly retains the source failures and coverage limits; no live telephone call was used as verification.
+
+Live API checks returned HTTP 200 for meat 3-for-10 and deli-counter offers. The meat lookup took 14.7 seconds, so voice latency remains an operational concern. A generic “milk products” lookup exposed product-word noise; a retrieval regression and token fix were added. The dependency audit also required Next.js 16.3.8 and Axios 1.20.0 after newly published advisories.

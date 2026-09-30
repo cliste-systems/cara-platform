@@ -134,3 +134,15 @@ it("searches beyond the first page before rejecting an own-label national produc
   assert.equal(matches.length, 1);
   assert.equal(matches[0]?.sku, "own");
 });
+
+
+it("finds national milk when callers ask for milk products or the range of milk", async () => {
+  const supabase = makeSupabaseRows([
+    { id: "milk", sku: "milk", product_name: "Avonmore Fresh Milk (1 L)", brand: "Avonmore", department: "Fresh Milk", service_area: "dairy", fulfilment: "prepack", is_alcohol: false, search_text: "avonmore fresh milk", national_store_count: 12, national_regular_price_eur: 1.5 },
+    { id: "bread", sku: "bread", product_name: "SuperValu White Bread", brand: "SuperValu", department: "Bread", service_area: "bakery", fulfilment: "prepack", is_alcohol: false, search_text: "supervalu white bread", national_store_count: 12, national_regular_price_eur: 1.2 },
+  ]);
+  for (const query of ["milk products", "range of milk"]) {
+    const matches = await searchNationalRetailCatalog(supabase as never, { retailBanner: "supervalu", query, intent: "stock", serviceArea: "dairy" });
+    assert.deepEqual(matches.map(match => match.sku), ["milk"]);
+  }
+});
