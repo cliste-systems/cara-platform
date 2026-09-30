@@ -16,7 +16,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { retailSearchTokenMatchesText, retailSearchTokenSimilarity } from "@/lib/retail-search-fuzzy";
 import { isRetailOfferObservationFresh, RETAIL_OFFER_MAX_SOURCE_AGE_MS, RETAIL_OFFERS_UNVERIFIED_MESSAGE } from "@/lib/retail-offer-freshness";
 import { parseRetailMultibuyLabel } from "@/lib/retail-price-presentation";
-import { filterWeeklyOffersByPromotionQuery, shouldUseStructuredPromotionSearch } from "@/lib/retail-promotion-search";
+import { filterWeeklyOffersByPromotionQuery, parseRetailPromotionQuery, shouldUseStructuredPromotionSearch } from "@/lib/retail-promotion-search";
 import {
   formatSpokenDiscountLabel,
   formatSpokenEurAmount,
@@ -25,6 +25,17 @@ import {
 } from "@/lib/spoken-eur-price";
 
 const DUBLIN = "Europe/Dublin";
+// A lookup tests thousands of rows against one reference date. Reuse the
+// calendar conversion without retaining request dates or ignoring mutations.
+const retailCalendarDays = new WeakMap<Date, { timestamp: number; day: string }>();
+function retailCalendarDay(reference: Date): string {
+  const timestamp = reference.getTime();
+  const cached = retailCalendarDays.get(reference);
+  if (cached?.timestamp === timestamp) return cached.day;
+  const day = formatInTimeZone(reference, DUBLIN, "yyyy-MM-dd");
+  retailCalendarDays.set(reference, { timestamp, day });
+  return day;
+}
 
 /** Both boundaries are inclusive in the retailer's Dublin calendar. */
 export function isRetailOfferWeekActive(
@@ -34,7 +45,7 @@ export function isRetailOfferWeekActive(
   const end = String(row.offer_week_end ?? "").trim();
   const start = String(row.offer_week_start ?? "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) return false;
-  const today = formatInTimeZone(reference, DUBLIN, "yyyy-MM-dd");
+  const today = retailCalendarDay(reference);
   return start <= today && end >= today;
 }
 
@@ -130,7 +141,7 @@ export function assessSyncedOffersFreshness(input: {
   reference?: Date;
 }): SyncedOffersFreshness {
   const reference = input.reference ?? new Date();
-  const today = formatInTimeZone(reference, DUBLIN, "yyyy-MM-dd");
+  const today = retailCalendarDay(reference);
   const week = currentSupervaluOfferWeek(reference);
   const offerWeekEnd = input.offerWeekEnd?.trim() || null;
   const syncedAt = input.syncedAt?.trim() || null;
@@ -206,7 +217,12 @@ export function inferRewardsPricePointFromQuery(query: string): number | null {
   const q = query.toLowerCase();
   if (!/\b(?:real\s+rewards?|rewards?)(?:\s+price)?\b/i.test(q) || /\bpoints?\b/i.test(q)) return null;
 
-  const numeric = q.match(/(?:€\s*)?(\d{1,3}(?:[.,]\d{1,2})?)/);
+  // A named product with a pack count is not a price-only Rewards browse.
+  const subject = parseRetailPromotionQuery(query).subjectTokens.filter(token => !["euro", "euros"].includes(token));
+  if (subject.length > 0) return null;
+  const rewards = q.match(/\brewards?(?:\s+price)?\b/);
+  const amountText = q.includes("€") ? q.slice(q.indexOf("€")) : q.slice((rewards?.index ?? 0)+(rewards?.[0].length ?? 0));
+  const numeric = amountText.match(/(?:€\s*)?(\d{1,3}(?:[.,]\d{1,2})?)/);
   if (numeric) {
     const amount = Number(numeric[1]!.replace(",", "."));
     if (Number.isFinite(amount) && amount > 0) return Math.round(amount * 100) / 100;
@@ -349,6 +365,10 @@ export function inferWeeklyOfferServiceAreaFromQuery(
   // frozen or pre-pack meat burgers may belong to other catalogue areas.
   const q = (queryRequestsMeatBurgers(query) && !/\b(?:butcher|counter|department|section|aisle)\b/i.test(query)
     ? stripBurgerSearchContext(query) : query).toLowerCase();
+  // Named products get their department from catalogue evidence. Ingredient
+  // words inside a specific product name must not hard-scope the lookup.
+  if (!/\b(?:counter|department|section|aisle|butcher|deli|bakery|off[ -]licen[cs]e)\b/.test(q)
+      && offerSearchProductIdentityTokens(q).length > 2) return null;
   // A product ingredient does not establish a department. Explicit counter /
   // department language still wins through the normal rules below.
   if (!/\b(?:counter|department|section|aisle)\b/.test(q) &&
@@ -413,7 +433,7 @@ export function inferWeeklyOfferFulfilmentFromQuery(
     return "prepack";
   }
   if (
-    /(?:butcher|meat|fish|deli|seafood)\s+counter|counter\s+(?:ham|meat|fish|salmon|steak|prawns?)|the counter|fresh sliced|per kilo|per kg|by weight|loose|priced per/i.test(
+    /(?:butcher|meat|fish|deli|seafood)\s+counter|counter\s+(?:ham|meat|fish|salmon|steak|prawns?)|the counter|fresh sliced|per kilo|per kg|by weight|priced per/i.test(
       q,
     )
   ) {
@@ -422,7 +442,7 @@ export function inferWeeklyOfferFulfilmentFromQuery(
   if (/\bcounter\b/i.test(q) && !/pre\s*-?\s*pack|packaged/i.test(q)) {
     return "counter";
   }
-  if (/fruit|veg|produce/i.test(q) && /fresh counter|loose/i.test(q)) {
+  if (/fruit|veg|produce/i.test(q) && /fresh counter/i.test(q)) {
     return "counter";
   }
   return null;
@@ -639,6 +659,7 @@ export function tokenizeSupervaluSearchQuery(query: string): string[] {
     ...new Set(
       stripPriceComparisonWords(stripBurgerSearchContext(query))
         .toLowerCase()
+        .replace(/\b(?:i[\u2019']?m|i am)\s+(?:looking for|after)\b/g, " ")
         .replace(/[^a-z0-9\s]/g, " ")
         .split(/\s+/)
         .map((token) => token.trim())
@@ -1083,15 +1104,26 @@ export function searchSyncedWeeklyOffersInRows(
   if (!trimmed) return [];
 
   const reference = options?.reference ?? new Date();
-  rows = filterWeeklyOffersByPromotionQuery(rows.filter((row) =>
-    isRetailOfferWeekActive(row, reference) && isRetailOfferObservationFresh(row.synced_at, reference),
-  ), trimmed);
+  const activeRows = rows.filter((row) =>
+    isRetailOfferWeekActive(row, reference) && isRetailOfferObservationFresh(row.synced_at, reference));
+  const tokenLimit = options?.limit ?? RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS;
+  // Resolve a supplied full product name before interpreting its ingredients,
+  // cocoa/fat percentage, "Loose" name, or pack count as search instructions.
+  const literalMatches = activeRows.filter((row) => {
+    const index = trimmed.toLowerCase().indexOf(row.product_name.toLowerCase());
+    if (index < 0) return false;
+    const request = trimmed.slice(0,index) + " " + trimmed.slice(index+row.product_name.length);
+    const scope = resolveWeeklyOfferSearchFilters(request, options);
+    return rowMatchesFilters(row, scope, {excludeMeat:inferWeeklyOffersExcludeMeat(request),alcoholOnly:inferAlcoholOnlyFromQuery(request)})
+      && filterWeeklyOffersByPromotionQuery([row],request).length > 0;
+  });
+  if (literalMatches.length > 0) return literalMatches.slice(0,tokenLimit).map(row=>rowToMatch(row,1));
+  rows = filterWeeklyOffersByPromotionQuery(activeRows, trimmed);
   const filters = resolveWeeklyOfferSearchFilters(trimmed, options);
   const excludeMeat = inferWeeklyOffersExcludeMeat(trimmed);
   const alcoholOnly = inferAlcoholOnlyFromQuery(trimmed);
   const listIntent = inferWeeklyOffersListIntent(trimmed);
   const browseCategories = inferWeeklyOffersBrowseCategories(trimmed);
-  const tokenLimit = options?.limit ?? RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS;
   const listLimit = Math.max(tokenLimit, RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS);
   const browseOptions = { excludeMeat, filters, alcoholOnly };
   const rewardsPricePoint = inferRewardsPricePointFromQuery(trimmed);

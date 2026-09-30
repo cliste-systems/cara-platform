@@ -146,3 +146,16 @@ it("finds national milk when callers ask for milk products or the range of milk"
     assert.deepEqual(matches.map(match => match.sku), ["milk"]);
   }
 });
+
+it("uses the customer's product words after natural looking-for phrasing", async()=>{
+ const adapter=makeSupabaseRows([{id:"lotion",sku:"lotion",product_name:"Aveeno Skin Relief Body Lotion (200 ml)",brand:"Aveeno",department:"Body Care",service_area:"grocery",fulfilment:"prepack",is_alcohol:false,search_text:"aveeno skin relief body lotion 200 ml",national_store_count:3,national_regular_price_eur:5}]);
+ assert.equal((await searchNationalRetailCatalog(adapter as never,{retailBanner:"supervalu",query:"I'm looking for Aveeno Skin Relief Body Lotion (200 ml)",intent:"stock"}))[0]?.sku,"lotion");
+});
+
+it("withholds conflicting prices for indistinguishable catalogue names",async()=>{
+ const base={product_name:"Barry's Tea Original Blend 80 Bags (250 g)",brand:"Barry's Tea",department:"Tea Bags",service_area:"grocery",fulfilment:"prepack",is_alcohol:false,search_text:"barry's tea original blend 80 bags 250 g",national_store_count:3};
+ const rows=[{...base,id:"one",sku:"one",national_regular_price_eur:3.99},{...base,id:"two",sku:"two",national_regular_price_eur:4.19}];
+ const matches=await searchNationalRetailCatalog(makeSupabaseRows(rows) as never,{retailBanner:"supervalu",query:base.product_name,intent:"price"});
+ assert.equal(matches.length,2);
+ for(const match of matches){assert.equal(match.currentPriceEur,null);assert.equal(match.priceConflict,true);assert.match(match.quoteText,/price needs confirmation/);assert.doesNotMatch(match.quoteText,/3\.99|4\.19/);}
+});

@@ -1312,3 +1312,30 @@ it("scopes dairy, baby and wine offer browses to their departments", () => {
     assert.deepEqual(searchSyncedWeeklyOffersInRows(rows, `${department} offers`).map(x => x.productName), [rows.find(x => x.id === department)!.product_name]);
   }
 });
+
+it("retrieves a specific offer rather than substituting ingredient departments or broad samples", () => {
+  const names=["Kinetica Strawberry Protein Milkshake (330 ml)","Tayto Occassions Cheese & Onion (125 g)","Dreamies with Salmon Cat Treats (60 g)","Cadbury Dairy Milk Mint Crisp Chocolate Bar (54 g)"];
+  const rows=names.map((name,index)=>mockOfferRow({id:String(index),product_name:name,search_text:name.toLowerCase(),department:"Grocery",service_area:"grocery",fulfilment:"prepack",current_price_eur:2.5,discount_label:"Rewards Price Only €2.50"}));
+  for (const [index,name] of names.entries()) {
+    assert.equal(inferWeeklyOfferServiceAreaFromQuery(name),null);
+    for(const query of [`Any offers on ${name}?`,`${name} Rewards Price`]) {
+      const matches=searchSyncedWeeklyOffersInRows(rows,query);
+      assert.equal(matches[0]?.id,String(index),query);
+      assert.equal(matches[0]?.discountLabel,"Rewards Price Only €2.50");
+    }
+  }
+  assert.deepEqual(searchSyncedWeeklyOffersInRows(rows,`Any offers on ${names[0]}?`,{serviceArea:"fish"}),[]);
+});
+it("recomputes Dublin offer dates when a reused reference date changes",()=>{
+  const row={offer_week_start:"2026-10-01",offer_week_end:"2026-10-07"};
+  const reference=new Date("2026-09-30T22:59:59Z");
+  assert.equal(isRetailOfferWeekActive(row,reference),false);
+  reference.setTime(Date.parse("2026-09-30T23:00:00Z"));
+  assert.equal(isRetailOfferWeekActive(row,reference),true);
+});
+
+it("does not turn a product pack count into a Rewards price-only browse",()=>{
+ assert.equal(inferRewardsPricePointFromQuery("Kinetica Strawberry Protein Milkshake (330 ml) Rewards Price"),null);
+ assert.equal(inferRewardsPricePointFromQuery("Kinetica Strawberry Protein Milkshake (330 ml) Rewards Price Only €2.50"),null);
+ assert.equal(inferRewardsPricePointFromQuery("Rewards Price for €2.50"),2.5);
+});

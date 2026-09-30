@@ -74,6 +74,9 @@ function catalogRankingBoost(input: {
   const normalizedDepartment = normalizeSearchText(input.department ?? "");
   const phrase = tokens.join(" ");
   let boost = 0;
+  const requestedName = normalizeSearchText(input.query.replace(/^(?:have (?:ye|you) got|how much is|(?:i['’]?m|i am) looking for)\s+/i, "")).replace(/[^a-z0-9]/g, "");
+  const compactName = normalizedName.replace(/[^a-z0-9]/g, "");
+  if (requestedName === compactName) boost += 1000;
 
   if (phrase && normalizedName.includes(phrase)) boost += 3;
   if (phrase && normalizedDepartment.includes(phrase)) boost += 4;
@@ -254,6 +257,9 @@ export async function searchNationalRetailCatalog(
       if ((data ?? []).length < pageSize) break;
     }
     const relevantRows = rows.filter((row) => {
+      const compactQuery = normalizeSearchText(input.query).replace(/[^a-z0-9]/g, "");
+      const compactName = normalizeSearchText(row.product_name).replace(/[^a-z0-9]/g, "");
+      if (compactName.length >= 4 && compactQuery.includes(compactName)) return true;
       if (
         queryRequestsSupervaluBrand(input.query) &&
         !(
@@ -272,31 +278,42 @@ export async function searchNationalRetailCatalog(
     }
   }
 
+  const identityKey = (name: string) => normalizeSearchText(name).replace(/[^a-z0-9]/g, "");
+  const identityPrices = new Map<string, Set<number | null>>();
+  for (const row of candidateRows) {
+    const key = identityKey(row.product_name);
+    const prices = identityPrices.get(key) ?? new Set<number | null>();
+    prices.add(row.national_regular_price_eur); identityPrices.set(key, prices);
+  }
+
   return candidateRows
     .map((row) => {
       const score = scoreSupervaluSearchText(
         normalizeSearchText(row.search_text),
         tokens,
         row.department,
-      ) + catalogRankingBoost({
+      ) + (normalizeSearchText(input.query).replace(/[^a-z0-9]/g, "").includes(normalizeSearchText(row.product_name).replace(/[^a-z0-9]/g, "")) ? 100 : 0) + catalogRankingBoost({
         query: input.query,
         productName: row.product_name,
         brand: row.brand,
         department: row.department,
       });
+      const priceConflict = (identityPrices.get(identityKey(row.product_name))?.size ?? 0) > 1;
+      const safePrice = priceConflict ? null : row.national_regular_price_eur;
       return {
+        priceConflict,
         productName: row.product_name,
         department: row.department,
         sku: row.sku,
-        currentPriceEur: row.national_regular_price_eur,
+        currentPriceEur: safePrice,
         wasPriceEur: null,
         discountLabel: null,
         isOnOffer: false,
         score,
-        quoteText: formatCatalogStockQuote({
+        quoteText: (priceConflict ? "The catalogue has conflicting prices for this named product, so its price needs confirmation. " : "") + formatCatalogStockQuote({
           productName: row.product_name,
           department: row.department,
-          currentPriceEur: row.national_regular_price_eur,
+          currentPriceEur: safePrice,
           wasPriceEur: null,
           discountLabel: null,
           isOnOffer: false,

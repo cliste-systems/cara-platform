@@ -255,6 +255,7 @@ export type SupervaluCatalogProduct = {
 };
 
 export type SupervaluCatalogMatch = {
+  priceConflict?: boolean;
   productName: string;
   department: string;
   sku: string | null;

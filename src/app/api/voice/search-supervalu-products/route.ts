@@ -197,6 +197,7 @@ export async function POST(request: Request) {
   });
 
   const mappedMatches = matches.map((match) => ({
+    price_conflict: match.priceConflict === true,
     product_name: match.productName,
     department: match.department,
     sku: match.sku,
