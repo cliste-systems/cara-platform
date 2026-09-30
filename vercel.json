@@ -26,6 +26,14 @@
     {
       "path": "/api/cron/sub-processor-notify",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/supervalu-offers-sync",
+      "schedule": "0 4 * * 4"
+    },
+    {
+      "path": "/api/cron/supervalu-offers-sync-retry",
+      "schedule": "0 6 * * 5"
     }
   ]
 }
