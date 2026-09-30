@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireAdminSessionUser } from "@/lib/admin-session";
+import { requireAdminPermission } from "@/lib/admin-session";
 import {
   generateTextRehearsalVariants,
   type TextRehearsalVariantCount,
@@ -18,7 +18,7 @@ const ALLOWED_COUNTS = new Set<TextRehearsalVariantCount>([5, 10, 20]);
 
 export async function POST(request: Request) {
   try {
-    await requireAdminSessionUser();
+    await requireAdminPermission("calls");
   } catch {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }

@@ -56,7 +56,7 @@ import {
   invalidateStoreTransferVerification,
   setStoreTransferVerificationPending,
 } from "@/lib/transfer-verification-db";
-import { requireAdminSessionUser } from "@/lib/admin-session";
+import { requireAdminPermission } from "@/lib/admin-session";
 import { searchRetailWeeklyOffers } from "@/lib/retail-weekly-offers-search";
 import {
   loadLatestSupervaluOfferSyncMeta,
@@ -149,7 +149,7 @@ function revalidateAll(orgId: string) {
 }
 
 async function adminClient() {
-  await requireAdminSessionUser();
+  await requireAdminPermission("customers");
   return createAdminClient();
 }
 
@@ -1056,7 +1056,7 @@ export async function refreshSupervaluWeeklyOffers(): Promise<
     }
   | { ok: false; message: string }
 > {
-  await requireAdminSessionUser();
+  await requireAdminPermission("customers");
   let admin: ReturnType<typeof createAdminClient>;
   try {
     admin = createAdminClient();
@@ -1092,7 +1092,7 @@ export async function previewSupervaluWeeklyOfferSearch(
     }
   | { ok: false; message: string }
 > {
-  await requireAdminSessionUser();
+  await requireAdminPermission("customers");
   const admin = await adminClient();
   try {
     const matches = await searchRetailWeeklyOffers(admin, "supervalu", query);

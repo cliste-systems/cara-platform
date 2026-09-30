@@ -1,3 +1,4 @@
+import { requireAdminPermission } from "@/lib/admin-session";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LifeBuoy } from "lucide-react";
@@ -79,6 +80,7 @@ function messagePreview(body: string, maxLen = 120): string {
 }
 
 export default async function AdminSupportPage() {
+  await requireAdminPermission("support");
   let tickets: SupportTicketAdminRow[] = [];
   let loadError: string | null = null;
 

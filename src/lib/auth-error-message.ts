@@ -3,6 +3,16 @@ export function describeAuthCallbackError(
   message: string | undefined
 ): string | null {
   if (!error) return null;
+  if (error === "session_expired") {
+    if (message) {
+      try {
+        return decodeURIComponent(message);
+      } catch {
+        // Use the clear sign-in recovery message below for malformed parameters.
+      }
+    }
+    return "Your session has expired. Sign in again to continue, or ask the workspace owner for a new invitation if you haven’t set your password yet.";
+  }
   if (error === "session") {
     if (message) {
       try {

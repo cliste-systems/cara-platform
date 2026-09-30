@@ -20,18 +20,18 @@ export function OpenDashboardButton({
 
   const open = useCallback(() => {
     setError(null);
+    // Open during the click gesture so browsers do not block an async popup.
+    const popup = window.open("about:blank", "_blank");
+    if (popup) popup.opener = null;
     startTransition(async () => {
-      const result = await createSupportDashboardLink(
-        organizationId,
-        typeof window !== "undefined" ? window.location.origin : null,
-      );
-      if (!result.ok) {
-        setError(result.message);
-        return;
-      }
-      const w = window.open(result.url, "_blank", "noopener,noreferrer");
-      if (!w) {
-        window.location.assign(result.url);
+      try {
+        const result = await createSupportDashboardLink(organizationId, window.location.origin);
+        if (!result.ok) { popup?.close(); setError(result.message); return; }
+        if (popup) popup.location.replace(result.url);
+        else window.location.assign(result.url);
+      } catch {
+        popup?.close();
+        setError("Client dashboard could not be opened. Please try again.");
       }
     });
   }, [organizationId]);
@@ -46,7 +46,7 @@ export function OpenDashboardButton({
         onClick={open}
       >
         <LogIn className="size-4" aria-hidden />
-        {pending ? "Opening…" : "Open dashboard as tenant"}
+        {pending ? "Opening…" : "Open client dashboard"}
       </Button>
       {error ? (
         <p className="text-destructive text-xs" role="alert">

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { clientSlug, type ClientAccountOption } from "@/lib/admin-client-account";
 import { adminCustomerPath } from "@/lib/admin-route-paths";
+import { ADMIN_PROVISIONING_NICHES, ORGANIZATION_NICHE_ADMIN_LABELS, type AdminProvisioningNiche } from "@/lib/organization-niche";
 import { cn } from "@/lib/utils";
 import { createOrganization, listClientAccounts, resendOrganizationInvite, type CreateOrganizationResult } from "./actions";
 
@@ -25,17 +26,12 @@ export function NewClientDialog() {
   const [address, setAddress] = useState("");
   const [eircode, setEircode] = useState("");
   const [assignPhone, setAssignPhone] = useState(true);
-  const [accountMode, setAccountMode] = useState<"new" | "existing">("new");
+  const [niche, setNiche] = useState<AdminProvisioningNiche>("retail");
   const [accounts, setAccounts] = useState<ClientAccountOption[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(false);
   const [accountsError, setAccountsError] = useState<string | null>(null);
   const [accountId, setAccountId] = useState("");
   const [accountSearch, setAccountSearch] = useState("");
-  const [accountName, setAccountName] = useState("");
-  const [billingEmail, setBillingEmail] = useState("");
-  const [billingContact, setBillingContact] = useState("");
-  const [billingAddress, setBillingAddress] = useState("");
-  const [vatNumber, setVatNumber] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
   const [ownerMobile, setOwnerMobile] = useState("");
@@ -43,8 +39,8 @@ export function NewClientDialog() {
   const [result, setResult] = useState<Extract<CreateOrganizationResult, { ok: true }> | null>(null);
   const [pending, startTransition] = useTransition();
   const selectedAccount = accounts.find((account) => account.id === accountId);
-  const organisationName = accountMode === "new" ? accountName : selectedAccount?.name ?? "";
-  const invoiceEmail = accountMode === "new" ? billingEmail : selectedAccount?.billing_email || billingEmail;
+  const organisationName = selectedAccount?.name ?? "";
+  const invoiceEmail = selectedAccount?.billing_email || "";
   const filteredAccounts = accounts.filter((account) => `${account.name} ${account.billing_email ?? ""}`.toLowerCase().includes(accountSearch.toLowerCase()));
 
   async function loadAccounts() {
@@ -63,8 +59,7 @@ export function NewClientDialog() {
 
   function reset() {
     setStep(0); setName(""); setSlug(""); setAddress(""); setEircode(""); setAssignPhone(true);
-    setAccountMode("new"); setAccountId(""); setAccountSearch(""); setAccountName("");
-    setBillingEmail(""); setBillingContact(""); setBillingAddress(""); setVatNumber("");
+    setNiche("retail"); setAccountId(""); setAccountSearch("");
     setOwnerName(""); setOwnerEmail(""); setOwnerMobile(""); setError(null); setResult(null);
   }
 
@@ -73,13 +68,10 @@ export function NewClientDialog() {
     startTransition(async () => {
       try {
         const created = await createOrganization({
-          name, slug: slug.trim() || clientSlug(name), tier: "native", niche: "retail",
+          name, slug: slug.trim() || clientSlug(name), tier: "native", niche,
           ownerName, ownerEmail, ownerMobile, address, storefrontEircode: eircode,
           assignPhoneNumber: assignPhone,
-          account: accountMode === "existing" ? { mode: "existing", id: accountId, billingEmail, billingAddress } : {
-            mode: "new", name: accountName, billingEmail, billingAddress,
-            billingContactName: billingContact, billingVatNumber: vatNumber,
-          },
+          account: { mode: "existing", id: accountId },
           clientOrigin: window.location.origin,
         });
         if (!created.ok) setError(created.message);
@@ -113,7 +105,7 @@ export function NewClientDialog() {
       <DialogTrigger render={<Button type="button" variant="outline" className="shrink-0 bg-white shadow-sm" />}>New client</DialogTrigger>
       <DialogContent showCloseButton={!pending} className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader className="pr-7">
-          <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"><Store className="size-4" /> Retail onboarding</div>
+          <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"><Store className="size-4" /> Client setup</div>
           <DialogTitle className="text-2xl font-semibold tracking-tight">{result ? "Store created" : "Add a new client"}</DialogTitle>
           <DialogDescription>{result ? "The store and its organisation details are saved." : "Add the store, connect its organisation, then invite your client."}</DialogDescription>
         </DialogHeader>
@@ -152,6 +144,7 @@ export function NewClientDialog() {
             </ol>
             <fieldset disabled={pending} className="min-w-0 space-y-5 pb-5">
               {step === 0 && <>
+                <div className="space-y-2"><Label htmlFor={`${id}-niche`}>Business niche</Label><select id={`${id}-niche`} className={controlClass} value={niche} onChange={(event) => setNiche(event.target.value as AdminProvisioningNiche)}>{ADMIN_PROVISIONING_NICHES.map((value) => <option key={value} value={value}>{ORGANIZATION_NICHE_ADMIN_LABELS[value]}</option>)}</select></div>
                 <div className="space-y-2"><Label htmlFor={`${id}-name`}>Store name</Label><Input id={`${id}-name`} value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} placeholder="Murphy’s SuperValu Killarney" autoFocus /></div>
                 <div className="space-y-2"><Label htmlFor={`${id}-address`}>Store address <span className="font-normal text-slate-400">(optional)</span></Label><Input id={`${id}-address`} value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Street, town, county" /></div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -161,28 +154,16 @@ export function NewClientDialog() {
                 <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4"><input type="checkbox" className="mt-1" checked={assignPhone} onChange={(event) => setAssignPhone(event.target.checked)} /><span><span className="block font-medium">Assign an Irish phone number</span><span className="mt-1 block text-xs leading-relaxed text-slate-500">Use an available number from the phone pool. Cara stays offline while the store is being configured.</span></span></label>
               </>}
               {step === 1 && <>
-                <div><h3 className="font-semibold">Who owns this store?</h3><p className="mt-1 text-sm text-slate-500">Use the legal company or group name. One organisation can own several stores and share invoice details.</p></div>
-                <div className="grid grid-cols-2 gap-3">
-                  {(["new", "existing"] as const).map((mode) => <label key={mode} className={cn("flex cursor-pointer items-center gap-2 rounded-xl border p-3 text-sm font-medium", accountMode === mode ? "border-slate-700 bg-slate-50" : "border-slate-200")}><input type="radio" name={`${id}-mode`} value={mode} checked={accountMode === mode} onChange={() => setAccountMode(mode)} />{mode === "new" ? "Create organisation" : "Select existing"}</label>)}
-                </div>
-                {accountMode === "existing" ? <div className="space-y-3">
-                  {accountsLoading ? <p className="text-sm text-slate-500" role="status">Loading organisations…</p> : accountsError ? <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800"><p>{accountsError}</p><Button type="button" variant="outline" className="mt-2" onClick={() => void loadAccounts()}>Try again</Button></div> : accounts.length === 0 ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">No active organisations with invoice billing are available yet. Choose Create organisation to add one.</p> : <>
+                <div><h3 className="font-semibold">Who owns this store?</h3><p className="mt-1 text-sm text-slate-500">Use the legal company or group name. One organisation can own several stores and share invoice details.</p><Link href="/admin/organisations" className="mt-2 inline-block text-sm underline">Manage organisations</Link><Button type="button" variant="ghost" size="sm" onClick={() => void loadAccounts()}>Refresh list</Button></div>
+                <div className="space-y-3">
+                  {accountsLoading ? <p className="text-sm text-slate-500" role="status">Loading organisations…</p> : accountsError ? <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800"><p>{accountsError}</p><Button type="button" variant="outline" className="mt-2" onClick={() => void loadAccounts()}>Try again</Button></div> : accounts.length === 0 ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">No organisations are available yet. Create one on the Organisations page, then return here.</p> : <>
                     <div className="space-y-2"><Label htmlFor={`${id}-search`}>Find an organisation</Label><Input id={`${id}-search`} type="search" placeholder="Search by name or invoice email" value={accountSearch} onChange={(event) => setAccountSearch(event.target.value)} /></div>
-                    <div className="space-y-2"><Label htmlFor={`${id}-account`}>Organisation</Label><select id={`${id}-account`} className={controlClass} value={accountId} onChange={(event) => { setAccountId(event.target.value); setBillingEmail(""); setBillingAddress(""); }} required><option value="">Select an organisation</option>{filteredAccounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.storeCount} {account.storeCount === 1 ? "store" : "stores"}</option>)}</select></div>
+                    <div className="space-y-2"><Label htmlFor={`${id}-account`}>Organisation</Label><select id={`${id}-account`} className={controlClass} value={accountId} onChange={(event) => { setAccountId(event.target.value); }} required><option value="">Select an organisation</option>{filteredAccounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.storeCount} {account.storeCount === 1 ? "store" : "stores"}</option>)}</select></div>
+                    {selectedAccount && (!selectedAccount.billing_email || !selectedAccount.billing_address) && <p role="alert" className="text-sm text-amber-800">Complete the invoice email and billing address in Organisations before adding this business.</p>}
                     {filteredAccounts.length === 0 && <p className="text-xs text-slate-500">No organisations match this search.</p>}
-                    {selectedAccount && !selectedAccount.billing_email?.trim() && <div className="space-y-2"><Label htmlFor={`${id}-existing-email`}>Organisation invoice email</Label><Input id={`${id}-existing-email`} type="email" required value={billingEmail} onChange={(event) => setBillingEmail(event.target.value)} placeholder="accounts@company.ie" /></div>}
-                    {selectedAccount && !selectedAccount.billing_address?.trim() && <div className="space-y-2"><Label htmlFor={`${id}-existing-address`}>Organisation billing address</Label><textarea id={`${id}-existing-address`} required rows={2} className={cn(controlClass, "h-auto py-2")} value={billingAddress} onChange={(event) => setBillingAddress(event.target.value)} placeholder="Registered company address, including Eircode" /></div>}
                     {selectedAccount && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm"><p className="font-medium">{selectedAccount.name}</p><p className="mt-1 text-slate-600">{selectedAccount.billing_email || "Invoice email not yet recorded"}</p><p className="mt-1 whitespace-pre-line text-slate-500">{selectedAccount.billing_address || "Billing address not yet recorded"}</p><p className="mt-3 text-xs text-slate-500">This store will share the organisation’s invoice billing details.</p></div>}
                   </>}
-                </div> : <>
-                  <div className="space-y-2"><Label htmlFor={`${id}-company`}>Legal organisation name</Label><Input id={`${id}-company`} value={accountName} onChange={(event) => setAccountName(event.target.value)} placeholder="Murphy Retail Group Ltd" required maxLength={200} /></div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2"><Label htmlFor={`${id}-billing-email`}>Invoice email</Label><Input id={`${id}-billing-email`} type="email" value={billingEmail} onChange={(event) => setBillingEmail(event.target.value)} required placeholder="accounts@company.ie" /></div>
-                    <div className="space-y-2"><Label htmlFor={`${id}-billing-contact`}>Billing contact <span className="font-normal text-slate-400">(optional)</span></Label><Input id={`${id}-billing-contact`} value={billingContact} onChange={(event) => setBillingContact(event.target.value)} placeholder="Accounts team" /></div>
-                  </div>
-                  <div className="space-y-2"><Label htmlFor={`${id}-billing-address`}>Billing address</Label><textarea id={`${id}-billing-address`} value={billingAddress} onChange={(event) => setBillingAddress(event.target.value)} required rows={2} className={cn(controlClass, "h-auto py-2")} placeholder="Registered company address, including Eircode" /></div>
-                  <div className="space-y-2"><Label htmlFor={`${id}-vat`}>VAT number <span className="font-normal text-slate-400">(optional)</span></Label><Input id={`${id}-vat`} value={vatNumber} onChange={(event) => setVatNumber(event.target.value)} placeholder="IE…" /></div>
-                </>}
+                </div>
                 <div className="flex items-start gap-3 rounded-xl bg-slate-50 p-4"><FileText className="mt-0.5 size-4 shrink-0 text-slate-500" /><p className="text-xs leading-relaxed text-slate-600">Billing is by invoice for the organisation. No payment card is needed during client setup.</p></div>
               </>}
               {step === 2 && <>
@@ -199,7 +180,7 @@ export function NewClientDialog() {
             {error && <p className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">{error}</p>}
             <DialogFooter className="sm:justify-between">
               <Button type="button" variant="outline" disabled={pending} onClick={() => { setError(null); if (step > 0) setStep(step - 1); else setOpen(false); }}>{step > 0 && <ChevronLeft className="size-4" />}{step > 0 ? "Back" : "Cancel"}</Button>
-              <Button type="submit" disabled={pending || (step === 1 && accountMode === "existing" && (!selectedAccount || accountsLoading || Boolean(accountsError)))}>{pending ? "Creating client…" : step < 2 ? "Continue" : "Create client & send invitation"}</Button>
+              <Button type="submit" disabled={pending || (step === 1 && (!selectedAccount || !selectedAccount.billing_email || !selectedAccount.billing_address || accountsLoading || Boolean(accountsError)))}>{pending ? "Creating client…" : step < 2 ? "Continue" : "Create client & send invitation"}</Button>
             </DialogFooter>
           </form>
         )}

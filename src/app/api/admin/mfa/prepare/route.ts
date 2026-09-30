@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { canAccessAdminConsole } from "@/lib/admin-session";
+import { requireAdminMfaSetupSessionUser } from "@/lib/admin-session";
 import { createAdminClient } from "@/utils/supabase/admin";
-import { createClient } from "@/utils/supabase/server";
+import type { User } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,24 +10,11 @@ export const dynamic = "force-dynamic";
 const ADMIN_MFA_FRIENDLY_NAME = "Cliste Systems Admin";
 
 export async function POST() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return NextResponse.json(
-      { error: "Admin sign-in is required.", code: "session_required" },
-      { status: 401 },
-    );
-  }
-
-  if (!canAccessAdminConsole(user)) {
-    return NextResponse.json(
-      { error: "This account cannot access the admin console." },
-      { status: 403 },
-    );
+  let user: User;
+  try {
+    user = await requireAdminMfaSetupSessionUser();
+  } catch {
+    return NextResponse.json({ error: "An active staff sign-in is required.", code: "session_required" }, { status: 403 });
   }
 
   const admin = createAdminClient();

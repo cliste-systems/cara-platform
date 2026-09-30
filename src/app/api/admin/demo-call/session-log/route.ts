@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { loadAdminDemoCallSessionLog } from "@/lib/admin-demo-call";
-import { requireAdminSessionUser } from "@/lib/admin-session";
+import { requireAdminPermission } from "@/lib/admin-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
-    await requireAdminSessionUser();
+    await requireAdminPermission("calls");
   } catch {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }

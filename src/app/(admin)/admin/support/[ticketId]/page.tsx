@@ -1,3 +1,4 @@
+import { requireAdminPermission } from "@/lib/admin-session";
 import { notFound } from "next/navigation";
 import { LifeBuoy } from "lucide-react";
 
@@ -71,6 +72,7 @@ export default async function AdminSupportTicketPage({
 }: {
   params: Promise<{ ticketId: string }>;
 }) {
+  await requireAdminPermission("support");
   const { ticketId } = await params;
   if (!UUID_RE.test(ticketId)) notFound();
 

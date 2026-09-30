@@ -13,7 +13,7 @@ const checks = (): CallAnalysisCheck[] => CALL_ANALYSIS_QUESTIONS.map(q => ({
 }));
 const response = () => ({ summary: "Cara gave the location.", improvement: "No clear improvement from the verified transcript.", checks: checks() });
 
-test("seven questions have the intended good and bad polarity", () => {
+test("checklist questions have the intended good and bad polarity", () => {
   const positive = deriveCallAnalysisVerdict(response());
   assert.equal(positive.verdict, "pass");
   const unresolved = response(); unresolved.checks[0].answer = "no";
@@ -32,7 +32,7 @@ test("incomplete capture never shows a clean call", () => {
   const reviewed = groundCallAnalysis(parseCallAnalysisResult(response()), { ...input, diagnostics: { events: [] } });
   assert.equal(reviewed.verdict, "review");
   assert.equal(reviewed.checks.find(c => c.id === "resolved_request")?.answer, "unverified");
-  assert.equal(reviewed.checks.find(c => c.id === "tool_calls_failed")?.answer, "no");
+  assert.equal(reviewed.checks.find(c => c.id === "tool_calls_failed")?.answer, "unverified");
 });
 test("recorded tool failures override a model no answer", () => {
   const reviewed = groundCallAnalysis(parseCallAnalysisResult(response()), { ...input, diagnostics: { transcriptCapture: capture, events: [{ tag: "tool_failure", level: "error", message: "Lookup timed out" }] } });
@@ -44,4 +44,23 @@ test("a claimed problem without an exact saved excerpt is unverified", () => {
   raw.checks[1] = { ...raw.checks[1], answer: "yes", evidence: [{ source: "transcript", quote: "Caller yelled at Cara" }] };
   const reviewed = groundCallAnalysis(parseCallAnalysisResult(raw), input);
   assert.equal(reviewed.checks[1].answer, "unverified");
+});
+
+test("a technical failure makes an otherwise successful conversation fail", () => {
+  const reviewed = deriveCallAnalysisVerdict({ ...response(), technicalChecks: [{ id: "processing", label: "Processing", value: "Failed", expected: "Complete", status: "fail", detail: "Message delivery failed." }] });
+  assert.equal(reviewed.verdict, "fail");
+  assert.equal(reviewed.failedCount, 1);
+});
+test("missing audio evidence prevents an overall pass", () => {
+  const reviewed = deriveCallAnalysisVerdict({ ...response(), technicalChecks: [{ id: "audio", label: "Audio", value: "Not captured", expected: "Measured", status: "unknown", detail: "No audio measurement." }] });
+  assert.equal(reviewed.verdict, "review");
+});
+test("greeting-only readable dialogue cannot pass despite raw event counts", () => {
+  const reviewed = groundCallAnalysis(parseCallAnalysisResult(response()), { ...input, diagnostics: { transcriptCapture: { ...capture, readableConversationComplete: false }, events: [], toolEventCoverageComplete: true } });
+  assert.equal(reviewed.checks.find(c => c.id === "resolved_request")?.answer, "unverified");
+  assert.equal(reviewed.checks.find(c => c.id === "clarification_missing")?.answer, "unverified");
+});
+test("only explicit complete tool coverage can certify no tool failure", () => {
+  const reviewed = groundCallAnalysis(parseCallAnalysisResult(response()), { ...input, diagnostics: { transcriptCapture: capture, events: [], toolEventCoverageComplete: true } });
+  assert.equal(reviewed.checks.find(c => c.id === "tool_calls_failed")?.answer, "no");
 });

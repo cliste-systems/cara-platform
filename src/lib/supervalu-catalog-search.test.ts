@@ -327,7 +327,10 @@ describe("national product tool integration", () => {
     const calls: Record<string, unknown>[] = [];
     return {
       calls,
-      async rpc(_name: string, args: Record<string, unknown>) { calls.push(args); return { data: rpcRows, error: null }; },
+      rpc(_name: string, args: Record<string, unknown>) {
+        calls.push(args);
+        return { async abortSignal() { return { data: rpcRows, error: null }; } };
+      },
       from(table: string) {
         assert.equal(table, "retail_weekly_offers", "offer browse must not fall back to regular-price catalogue");
         const equals: Array<[string, unknown]> = [];
@@ -390,4 +393,17 @@ it("quotes catalog bundle mechanics independently of their single-item price", (
     assert.doesNotMatch(quote, /not showing as on offer|on offer.*at four|zero euro/i);
     if (currentPriceEur == null) assert.doesNotMatch(quote, /single item price/i);
   }
+});
+
+
+it("stops a repeated gateway page while comparing prices", async (t) => {
+  let requests = 0;
+  t.mock.method(globalThis, "fetch", async (_url, init) => {
+    requests += 1;
+    assert.ok(init?.signal, "the entire gateway lookup must have a deadline");
+    return Response.json({ items: Array.from({length: 100}, (_, i) => ({sku: `burger-${i}`, name: `Beef Burgers ${i}`, priceNumeric: 4, attributes: {altCategory: "Meat"}})) });
+  });
+  const matches = await searchSupervaluCatalogLive("cheapest burgers", {intent: "price"});
+  assert.equal(requests, 2);
+  assert.equal(matches.length, 100);
 });

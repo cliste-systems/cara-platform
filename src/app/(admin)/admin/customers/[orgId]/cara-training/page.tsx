@@ -1,3 +1,4 @@
+import { requireAdminPermission } from "@/lib/admin-session";
 import { notFound } from "next/navigation";
 import { BookOpenCheck } from "lucide-react";
 
@@ -15,6 +16,7 @@ type PageProps = {
 };
 
 export default async function ClientCaraTrainingPage({ params }: PageProps) {
+  await requireAdminPermission("customers");
   const { orgId } = await params;
 
   const client = await loadAdminClientDetail(orgId);

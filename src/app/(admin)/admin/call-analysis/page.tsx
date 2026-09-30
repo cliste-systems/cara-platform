@@ -9,7 +9,7 @@ import { AdminErrorCard, AdminPageShell } from "@/components/admin/admin-page-sh
 import { AdminStatsGrid } from "@/components/admin/admin-stats-grid";
 import { AdminStatCard } from "@/components/admin/admin-stat-card";
 import { adminTableBodyClass, adminTableClass, adminTableEmptyClass, adminTableHeadClass, adminTableRowClass, adminTableTdClass, adminTableTdDateClass, adminTableThClass } from "@/components/admin/admin-table";
-import { requireAdminMfaSessionUser } from "@/lib/admin-session";
+import { requireAdminPermission } from "@/lib/admin-session";
 import { adminCallAnalysisPath } from "@/lib/admin-route-paths";
 import { formatDurationLabel, formatE164ForDisplay } from "@/lib/call-history-types";
 import { PRODUCT_NAME } from "@/lib/company-details";
@@ -22,7 +22,7 @@ export const maxDuration = 300;
 export const metadata: Metadata = { title: `${PRODUCT_NAME} Admin — Call Analysis` };
 
 export default async function CallAnalysisPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; customer?: string }> }) {
-  await requireAdminMfaSessionUser();
+  await requireAdminPermission("calls");
   const filters = await searchParams;
   const query = typeof filters.q === "string" ? filters.q.trim().slice(0, 200) : "";
   const status = typeof filters.status === "string" && filters.status in ANALYSIS_STATUS_LABELS ? filters.status : "all";

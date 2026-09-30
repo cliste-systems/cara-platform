@@ -27,10 +27,12 @@ export type SupervaluGatewaySearchResponse = {
 
 export async function fetchSupervaluGatewayJson(
   url: string,
+  signal?: AbortSignal,
 ): Promise<SupervaluGatewaySearchResponse> {
   const response = await fetch(url, {
     headers: SUPERVALU_GATEWAY_STOREFRONT_HEADERS,
     cache: "no-store",
+    ...(signal ? { signal } : {}),
   });
   if (!response.ok) {
     throw new Error(`SuperValu gateway HTTP ${response.status} for ${url}`);
@@ -44,6 +46,7 @@ export async function fetchSupervaluGatewaySearch(input: {
   take?: number;
   skip?: number;
   promotionsOnly?: boolean;
+  signal?: AbortSignal;
 }): Promise<SupervaluGatewayProduct[]> {
   const storeId = input.storeId ?? SUPERVALU_STOREFRONT_STORE_ID;
   const take = input.take ?? SUPERVALU_GATEWAY_PAGE_SIZE;
@@ -52,6 +55,6 @@ export async function fetchSupervaluGatewaySearch(input: {
   const url =
     `${SUPERVALU_GATEWAY_BASE}/stores/${encodeURIComponent(storeId)}/search` +
     `?q=${encodeURIComponent(input.query)}&take=${take}&skip=${skip}${promoPart}`;
-  const payload = await fetchSupervaluGatewayJson(url);
+  const payload = await fetchSupervaluGatewayJson(url, input.signal);
   return payload.items ?? [];
 }

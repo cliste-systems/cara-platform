@@ -1,7 +1,10 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
+import { loadOriginalCallDialogue } from "@/lib/call-analysis-transcript";
 import { CALL_ANALYSIS_VERSION, getCallAnalysisModel, type CallAnalysisInput, type CallAnalysisVerdict } from "@/lib/call-analysis-simple";
+import { buildCallTechnicalHealth } from "@/lib/call-technical-health";
+import { deriveCallAnalysisVerdict } from "@/lib/call-analysis-simple";
 import { evaluateCallAnalysis } from "@/lib/call-analysis-openai";
 import { redactCallText } from "@/lib/transcript-redaction";
 import { isAdminDemoCallRow, isEngineerTestCallRow } from "@/lib/engineer-test-call";
@@ -30,7 +33,7 @@ function redactEvidence(value: unknown): unknown {
 function sanitizeDiagnostics(value: unknown): Record<string, unknown> | null {
   if (!object(value)) return null;
   // Exclude configuration blobs and derived test verdicts from primary evidence.
-  const keys = ["latency", "pipeline", "sessionFlags", "events", "greetingPlayed", "greetingSource", "disclosureConfirmed", "deploy", "toolLines", "transcriptCompleteness", "pipelineIncidents", "postprocessRan", "knowledgeGapCount", "knowledgeGaps", "greetingText", "capturedAtMs", "audioQuality", "transcriptCapture"];
+  const keys = ["latency", "pipeline", "sessionFlags", "events", "greetingPlayed", "greetingSource", "disclosureConfirmed", "deploy", "toolLines", "transcriptCompleteness", "pipelineIncidents", "postprocessRan", "knowledgeGapCount", "knowledgeGaps", "greetingText", "capturedAtMs", "audioQuality", "transcriptCapture", "toolEventCoverageComplete"];
   return redactEvidence(Object.fromEntries(keys.filter(key => key in value).map(key => [key, value[key]]))) as Record<string, unknown>;
 }
 
@@ -83,17 +86,24 @@ async function loadTranscriptCapture(admin: AdminClient, call: CallRow): Promise
     .order("updated_at", { ascending: false }).limit(1).maybeSingle();
   if (error) return { status: "unavailable", verificationError: "The persisted transcript capture could not be checked." };
   if (!capture) return null;
-  const [first, last, callers, assistants] = await Promise.all([
+  const [first, last, callers, assistants, dialogue] = await Promise.all([
     admin.from("call_transcript_events").select("seq", { count: "exact" }).eq("capture_id", capture.id).order("seq").limit(1),
     admin.from("call_transcript_events").select("seq").eq("capture_id", capture.id).order("seq", { ascending: false }).limit(1),
     admin.from("call_transcript_events").select("seq", { count: "exact", head: true }).eq("capture_id", capture.id).eq("speaker", "caller"),
     admin.from("call_transcript_events").select("seq", { count: "exact", head: true }).eq("capture_id", capture.id).eq("speaker", "assistant"),
+    loadOriginalCallDialogue(admin, capture.id),
   ]);
-  if (first.error || last.error || callers.error || assistants.error) return { status: "unavailable", verificationError: "The persisted transcript sequence could not be checked." };
+  if (first.error || last.error || callers.error || assistants.error || dialogue.error) return { status: "unavailable", verificationError: "The persisted transcript sequence could not be checked." };
   const count = first.count ?? 0;
   const firstSeq = first.data?.[0]?.seq;
   const lastSeq = last.data?.[0]?.seq;
+  const turns = dialogue.data ?? [];
+  const callerTurns = turns.filter(turn => turn.speaker === "caller").length;
+  const assistantTurns = turns.filter(turn => turn.speaker === "assistant").length;
+  const dialogueComplete = dialogue.complete && callerTurns > 0 && assistantTurns > 0 && !(callerTurns > 1 && assistantTurns <= 1);
   return {
+    originalDialogue: turns.map(turn => `${turn.speaker === "caller" ? "Caller" : "Assistant"}: ${turn.text ?? ""}`).join("\n\n"),
+    readableConversationComplete: dialogueComplete,
     status: capture.status,
     expectedEventCount: capture.expected_events,
     persistedEventCount: count,
@@ -135,9 +145,13 @@ async function loadEvidence(admin: AdminClient, call: CallRow, queue: QueueRow):
   if (historicalReport.error) diagnostics.historicalReportNote = "The historical call test report could not be loaded; that evidence is unavailable.";
   diagnostics.pipelineIncidents = redactEvidence(incidents.data);
   diagnostics.incidentListComplete = incidents.complete;
-  if (transcriptCapture) diagnostics.transcriptCapture = redactEvidence(transcriptCapture);
+  if (transcriptCapture) {
+    const { originalDialogue: _dialogue, ...captureMetadata } = transcriptCapture;
+    diagnostics.transcriptCapture = redactEvidence(captureMetadata);
+  }
   return {
-    transcript: redactCallText(queue.source_transcript ?? call.transcript ?? "").text ?? "",
+    transcript: redactCallText(typeof transcriptCapture?.originalDialogue === "string" && transcriptCapture.originalDialogue.trim()
+      ? transcriptCapture.originalDialogue : queue.source_transcript ?? call.transcript ?? "").text ?? "",
     diagnostics: Object.keys(diagnostics).length ? diagnostics : null,
     context: redactEvidence({
       businessKnowledgeBasis: "Current business settings at analysis time, NOT a historical snapshot. A difference from today's facts is not proof that a past answer was incorrect. Use tool results captured during the call for historical products and offers.",
@@ -216,9 +230,13 @@ export async function runCallAnalysis(callLogId: string, options: { admin?: Admi
     const { data: stillOwned, error: ownershipError } = await admin.from("call_analysis").select("call_log_id").eq("call_log_id", callLogId).eq("lease_token", leaseToken).maybeSingle();
     if (ownershipError) throw new Error("Call evidence could not be loaded. Please retry analysis.");
     if (!stillOwned) return { status: "skipped" };
+    const transport = call.room_name ? await admin.from("admin_call_transport_samples").select("sample", { count: "exact" }).eq("room_name", call.room_name).order("created_at").limit(1000) : null;
     const evaluated = await evaluateCallAnalysis(input);
+    evaluated.result = deriveCallAnalysisVerdict({ ...evaluated.result,
+      technicalChecks: buildCallTechnicalHealth(input.diagnostics, call.post_call_status, transport?.data?.map(row => row.sample) ?? [], !transport?.error && (transport?.count ?? 0) <= 1000),
+    });
     const { data: saved, error } = await admin.from("call_analysis").update({
-      status: "completed", result: redactEvidence({ ...evaluated.result,
+      status: "completed", source_transcript: input.transcript, result: redactEvidence({ ...evaluated.result,
         evidenceSnapshot: { diagnostics: input.diagnostics, context: input.context, call: input.call },
       }), verdict: evaluated.result.verdict,
       model: getCallAnalysisModel(), resolved_model: evaluated.model, checklist_version: CALL_ANALYSIS_VERSION,

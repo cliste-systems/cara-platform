@@ -71,15 +71,15 @@ export function AdminPageShell({
       ) : null}
 
       <header
-        className={cn("relative flex shrink-0 flex-wrap items-center justify-between gap-4 overflow-hidden rounded-xl border border-[#d9e2dd] bg-[#e7ede9] px-5 py-5 shadow-[0_1px_0_rgba(17,24,29,0.05),0_14px_34px_-28px_rgba(17,24,29,0.26)] sm:px-6 sm:py-6", compact && "py-3 sm:py-3")}
+        className={cn("relative flex shrink-0 flex-wrap items-center justify-between gap-4 overflow-hidden rounded-xl border border-[#e0e3e6] bg-[#ffffff] px-5 py-5 shadow-[0_1px_0_rgba(17,24,29,0.05),0_14px_34px_-28px_rgba(17,24,29,0.26)] sm:px-6 sm:py-6", compact && "py-3 sm:py-3")}
       >
         <div className="relative min-w-0">
           <h1 className="flex items-center gap-3 text-[24px] font-semibold leading-tight tracking-tight text-[#11181d] sm:text-[28px]">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-[#cfd9d4] bg-white/80 text-[#353d42]"><Icon className="size-[18px]" aria-hidden /></span>
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-[#e0e3e6] bg-white/80 text-[#353d42]"><Icon className="size-[18px]" aria-hidden /></span>
             {title}
           </h1>
           {description ? (
-            <p className="mt-2 max-w-3xl text-[13px] leading-5 text-[#5f6f68]">{description}</p>
+            <p className="mt-2 max-w-3xl text-[13px] leading-5 text-[#667078]">{description}</p>
           ) : null}
         </div>
         {actions ? <div className="relative flex shrink-0 items-center gap-2">{actions}</div> : null}
@@ -104,7 +104,7 @@ export function AdminPageEmptyState({
   return (
     <div
       className={cn(
-        "rounded-lg border border-dashed border-[#cfd9d4] bg-[#f6faf7] px-5 py-10 text-center text-sm text-[#6b7c75]",
+        "rounded-lg border border-dashed border-[#e0e3e6] bg-[#fafafa] px-5 py-10 text-center text-sm text-[#667078]",
         className,
       )}
     >

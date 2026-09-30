@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { loadSupervaluOffersSnapshot } from "@/lib/supervalu-offers-snapshot";
-import { requireAdminSessionUser } from "@/lib/admin-session";
+import { requireAdminPermission } from "@/lib/admin-session";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    await requireAdminSessionUser();
+    await requireAdminPermission("customers");
     const admin = createAdminClient();
     const snapshot = await loadSupervaluOffersSnapshot(admin);
     if (!snapshot) {

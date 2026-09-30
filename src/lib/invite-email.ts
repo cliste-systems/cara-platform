@@ -1,4 +1,6 @@
 import "server-only";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -82,10 +84,12 @@ export async function prepareInviteEmail(input: SendInviteEmailInput): Promise<P
 }
 
 export async function sendPreparedInviteEmail(prepared: PreparedInviteEmail): Promise<SendInviteEmailResult> {
-  const bodies = buildInviteEmailBodies({ ...prepared, logoUrl: inviteEmailLogoUrl() });
+  const bodies = buildInviteEmailBodies({ ...prepared, logoUrl: "cid:hellocara-logo" });
   try {
+    const logo = await readFile(path.join(process.cwd(), "public", PUBLIC_ASSETS.logo.slice(1)));
     const sent = await sendTransactionalEmail({
       to: prepared.email, ...bodies,
+      attachments: [{ filename: "hellocara.png", content: logo, contentId: "hellocara-logo" }],
       replyTo: { email: "support@hellocara.ie", name: "HelloCara Support" },
     });
     return sent.ok ? { ok: true, userId: prepared.userId } : sent;

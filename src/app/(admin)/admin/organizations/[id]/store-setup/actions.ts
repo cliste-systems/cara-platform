@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import { buildSecurityEventContext, logSecurityEvent } from "@/lib/security-events";
 
-import { requireAdminSessionUser } from "@/lib/admin-session";
+import { requireAdminPermission } from "@/lib/admin-session";
 import {
   callRoutingAllowsHumanTransfer,
   parseCallRoutingMode,
@@ -51,7 +53,7 @@ function revalidateOrg(orgId: string) {
 }
 
 async function adminClient() {
-  await requireAdminSessionUser();
+  await requireAdminPermission("customers");
   return createAdminClient();
 }
 
@@ -141,7 +143,7 @@ export async function assignStoreClisteNumber(
   organizationId: string,
 ): Promise<{ ok: true; e164: string } | { ok: false; message: string }> {
   if (!UUID_RE.test(organizationId)) return { ok: false, message: "Invalid id." };
-  await requireAdminSessionUser();
+  await requireAdminPermission("customers");
   const result = await provisionOrganizationPhoneNumber(organizationId);
   if (!result.ok) return result;
   revalidateOrg(organizationId);
@@ -152,7 +154,7 @@ export async function markDivertVerified(
   organizationId: string,
 ): Promise<ActionResult> {
   if (!UUID_RE.test(organizationId)) return { ok: false, message: "Invalid id." };
-  const user = await requireAdminSessionUser();
+  const user = await requireAdminPermission("customers");
   const admin = await adminClient();
 
   const { data: profile } = await admin
@@ -165,12 +167,15 @@ export async function markDivertVerified(
     .from("organizations")
     .update({
       divert_verified_at: new Date().toISOString(),
-      divert_verified_by: profile?.id ?? user.id,
+      divert_verified_by: profile?.id ?? null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", organizationId);
 
   if (error) return { ok: false, message: error.message };
+  await logSecurityEvent(buildSecurityEventContext(await headers()), {
+    eventType: "admin_store_divert_verified", outcome: "success", actorUserId: user.id, actorEmail: user.email, metadata: { organization_id: organizationId },
+  });
   revalidateOrg(organizationId);
   return { ok: true };
 }
@@ -611,7 +616,7 @@ export async function refreshSupervaluWeeklyOffers(): Promise<
     }
   | { ok: false; message: string }
 > {
-  await requireAdminSessionUser();
+  await requireAdminPermission("customers");
   let admin: ReturnType<typeof createAdminClient>;
   try {
     admin = createAdminClient();
@@ -643,7 +648,7 @@ export async function loadSupervaluWeeklyOffersAdminMeta(): Promise<{
   offerWeekStart: string | null;
   offerWeekEnd: string | null;
 }> {
-  await requireAdminSessionUser();
+  await requireAdminPermission("customers");
   const admin = await adminClient();
   return loadLatestSupervaluOfferSyncMeta(admin);
 }

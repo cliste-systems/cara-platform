@@ -1,3 +1,4 @@
+import { requireAdminPermission } from "@/lib/admin-session";
 import { Phone } from "lucide-react";
 
 import { AdminBadge } from "@/components/admin/admin-badge";
@@ -38,6 +39,7 @@ type PoolRow = {
 
 export default async function PhonePoolAdminPage() {
   const health = await poolHealthCheck();
+  await requireAdminPermission("customers");
   const admin = createAdminClient();
 
   const { data } = await admin

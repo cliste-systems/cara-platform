@@ -1,3 +1,4 @@
+import { requireAdminPermission } from "@/lib/admin-session";
 import type { Metadata } from "next";
 import { MessageSquareText } from "lucide-react";
 
@@ -14,6 +15,7 @@ export const metadata: Metadata = {
 };
 
 export default async function TextRehearsalAdminPage() {
+  await requireAdminPermission("calls");
   let loadError: string | null = null;
   let lines: Awaited<ReturnType<typeof loadAdminDemoCallLines>> = [];
 

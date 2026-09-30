@@ -3,7 +3,7 @@ import "server-only";
 import { CALL_MEDIA_RETENTION_MS } from "@/lib/call-media-retention";
 import type { CallAnalysisResult } from "@/lib/call-analysis-simple";
 import { CALL_ANALYSIS_VERSION } from "@/lib/call-analysis-simple";
-import { requireAdminMfaSessionUser } from "@/lib/admin-session";
+import { requireAdminPermission } from "@/lib/admin-session";
 import { ADMIN_SIM_CALLER_E164 } from "@/lib/admin-demo-call-lines";
 import { ADMIN_DEMO_ROOM_PREFIX, isAdminDemoCallRow, isEngineerTestCallRow } from "@/lib/engineer-test-call";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -80,7 +80,7 @@ function mapCall<Result extends AnalysisSummary>(row: CallRow, analysis: Analysi
 }
 
 export async function loadCallAnalysisList(): Promise<AnalysisCall[]> {
-  await requireAdminMfaSessionUser();
+  await requireAdminPermission("calls");
   const admin = createAdminClient();
   const [ordinary, demos] = await Promise.all([
     admin.from("call_logs")
@@ -129,7 +129,7 @@ export async function loadCallAnalysisList(): Promise<AnalysisCall[]> {
 }
 
 export async function loadCallAnalysisDetail(id: string): Promise<AnalysisCallDetail | null> {
-  await requireAdminMfaSessionUser();
+  await requireAdminPermission("calls");
   if (!CALL_ANALYSIS_ID_RE.test(id)) return null;
   const admin = createAdminClient();
   const [callResponse, analysisResponse] = await Promise.all([

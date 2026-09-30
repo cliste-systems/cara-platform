@@ -1,5 +1,7 @@
 "use server";
 
+import { ADMIN_PROVISIONING_NICHES } from "@/lib/organization-niche";
+
 import type { User } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
@@ -41,14 +43,14 @@ import {
   buildSecurityEventContext,
   logSecurityEvent,
 } from "@/lib/security-events";
-import { requireAdminSessionUser } from "@/lib/admin-session";
+import { requireAdminPermission } from "@/lib/admin-session";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-async function assertAdminOperator(): Promise<User> {
-  return requireAdminSessionUser();
+async function assertAdminOperator(permission: "customers" | "support" | "billing" | "team"): Promise<User> {
+  return requireAdminPermission(permission);
 }
 
 /**
@@ -231,7 +233,7 @@ function formatAuthError(message: string): string {
 export async function listClientAccounts(): Promise<
   { ok: true; accounts: ClientAccountOption[] } | { ok: false; message: string }
 > {
-  await assertAdminOperator();
+  await assertAdminOperator("customers");
   try {
     const admin = createAdminClient();
     const { data, error } = await admin.from("accounts")
@@ -270,7 +272,7 @@ export async function createOrganization(payload: {
   storefrontEircode?: string | null;
   clientOrigin?: string | null;
 }): Promise<CreateOrganizationResult> {
-  const operator = await assertAdminOperator();
+  const operator = await assertAdminOperator("customers");
   const name = payload.name.trim();
   const slug = payload.slug.trim().toLowerCase();
   const ownerEmail = payload.ownerEmail.trim().toLowerCase();
@@ -283,13 +285,12 @@ export async function createOrganization(payload: {
     return { ok: false, message: "Enter a store name and a valid store identifier (letters, numbers and hyphens)." };
   }
   if (!ownerName || !validEmail(ownerEmail)) return { ok: false, message: "Enter the client's name and a valid invitation email." };
-  if (payload.niche && payload.niche !== "retail") return { ok: false, message: "New clients must be retail stores." };
+  const niche = payload.niche ?? "retail";
+  if (!ADMIN_PROVISIONING_NICHES.some((available) => available === niche)) return { ok: false, message: "Select an available business niche." };
   const selection = payload.account;
-  if (!selection || !["new", "existing"].includes(selection.mode)) return { ok: false, message: "Create or select the legal organisation that owns this store." };
+  if (!selection || selection.mode !== "existing") return { ok: false, message: "Create the organisation in Organisations first, then select it for this business." };
   if (selection.mode === "existing" && !UUID_RE.test(selection.id)) return { ok: false, message: "Select a valid organisation." };
-  if (selection.mode === "new" && (!selection.name.trim() || !validEmail(selection.billingEmail.trim()) || !selection.billingAddress.trim())) {
-    return { ok: false, message: "The legal organisation name, invoice email and billing address are required." };
-  }
+
 
   let organizationId: string | null = null;
   let accountId: string | null = null;
@@ -298,7 +299,7 @@ export async function createOrganization(payload: {
     const admin = createAdminClient();
     const existingUser = await findClientAuthUser(admin, ownerEmail);
     await validateClientAccountUser(admin, existingUser, selection.mode === "existing" ? selection.id : null);
-    let accountName: string;
+    let accountName = "";
     let planTier: PlanTier = "pro";
     let isPrimaryLocation = true;
     let existingBillingUpdate: Record<string, string> | null = null;
@@ -310,8 +311,8 @@ export async function createOrganization(payload: {
       if (!account || account.status !== "active" || !supportsInvoiceClientSetup({ billingMethod: account.billing_method, subscriptionId: account.platform_subscription_id, storeNiches: account.organizations.map((store) => store.niche) })) {
         return { ok: false, message: "Select an active organisation with invoice billing. Refresh the organisation list and try again." };
       }
-      const invoiceEmail = account.billing_email?.trim() || selection.billingEmail?.trim().toLowerCase();
-      const invoiceAddress = account.billing_address?.trim() || selection.billingAddress?.trim();
+      const invoiceEmail = account.billing_email?.trim();
+      const invoiceAddress = account.billing_address?.trim();
       if (!invoiceEmail || !validEmail(invoiceEmail) || !invoiceAddress) return { ok: false, message: "Add the organisation’s invoice email and billing address before continuing." };
       existingBillingUpdate = { billing_method: "manual_invoice" };
       if (!account.billing_email?.trim()) existingBillingUpdate.billing_email = invoiceEmail;
@@ -322,22 +323,6 @@ export async function createOrganization(payload: {
       const { count, error: countError } = await admin.from("organizations").select("id", { count: "exact", head: true }).eq("account_id", account.id);
       if (countError) throw new Error(countError.message);
       isPrimaryLocation = count === 0;
-    } else {
-      accountName = selection.name.trim();
-      const { data: account, error } = await admin.from("accounts").insert({
-        name: accountName,
-        slug: `${clientSlug(accountName) || "organisation"}-${crypto.randomUUID().slice(0, 8)}`,
-        status: "active",
-        launch_status: "not_started",
-        plan_tier: planTier,
-        billing_method: "manual_invoice",
-        billing_email: selection.billingEmail.trim().toLowerCase(),
-        billing_contact_name: selection.billingContactName?.trim() || null,
-        billing_address: selection.billingAddress.trim(),
-        billing_vat_number: selection.billingVatNumber?.trim() || null,
-      }).select("id").single();
-      if (error || !account) throw new Error(error?.message ?? "Could not create the organisation.");
-      accountId = account.id;
     }
     if (existingBillingUpdate) {
       const { error: billingError } = await admin.from("accounts").update(existingBillingUpdate).eq("id", accountId);
@@ -352,7 +337,7 @@ export async function createOrganization(payload: {
       slug,
       tier: "native",
       plan_tier: planTier,
-      niche: "retail",
+      niche,
       status: "active",
       onboarding_step: 7,
       is_active: false,
@@ -367,8 +352,6 @@ export async function createOrganization(payload: {
       routing_links: buildRetailRoutePack({}),
     }).select("id").single();
     if (storeError || !store) {
-      // Only this request's unused parent may be removed. Existing organisations and users are never deleted.
-      if (selection.mode === "new") await admin.from("accounts").delete().eq("id", accountId);
       throw new Error(storeError?.message ?? "Could not save the store.");
     }
     organizationId = store.id;
@@ -429,7 +412,7 @@ export async function resendOrganizationInvite(
   organizationId: string,
   savedContact?: { email: string; name: string },
 ): Promise<ResendOrganizationInviteResult> {
-  const operator = await assertAdminOperator();
+  const operator = await assertAdminOperator("customers");
   const id = organizationId.trim();
   if (!UUID_RE.test(id)) return { ok: false, message: "Invalid store id." };
   try {
@@ -489,7 +472,7 @@ export async function updateOrganizationNiche(
   organizationId: string,
   niche: string,
 ): Promise<UpdateOrganizationNicheResult> {
-  await assertAdminOperator();
+  await assertAdminOperator("customers");
   const id = organizationId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid organization id." };
@@ -532,7 +515,7 @@ export type DeleteOrganizationResult =
 
 /** Remove a store without deleting logins that belong to the wider organisation. */
 export async function deleteOrganization(organizationId: string): Promise<DeleteOrganizationResult> {
-  const operator = await assertAdminOperator();
+  const operator = await assertAdminOperator("team");
   const id = organizationId.trim();
   if (!UUID_RE.test(id)) return { ok: false, message: "Invalid store id." };
   try {
@@ -585,7 +568,7 @@ export async function createSupportDashboardLink(
   organizationId: string,
   clientOrigin?: string | null
 ): Promise<SupportDashboardLinkResult> {
-  await assertAdminOperator();
+  await assertAdminOperator("team");
   const id = organizationId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid organization id." };
@@ -682,7 +665,7 @@ export type AdminCloseSupportTicketResult =
 export async function adminCloseSupportTicket(
   ticketId: string
 ): Promise<AdminCloseSupportTicketResult> {
-  await assertAdminOperator();
+  await assertAdminOperator("support");
   const id = ticketId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid ticket id." };
@@ -727,7 +710,7 @@ export async function adminReplyToSupportTicket(
   ticketId: string,
   body: string
 ): Promise<AdminReplySupportTicketResult> {
-  await assertAdminOperator();
+  await assertAdminOperator("support");
   const id = ticketId.trim();
   const text = body.trim();
   if (!UUID_RE.test(id)) {
@@ -800,7 +783,7 @@ export type AssignLivekitUsPhoneResult =
 export async function assignLivekitUsPhoneToOrganization(
   organizationId: string
 ): Promise<AssignLivekitUsPhoneResult> {
-  await assertAdminOperator();
+  await assertAdminOperator("customers");
   const id = organizationId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid organization id." };
@@ -916,7 +899,7 @@ export type AssignPoolPhoneResult =
 export async function assignPoolPhoneToOrganization(
   organizationId: string,
 ): Promise<AssignPoolPhoneResult> {
-  const operator = await assertAdminOperator();
+  const operator = await assertAdminOperator("customers");
   const id = organizationId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid organization id." };
@@ -950,7 +933,7 @@ export type ReleasePoolPhoneResult =
 export async function releasePoolPhoneFromOrganization(
   organizationId: string,
 ): Promise<ReleasePoolPhoneResult> {
-  const operator = await assertAdminOperator();
+  const operator = await assertAdminOperator("customers");
   const id = organizationId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid organization id." };
@@ -981,7 +964,7 @@ export type SendDivertCodesResult =
 export async function sendDivertCodesToOwner(
   organizationId: string,
 ): Promise<SendDivertCodesResult> {
-  const operator = await assertAdminOperator();
+  const operator = await assertAdminOperator("customers");
   const id = organizationId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid organization id." };
@@ -1062,7 +1045,7 @@ export async function sendDivertCodesToOwner(
 export async function retryTwilioIe1MessagingRegion(
   organizationId: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  await assertAdminOperator();
+  await assertAdminOperator("customers");
   const id = organizationId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid organization id." };
@@ -1117,7 +1100,7 @@ export async function updateOrganizationCallRouting(
     divertCarrier?: string;
   },
 ): Promise<UpdateCallRoutingResult> {
-  await assertAdminOperator();
+  await assertAdminOperator("customers");
   const id = organizationId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid organization id." };
@@ -1198,7 +1181,7 @@ export async function setOrganizationLive(
   organizationId: string,
   live: boolean,
 ): Promise<SetOrganizationLiveResult> {
-  const operator = await assertAdminOperator();
+  const operator = await assertAdminOperator("customers");
   const id = organizationId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid organization id." };
@@ -1244,6 +1227,7 @@ export async function setOrganizationLive(
   if (error) return { ok: false, message: error.message };
 
   revalidatePath(`/admin/organizations/${id}`);
+  revalidatePath(`/admin/customers/${id}`);
   revalidatePath("/admin/customers");
   await recordAdminEvent(operator, {
     eventType: live ? "admin_store_went_live" : "admin_store_taken_offline",
@@ -1262,7 +1246,7 @@ export async function updateAccountPlanTier(
   accountId: string,
   planTier: string,
 ): Promise<UpdateAccountPlanTierResult> {
-  const operator = await assertAdminOperator();
+  const operator = await assertAdminOperator("billing");
   const id = accountId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid account id." };

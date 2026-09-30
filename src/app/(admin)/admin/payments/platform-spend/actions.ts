@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireAdminSessionUser } from "@/lib/admin-session";
+import { requireAdminPermission } from "@/lib/admin-session";
 import { adminPaymentsPlatformSpendPath } from "@/lib/admin-route-paths";
 import {
   computeNextBillingDate,
@@ -41,7 +41,7 @@ function parseBillingCycle(raw: FormDataEntryValue | null): PlatformBillingCycle
 }
 
 async function assertAdmin() {
-  await requireAdminSessionUser();
+  await requireAdminPermission("billing");
 }
 
 function revalidatePlatformSpend() {

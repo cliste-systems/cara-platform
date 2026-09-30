@@ -23,12 +23,14 @@ export const dynamic = "force-dynamic";
 export default async function AuthenticatePage({
   searchParams,
 }: AuthenticatePageProps) {
+  const q = await searchParams;
   const user = await getAuthUserOrNull();
-  if (user) {
+  // Keep an explicit access error visible even if an old JWT still resolves a user.
+  // Disabled or revoked staff must be able to sign out or replace that session.
+  if (user && !q.error) {
     redirect("/auth/post-login");
   }
 
-  const q = await searchParams;
   const urlError = describeAuthCallbackError(q.error, q.message);
 
   return (
@@ -36,6 +38,7 @@ export default async function AuthenticatePage({
       <AuthParamForwarder />
       <AuthenticateFlow
         urlError={urlError}
+        showSignOut={Boolean(user && q.error)}
         showSignUpLink={isPublicSignupEnabled()}
       />
     </>

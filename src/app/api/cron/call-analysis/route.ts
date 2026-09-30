@@ -9,7 +9,7 @@ export const maxDuration = 300;
 
 /** Retry queued reviews and expired leases after an interrupted worker. */
 async function run(request: Request) {
-  const secret = process.env.CRON_SECRET?.trim();
+  const secret = process.env.CALL_ANALYSIS_CRON_SECRET?.trim() || process.env.CRON_SECRET?.trim();
   const authorization = request.headers.get("authorization");
   const bearer = authorization?.startsWith("Bearer ")
     ? authorization.slice(7).trim()

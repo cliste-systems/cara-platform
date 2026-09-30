@@ -1,265 +1,59 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
-import { Building2 } from "lucide-react";
-
-import {
-  clientProvisionSourceBadgeClass,
-  clientProvisionSourceDescription,
-  clientProvisionSourceLabel,
-} from "@/lib/client-provision-source";
-import { loadAdminClientDetail } from "@/lib/load-admin-clients";
-import { loadOrganizationProvisioning } from "@/lib/load-provisioning-pipeline";
-import { livekitUsNumbersEnabled } from "@/lib/livekit-us-numbers-flag";
-import {
-  ORGANIZATION_NICHE_ADMIN_LABELS,
-  parseOrganizationNiche,
-} from "@/lib/organization-niche";
-import { createAdminClient } from "@/utils/supabase/admin";
-
-import { adminCustomersPath } from "@/lib/admin-route-paths";
+import { Building2, ArrowUpRight, Phone, ShieldCheck, FileText, Activity, Headphones } from "lucide-react";
 import { AdminPageShell } from "@/components/admin/admin-page-shell";
-import { AccountPlanForm } from "@/app/(admin)/admin/organizations/[id]/account-plan-form";
-import { GoLiveCard } from "@/app/(admin)/admin/organizations/[id]/go-live-card";
-import { IrishPhoneCard } from "@/app/(admin)/admin/organizations/[id]/irish-phone-card";
-import { LiveKitPhoneCard } from "@/app/(admin)/admin/organizations/[id]/livekit-phone-card";
-import { OpenDashboardButton } from "@/app/(admin)/admin/organizations/[id]/open-dashboard-button";
-import { OrganizationNicheForm } from "@/app/(admin)/admin/organizations/[id]/organization-niche-form";
-import {
-  CaraTrainingLinkCard,
-  ProvisioningStepsRail,
-} from "@/app/(admin)/admin/organizations/[id]/retail-org-sections";
-import { TenantProvisioningStageChip } from "@/app/(admin)/admin/tenant-provisioning-chip";
-
+import { loadAdminBusinessOverview } from "@/lib/load-admin-business-overview";
+import { loadOrganizationProvisioning } from "@/lib/load-provisioning-pipeline";
+import { nicheAdminLabel } from "@/lib/organization-niche";
+import { LEGAL_DOCUMENT_LABELS, LEGAL_DOCUMENT_VERSIONS, requiredLegalDocuments } from "@/lib/legal-documents";
+import { OpenDashboardButton } from "../../organizations/[id]/open-dashboard-button";
+import { IrishPhoneCard } from "../../organizations/[id]/irish-phone-card";
+import { BusinessServiceControl, BusinessInviteButton, RefreshBusinessButton } from "./business-controls";
 export const dynamic = "force-dynamic";
-
-type PageProps = {
-  params: Promise<{ orgId: string }>;
-};
-
-function formatWhen(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("en-IE", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+const when = (value?: string | null) => value ? new Date(value).toLocaleString("en-IE", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Dublin" }) : "Not recorded";
+const label = (value?: string | null) => value?.replaceAll("_", " ") || "Not recorded";
+function Panel({ title, icon: Icon, children, action }: { title: string; icon: typeof Building2; children: ReactNode; action?: ReactNode }) {
+  return <section className="overflow-hidden rounded-xl border border-[#d9e2dd] bg-white"><header className="flex items-center justify-between gap-3 border-b border-[#e7ece9] px-5 py-4"><h2 className="flex items-center gap-2 text-sm font-semibold text-[#11181d]"><Icon className="size-4 text-[#78858b]" />{title}</h2>{action}</header><div className="p-5">{children}</div></section>;
 }
-
-function ManagedInviteCard({
-  ownerEmail,
-  inviteSentAt,
-  inviteAcceptedAt,
-}: {
-  ownerEmail: string | null;
-  inviteSentAt: string | null;
-  inviteAcceptedAt: string | null;
-}) {
-  return (
-    <section className="rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] p-5 shadow-[0_1px_0_rgba(17,24,29,0.05),0_14px_34px_-28px_rgba(17,24,29,0.32)]">
-      <h2 className="text-sm font-semibold text-gray-900">Owner invite</h2>
-      <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
-        <div>
-          <dt className="text-xs text-gray-500">Email</dt>
-          <dd className="font-medium text-gray-900">{ownerEmail ?? "—"}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-gray-500">Sent</dt>
-          <dd className="text-gray-700">{formatWhen(inviteSentAt)}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-gray-500">Accepted</dt>
-          <dd className="text-gray-700">{formatWhen(inviteAcceptedAt)}</dd>
-        </div>
-      </dl>
-    </section>
-  );
-}
-
-function SelfServeClientSummary({
-  client,
-}: {
-  client: NonNullable<Awaited<ReturnType<typeof loadAdminClientDetail>>>;
-}) {
-  return (
-    <>
-      <section className="rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] p-5 shadow-[0_1px_0_rgba(17,24,29,0.05),0_14px_34px_-28px_rgba(17,24,29,0.32)]">
-        <h2 className="text-sm font-semibold text-gray-900">Account summary</h2>
-        <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <dt className="text-xs text-gray-500">Account status</dt>
-            <dd className="capitalize text-gray-900">{client.accountStatus}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-gray-500">Plan</dt>
-            <dd className="capitalize text-gray-900">{client.planTier ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-gray-500">Org status</dt>
-            <dd className="capitalize text-gray-900">{client.orgStatus ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-gray-500">Subscription</dt>
-            <dd className="font-mono text-xs text-gray-700">
-              {client.platformSubscriptionId ?? "—"}
-            </dd>
-          </div>
-        </dl>
-      </section>
-
-      <section className="rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] p-5 shadow-[0_1px_0_rgba(17,24,29,0.05),0_14px_34px_-28px_rgba(17,24,29,0.32)]">
-        <h2 className="text-sm font-semibold text-gray-900">Onboarding progress</h2>
-        <p className="mt-2 text-sm text-gray-600">
-          Wizard step{" "}
-          <span className="font-medium text-gray-900">
-            {client.onboardingStep ?? 0}
-          </span>
-          . The client completes setup in their own dashboard.
-        </p>
-      </section>
-
-      <section className="rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] p-5 shadow-[0_1px_0_rgba(17,24,29,0.05),0_14px_34px_-28px_rgba(17,24,29,0.32)]">
-        <h2 className="text-sm font-semibold text-gray-900">Business snapshot</h2>
-        <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-xs text-gray-500">Phone</dt>
-            <dd className="text-gray-900">{client.phoneNumber ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-gray-500">Created</dt>
-            <dd className="text-gray-900">{formatWhen(client.createdAt)}</dd>
-          </div>
-        </dl>
-      </section>
-    </>
-  );
-}
-
-export default async function AdminClientDetailPage({ params }: PageProps) {
+function Datum({ title, children }: { title: string; children: ReactNode }) { return <div className="min-w-0"><dt className="text-xs text-slate-500">{title}</dt><dd className="mt-1 break-words text-sm text-[#263239]">{children}</dd></div>; }
+function Jump({ href, children }: { href: string; children: ReactNode }) { return <Link href={href} className="inline-flex items-center gap-1 text-xs font-medium text-[#353d42] underline-offset-4 hover:underline">{children}<ArrowUpRight className="size-3.5" /></Link>; }
+export default async function BusinessPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
-  const client = await loadAdminClientDetail(orgId);
-  if (!client) notFound();
-
-  let admin;
-  try {
-    admin = createAdminClient();
-  } catch (e) {
-    return (
-      <AdminPageShell icon={Building2} title="Customer" backHref={adminCustomersPath()} backLabel="Customers">
-        <p className="text-destructive text-sm">
-          {e instanceof Error ? e.message : "Admin client unavailable."}
-        </p>
-      </AdminPageShell>
-    );
-  }
-
-  const { data: org } = await admin
-    .from("organizations")
-    .select(
-      "id, name, slug, niche, phone_number, account_id, store_code, is_active",
-    )
-    .eq("id", orgId)
-    .maybeSingle();
-
-  if (!org) notFound();
-
-  const niche = parseOrganizationNiche(org.niche);
-  const isManaged = client.provisionSource === "managed";
-  const isRetail = niche === "retail";
-
-  const shellProps = {
-    icon: Building2,
-    title: client.name,
-    description: (
-      <>
-        {client.slug}{client.storeCode ? ` · store ${client.storeCode}` : ""} · {ORGANIZATION_NICHE_ADMIN_LABELS[niche]}
-        <span className="block text-xs">{clientProvisionSourceDescription(client.provisionSource)}</span>
-      </>
-    ),
-    backHref: adminCustomersPath(),
-    backLabel: "Customers",
-    actions: (
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={clientProvisionSourceBadgeClass(client.provisionSource)}>
-          {clientProvisionSourceLabel(client.provisionSource)}
-        </span>
-        {isManaged && client.provisioningStage ? (
-          <TenantProvisioningStageChip stage={client.provisioningStage} />
-        ) : null}
-        <OpenDashboardButton organizationId={orgId} />
-      </div>
-    ),
-  };
-
-  if (!isManaged) {
-    return (
-      <AdminPageShell {...shellProps}>
-        <SelfServeClientSummary client={client} />
-      </AdminPageShell>
-    );
-  }
-
-  if (isRetail) {
-    const provisioning = await loadOrganizationProvisioning(orgId);
-    const phoneStep = provisioning?.steps.find((s) => s.id === "phone_assigned");
-    const caraTrainingStep = provisioning?.steps.find(
-      (s) => s.id === "cara_trained",
-    );
-    const clisteNumber = org.phone_number as string | null;
-
-    return (
-      <AdminPageShell {...shellProps}>
-        <ManagedInviteCard
-          ownerEmail={client.ownerEmail}
-          inviteSentAt={client.inviteSentAt}
-          inviteAcceptedAt={client.inviteAcceptedAt}
-        />
-        {provisioning ? (
-          <ProvisioningStepsRail steps={provisioning.steps} />
-        ) : null}
-        <IrishPhoneCard
-          organizationId={orgId}
-          phoneNumber={clisteNumber}
-          phoneAssignedComplete={phoneStep?.complete}
-        />
-        <CaraTrainingLinkCard
-          organizationId={orgId}
-          trainedComplete={caraTrainingStep?.complete}
-        />
-        <GoLiveCard
-          organizationId={orgId}
-          isActive={org.is_active === true}
-          readyForGoLive={provisioning?.readyForGoLive ?? false}
-          missingStepLabel={
-            provisioning
-              ? (provisioning.steps.find(
-                  (s) => s.id === "phone_assigned" && !s.complete,
-                )?.label ?? null)
-              : null
-          }
-        />
-      </AdminPageShell>
-    );
-  }
-
-  const accountId = org.account_id ?? null;
-  const planTier = client.planTier ?? "pro";
-  const showLivekit = livekitUsNumbersEnabled();
-
-  return (
-    <AdminPageShell {...shellProps}>
-      <ManagedInviteCard
-        ownerEmail={client.ownerEmail}
-        inviteSentAt={client.inviteSentAt}
-        inviteAcceptedAt={client.inviteAcceptedAt}
-      />
-      <IrishPhoneCard organizationId={orgId} phoneNumber={org.phone_number} />
-      {accountId ? (
-        <AccountPlanForm accountId={accountId} initialPlanTier={planTier} />
-      ) : null}
-      <OrganizationNicheForm organizationId={orgId} initialNiche={niche} />
-      {showLivekit ? (
-        <LiveKitPhoneCard organizationId={orgId} phoneNumber={org.phone_number} />
-      ) : null}
-    </AdminPageShell>
-  );
+  const data = await loadAdminBusinessOverview(orgId);
+  if (!data) notFound();
+  const { business: b, account, invite, owner } = data;
+  const provisioning = await loadOrganizationProvisioning(orgId);
+  const missing = provisioning?.steps.filter((step) => ["phone_assigned", "legal_acceptance"].includes(step.id) && !step.complete) ?? [];
+  const ready = Boolean(provisioning && missing.length === 0);
+  const agreements = requiredLegalDocuments(true).map((type) => ({ type, acceptance: data.agreements?.find((row) => row.user_id === invite?.user_id && row.document_type === type && row.document_version === LEGAL_DOCUMENT_VERSIONS[type] && row.authority_confirmed) }));
+  const accepted = agreements.every((item) => item.acceptance);
+  const hasAccount = Boolean(owner && !owner.needsPassword && owner.lastSignInAt);
+  return <AdminPageShell icon={Building2} title={b.name} description={<span>{nicheAdminLabel(b.niche)}{b.store_code ? ` · Store ${b.store_code}` : ""}<span className="mt-1 block text-sm">Part of {account ? <Link href={`/admin/organisations#${account.id}`} className="font-medium underline underline-offset-4">{account.name}</Link> : "an unlinked organisation"}</span></span>} backHref="/admin/customers" backLabel="Customers" actions={<div className="flex flex-wrap items-center gap-2"><RefreshBusinessButton /><Link href={`/admin/customers/${orgId}/cara-training`} className="rounded-md border border-[#d9e2dd] bg-white px-3 py-2 text-sm font-medium">Business configuration</Link>{data.isOwner && <OpenDashboardButton organizationId={orgId} />}</div>}>
+    {data.errors.length > 0 && <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Some data could not be loaded: {data.errors.join(", ")}. Refresh to try again.</p>}
+    <BusinessServiceControl id={orgId} active={b.is_active === true} ready={ready} reason={missing.length ? `Required to turn on: ${missing.map((step) => step.label.toLowerCase()).join(" and ")}.` : null} />
+    {data.canCalls && <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{[
+      ["Customer calls", data.callCount?.toLocaleString() ?? "Unavailable", "Last 30 days · excludes tests"],
+      ["Billable minutes", data.minutes?.toLocaleString("en-IE", { maximumFractionDigits: 1 }) ?? "Unavailable", "Last 30 days · recorded usage"],
+      ["Open follow-ups", data.openActions?.toLocaleString() ?? "Unavailable", "Customer requests awaiting action"],
+      ["Processing failures", data.failedCount?.toLocaleString() ?? "Unavailable", "Last 30 days · completed calls"],
+    ].map(([title, value, note]) => <div key={title} className="rounded-xl border border-[#d9e2dd] bg-white p-5"><p className="text-xs text-slate-500">{title}</p><p className="mt-2 text-2xl font-semibold tracking-tight text-[#11181d]">{value}</p><p className="mt-2 text-xs text-slate-400">{note}</p></div>)}</div>}
+    <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,1fr)]"><div className="space-y-5">
+      <Panel title="Client access" icon={ShieldCheck} action={invite ? <BusinessInviteButton id={orgId} /> : undefined}>
+        <div className="mb-5 flex flex-wrap gap-2"><span className={`rounded-full px-2.5 py-1 text-xs ${hasAccount ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>{hasAccount ? "Account set up" : owner?.needsPassword ? "Password pending" : "Account setup not confirmed"}</span><span className={`rounded-full px-2.5 py-1 text-xs ${accepted ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>{data.errors.includes("Agreements") ? "Agreements unavailable" : accepted ? "Agreements accepted" : "Agreements outstanding"}</span></div>
+        <dl className="grid gap-5 sm:grid-cols-2"><Datum title="Invited contact">{invite?.recipient_name || "Not recorded"}<span className="mt-1 block text-xs text-slate-500">{invite?.email || owner?.email}</span></Datum><Datum title="Invitation">{label(invite?.delivery_status)}<span className="mt-1 block text-xs text-slate-500">{when(invite?.sent_at)}</span></Datum><Datum title="Invitation accepted">{when(invite?.accepted_at)}</Datum><Datum title="Last sign-in">{when(owner?.lastSignInAt)}</Datum><Datum title="Email confirmed">{when(owner?.emailConfirmedAt)}</Datum><Datum title="Two-factor authentication">{owner ? owner.mfaEnabled ? "Enabled" : "Not enabled" : "Account not available"}</Datum></dl>
+        {invite?.delivery_error && <p className="mt-4 rounded-md bg-amber-50 p-3 text-xs text-amber-800">Invitation delivery needs attention. Resend the invitation to try again.</p>}
+        <div className="mt-5 border-t border-[#e7ece9] pt-4"><p className="mb-3 text-xs font-medium text-slate-500">Current organisation agreements · invited contact</p><div className="space-y-3">{agreements.map(({ type, acceptance }) => <div key={type} className="flex items-start justify-between gap-4 text-xs"><span>{LEGAL_DOCUMENT_LABELS[type]}<span className="mt-0.5 block text-slate-400">Version {LEGAL_DOCUMENT_VERSIONS[type]}</span></span><span className={`text-right ${acceptance ? "text-emerald-700" : "text-amber-700"}`}>{data.errors.includes("Agreements") ? "Unavailable" : acceptance ? `Accepted · ${when(acceptance.created_at)}` : "Not accepted"}{acceptance?.signatory_name && <span className="mt-0.5 block text-slate-500">{acceptance.signatory_name}{acceptance.signatory_role ? ` · ${acceptance.signatory_role}` : ""}</span>}</span></div>)}</div><p className="mt-4 text-xs leading-relaxed text-slate-500">{data.members ? `${data.members.length} organisation ${data.members.length === 1 ? "member has" : "members have"} access across its businesses.` : "Organisation membership unavailable."} Agreements are recorded against the organisation.</p></div>
+      </Panel>
+      {data.canCalls && <Panel title="Recent calls" icon={Activity}>
+        {data.calls?.length ? <div className="-mx-5 -my-5 divide-y divide-[#e7ece9]">{data.calls.map((call) => <Link key={call.id} href={`/admin/call-analysis/${call.id}`} className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-[#f7f9f8]"><div className="min-w-0"><p className="truncate text-sm font-medium">{call.caller_name || call.caller_number || "Unknown caller"}{(call.engineer_test_call || call.is_test_call) && <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">Test</span>}</p><p className="mt-1 text-xs text-slate-500">{when(call.created_at)} · {Math.round((call.duration_seconds ?? 0) / 60)} min</p></div><div className="shrink-0 text-right"><p className="text-xs capitalize">{label(call.call_resolution || call.outcome)}</p><ArrowUpRight className="ml-auto mt-1 size-3.5 text-slate-400" /></div></Link>)}</div> : <p className="text-sm text-slate-500">{data.calls ? "No calls recorded for this business yet." : "Call history unavailable."}</p>}
+      </Panel>}
+      {data.isOwner && <Panel title="Security activity" icon={ShieldCheck}><p className="mb-4 text-xs text-slate-500">Recent events for this business and its invited contact.</p>{data.security?.length ? <div className="space-y-4">{data.security.map((event) => <div key={event.id} className="flex justify-between gap-4"><div><p className="text-xs capitalize">{label(event.event_type)}</p><p className="mt-1 text-xs text-slate-400">{when(event.created_at)}{event.ip_masked ? ` · ${event.ip_masked}` : ""}</p></div><span className={`text-xs capitalize ${event.outcome === "success" ? "text-slate-500" : "text-amber-700"}`}>{label(event.outcome)}</span></div>)}</div> : <p className="text-sm text-slate-500">{data.security ? "No security events recorded yet." : "Security activity unavailable."}</p>}</Panel>}
+      {data.canSupport && <Panel title="Support tickets" icon={Headphones}>{data.support?.length ? <div className="space-y-4">{data.support.map((ticket) => <div key={ticket.id} className="flex justify-between gap-3"><div><Jump href={`/admin/support/${ticket.id}`}>{ticket.subject}</Jump><p className="mt-1 text-xs text-slate-400">{when(ticket.updated_at)}</p></div><span className="text-xs capitalize text-slate-500">{label(ticket.status)}</span></div>)}</div> : <p className="text-sm text-slate-500">{data.support ? "No support tickets for this business." : "Support history unavailable."}</p>}</Panel>}
+    </div><div className="space-y-5">
+      <Panel title="Phone & routing" icon={Phone}><dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1"><Datum title="Assigned HelloCara number"><span className="font-mono">{b.phone_number || "No number assigned"}</span></Datum><Datum title="Published business number">{b.store_public_number || "Not recorded"}</Datum><Datum title="Transfer / fallback number">{b.fallback_number || "Not recorded"}</Datum><Datum title="Routing mode"><span className="capitalize">{label(b.call_routing_mode)}</span></Datum><Datum title="Forwarding verified">{when(b.divert_verified_at)}</Datum><Datum title="Anonymous callers">{b.block_anonymous_callers ? "Blocked" : "Allowed"}</Datum></dl><details className="mt-5 border-t border-[#e7ece9] pt-4"><summary className="cursor-pointer text-xs font-medium">Manage assigned number</summary><div className="mt-4"><IrishPhoneCard organizationId={orgId} phoneNumber={b.phone_number} /></div></details></Panel>
+      {data.canBilling && <Panel title="Organisation billing" icon={FileText} action={<Jump href={`/admin/organisations#${b.account_id}`}>Details</Jump>}><p className="mb-4 text-xs leading-relaxed text-slate-500">Shared across all businesses in {account?.name || "this organisation"}.</p><dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1"><Datum title="Billing method">{account?.billing_method === "manual_invoice" ? "Invoice" : label(account?.billing_method)}</Datum><Datum title="Invoice email">{account?.billing_email || "Not recorded"}</Datum><Datum title="Plan / account status"><span className="capitalize">{label(account?.plan_tier)} · {label(account?.status)}</span></Datum></dl><div className="mt-5 border-t border-[#e7ece9] pt-4"><div className="mb-3 flex justify-between"><p className="text-xs font-medium text-slate-500">Latest invoices</p><Jump href="/admin/payments/platform-income">Billing</Jump></div>{data.invoices?.length ? <div className="space-y-3">{data.invoices.map((invoice) => <div key={invoice.id} className="flex justify-between gap-3 text-xs"><div><p>{invoice.number || "Unnumbered invoice"}</p><p className="mt-1 capitalize text-slate-500">{label(invoice.status)}{invoice.due_date ? ` · Due ${when(invoice.due_date)}` : ""}</p></div><div className="text-right"><p>{new Intl.NumberFormat("en-IE", { style: "currency", currency: invoice.currency || "EUR" }).format((invoice.total ?? 0) / 100)}</p><p className="mt-1 text-slate-500">{new Intl.NumberFormat("en-IE", { style: "currency", currency: invoice.currency || "EUR" }).format((invoice.amount_remaining ?? 0) / 100)} remaining</p></div></div>)}</div> : <p className="text-xs text-slate-500">{data.invoices ? "No invoices recorded for this organisation." : "Invoice data unavailable."}</p>}</div></Panel>}
+      <Panel title="Business details" icon={Building2}><dl className="space-y-4"><Datum title="Address">{[b.address, b.storefront_eircode].filter(Boolean).join(", ") || "Not recorded"}</Datum><Datum title="Contact">{b.notification_email || invite?.email || "Not recorded"}{b.notification_phone && <span className="block">{b.notification_phone}</span>}</Datum><Datum title="Created">{when(b.created_at)}</Datum><Datum title="Last updated">{when(b.updated_at)}</Datum><Datum title="Business ID"><span className="font-mono text-xs">{b.id}</span></Datum>{b.retail_banner === "supervalu" && <><Datum title="Offers last synced">{when(b.offers_synced_at)}</Datum><Datum title="Catalogue last synced">{when(b.catalog_synced_at)}</Datum></>}{b.admin_notes && <Datum title="Internal notes"><span className="whitespace-pre-line">{b.admin_notes}</span></Datum>}</dl></Panel>
+    </div></div>
+  </AdminPageShell>;
 }

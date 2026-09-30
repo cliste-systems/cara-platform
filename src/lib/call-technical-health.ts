@@ -37,8 +37,8 @@ export function buildCallTechnicalHealth(diagnostics: unknown, postCallStatus: s
     },
     {
       id: "tools", label: "Tool failures", value: toolErrors.length ? String(toolErrors.length) : events ? "0 recorded" : "Not captured", expected: "0",
-      status: toolErrors.length ? "fail" : "unknown",
-      detail: toolErrors.length ? toolErrors.map(event => String(event.message ?? "Tool error")).slice(0, 3).join(" · ") : "No failures recorded. Complete tool-event coverage is not confirmed by the saved diagnostics.",
+      status: toolErrors.length ? "fail" : data.toolEventCoverageComplete === true ? "pass" : "unknown",
+      detail: toolErrors.length ? toolErrors.map(event => String(event.message ?? "Tool error")).slice(0, 3).join(" · ") : data.toolEventCoverageComplete === true ? "Complete tool-event coverage confirms no recorded failures." : "No failures recorded. Complete tool-event coverage is not confirmed by the saved diagnostics.",
     },
     {
       id: "pipeline", label: "Voice pipeline incidents", value: incidents.length ? String(incidents.length) : data.incidentListComplete === true ? "0" : "Not captured", expected: "0",
@@ -47,8 +47,13 @@ export function buildCallTechnicalHealth(diagnostics: unknown, postCallStatus: s
     },
     {
       id: "capture", label: "Transcript capture", value: capture.status === "captured" ? "Captured" : capture.status === "partial" ? "Incomplete" : "Not captured", expected: "Complete event sequence",
-      status: capture.status === "partial" ? "fail" : capture.status === "captured" && numeric(capture.expectedEventCount) && capture.expectedEventCount > 0 && capture.expectedEventCount === capture.persistedEventCount && capture.sequenceContinuous === true && capture.hasCaller === true && capture.hasAssistant === true ? "pass" : "unknown",
+      status: capture.status === "partial" ? "fail" : capture.status === "captured" && numeric(capture.expectedEventCount) && capture.expectedEventCount > 0 && capture.expectedEventCount === capture.persistedEventCount && capture.sequenceContinuous === true && capture.hasCaller === true && capture.hasAssistant === true && capture.readableConversationComplete !== false ? "pass" : "unknown",
       detail: "Checks saved event counts, sequence continuity, and speech from both participants.",
+    },
+    {
+      id: "audio", label: "Static, clipping and distortion", value: record(data.audioQuality).measured === true ? String(record(data.audioQuality).status ?? "Unknown") : "Not captured", expected: "Measured audio quality",
+      status: record(data.audioQuality).measured === true && ["fail", "poor", "distorted", "clipped", "static"].includes(String(record(data.audioQuality).status)) ? "fail" : record(data.audioQuality).measured === true && ["pass", "clear", "good"].includes(String(record(data.audioQuality).status)) ? "pass" : "unknown",
+      detail: "Only explicit audio-quality measurements can establish waveform health. A transcript or good network connection cannot rule out static, clipping or distortion. Use the recording to check unmeasured audio.",
     },
     {
       id: "processing", label: "Post-call processing", value: postCallStatus === "complete" ? "Complete" : postCallStatus === "partial" ? "Partial" : postCallStatus === "failed" ? "Failed" : postCallStatus === "pending" ? "Pending" : "Not captured", expected: "Complete",

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
-import { requireAdminMfaSessionUser } from "@/lib/admin-session";
+import { requireAdminPermission } from "@/lib/admin-session";
 import { adminCallAnalysisPath } from "@/lib/admin-route-paths";
 import { enqueueCallAnalysis, runCallAnalysis } from "@/lib/call-analysis-server";
 import { CALL_ANALYSIS_VERSION } from "@/lib/call-analysis-simple";
@@ -11,7 +11,7 @@ import { createCallRecordingSignedUrl } from "@/lib/call-recordings-server";
 import { CALL_ANALYSIS_ID_RE, loadCallAnalysisDetail } from "./load-call-analysis";
 
 export async function retryCallAnalysis(callLogId: string): Promise<{ ok: boolean; message: string }> {
-  await requireAdminMfaSessionUser();
+  await requireAdminPermission("calls");
   if (!CALL_ANALYSIS_ID_RE.test(callLogId)) return { ok: false, message: "This call could not be found." };
   try {
     const call = await loadCallAnalysisDetail(callLogId);
@@ -38,7 +38,7 @@ export async function retryCallAnalysis(callLogId: string): Promise<{ ok: boolea
 }
 
 export async function fetchAdminCallRecording(callLogId: string): Promise<{ url: string | null }> {
-  await requireAdminMfaSessionUser();
+  await requireAdminPermission("calls");
   const call = await loadCallAnalysisDetail(callLogId);
   if (!call?.audio_storage_path) return { url: null };
   const url = await createCallRecordingSignedUrl({

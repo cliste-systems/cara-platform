@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireAdminSessionUser } from "@/lib/admin-session";
+import { requireAdminPermission } from "@/lib/admin-session";
 import {
   generateRetailDiscoveryDrafts,
   type RetailDiscoveryBatchCount,
@@ -30,7 +30,7 @@ const ALLOWED_BATCH_COUNTS = new Set<RetailDiscoveryBatchCount>([10, 15, 20, 25]
 
 export async function POST(request: Request) {
   try {
-    await requireAdminSessionUser();
+    await requireAdminPermission("calls");
   } catch {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }

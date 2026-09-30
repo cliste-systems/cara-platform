@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient, User } from "@supabase/supabase-js";
-import { canAccessAdminConsole } from "@/lib/admin-session";
+import { getAdminStaffRecord } from "@/lib/admin-staff-access";
 import { clientAccountAccessError } from "@/lib/admin-client-account";
 import { prepareInviteEmail, sendPreparedInviteEmail } from "@/lib/invite-email";
 
@@ -30,7 +30,7 @@ export async function validateClientAccountUser(admin: SupabaseClient, user: Use
     profileAccountId: profileResult.data?.account_id ?? null,
     hasProfile: Boolean(profileResult.data),
     membershipAccountIds: (membershipsResult.data ?? []).map((row) => row.account_id),
-    isStaff: canAccessAdminConsole(user),
+    isStaff: Boolean(await getAdminStaffRecord(user.id)),
   });
   if (accessError) throw new Error(accessError);
   return {

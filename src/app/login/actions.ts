@@ -125,7 +125,7 @@ export async function passwordSignIn(payload: {
     }
   }
 
-  const supabase = await createClient();
+  const supabase = await createClient({ userAgent: securityCtx.userAgent });
   const { error: signError } = await supabase.auth.signInWithPassword({
     email,
     password,

@@ -183,6 +183,7 @@ export async function searchStoredRetailCatalog(
         quoteText,
         serviceArea: row.service_area,
         fulfilment: row.fulfilment,
+        priceBasis: row.fulfilment === "counter" ? "counter_unknown" as const : "pack" as const,
         isAlcohol: row.is_alcohol,
         source: "catalog" as const,
       };
@@ -303,6 +304,7 @@ export async function searchNationalRetailCatalog(
         }),
         serviceArea: row.service_area,
         fulfilment: row.fulfilment,
+        priceBasis: row.fulfilment === "counter" ? "counter_unknown" as const : "pack" as const,
         isAlcohol: row.is_alcohol,
         source: "catalog" as const,
       };

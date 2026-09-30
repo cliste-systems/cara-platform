@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { stripPriceComparisonWords, type RetailPriceBasis } from "@/lib/retail-price-comparison";
+import { queryRequestsMeatBurgers, stripBurgerSearchContext } from "@/lib/retail-product-context";
 
 import type {
   RetailWeeklyOfferRow,
@@ -343,7 +345,10 @@ export function inferWeeklyOffersBrowseCategories(query: string): string[] {
 export function inferWeeklyOfferServiceAreaFromQuery(
   query: string,
 ): SupervaluServiceArea | null {
-  const q = query.toLowerCase();
+  // A meat preference for burgers does not require the butcher department;
+  // frozen or pre-pack meat burgers may belong to other catalogue areas.
+  const q = (queryRequestsMeatBurgers(query) && !/\b(?:butcher|counter|department|section|aisle)\b/i.test(query)
+    ? stripBurgerSearchContext(query) : query).toLowerCase();
   // A product ingredient does not establish a department. Explicit counter /
   // department language still wins through the normal rules below.
   if (!/\b(?:counter|department|section|aisle)\b/.test(q) &&
@@ -631,7 +636,7 @@ const STOPWORDS = new Set([
 export function tokenizeSupervaluSearchQuery(query: string): string[] {
   return [
     ...new Set(
-      query
+      stripPriceComparisonWords(stripBurgerSearchContext(query))
         .toLowerCase()
         .replace(/[^a-z0-9\s]/g, " ")
         .split(/\s+/)
@@ -773,6 +778,7 @@ export type WeeklyOfferMatch = {
   wasPriceEur: number | null;
   discountLabel: string | null;
   pricePerUnit: string | null;
+  priceBasis?: RetailPriceBasis;
   isAlcohol: boolean;
   campaignNames: string[];
   score: number;
@@ -977,6 +983,7 @@ function rowToMatch(row: RetailWeeklyOfferRow, score: number): WeeklyOfferMatch 
       row.was_price_eur == null ? null : Number(row.was_price_eur),
     discountLabel: row.discount_label,
     pricePerUnit: row.price_per_unit,
+    priceBasis: quoteUsesPerKilo({ priceUnitType: row.price_unit_type, sellBy: row.sell_by, pricePerUnit: row.price_per_unit, serviceArea, fulfilment }) ? "per_kilo" : "pack",
     isAlcohol: row.is_alcohol === true,
     campaignNames: row.campaign_names ?? [],
     score,

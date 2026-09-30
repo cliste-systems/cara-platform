@@ -33,11 +33,13 @@ type TenantRowActionsProps = {
   organizationId: string;
   organizationName: string;
   customerHref?: string;
+  allowOwnerActions?: boolean;
 };
 
 export function TenantRowActions({
   organizationId,
   organizationName,
+  allowOwnerActions = false,
   customerHref = adminCustomerPath(organizationId),
 }: TenantRowActionsProps) {
   const router = useRouter();
@@ -91,6 +93,7 @@ export function TenantRowActions({
             <Settings2 className="size-4" aria-hidden />
             Open customer
           </DropdownMenuItem>
+          {allowOwnerActions ? <>
           <DropdownMenuItem disabled={loginPending} onClick={openSupportDashboard}>
             <LogIn className="size-4" aria-hidden />
             {loginPending ? "Opening…" : "Open dashboard"}
@@ -107,6 +110,7 @@ export function TenantRowActions({
             <Trash2 className="size-4" aria-hidden />
             Delete tenant
           </DropdownMenuItem>
+          </> : null}
         </DropdownMenuContent>
       </DropdownMenu>
       {rowError ? (

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireAdminSessionUser } from "@/lib/admin-session";
+import { requireAdminPermission } from "@/lib/admin-session";
 import {
   isCartesiaVoiceId,
   resolveLiveKitTtsLanguage,
@@ -22,7 +22,7 @@ type Body = {
 
 export async function POST(request: Request) {
   try {
-    await requireAdminSessionUser();
+    await requireAdminPermission("customers");
   } catch {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }

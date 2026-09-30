@@ -25,7 +25,7 @@ type IrishPhoneCardProps = {
   phoneAssignedComplete?: boolean;
 };
 
-/** Assigns or releases the tenant's Irish Cliste number from the Twilio pool. */
+/** Assigns or releases the tenant's Irish HelloCara number from the Twilio pool. */
 export function IrishPhoneCard({
   organizationId,
   phoneNumber,
@@ -63,11 +63,9 @@ export function IrishPhoneCard({
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle className="text-lg">Store phone number</CardTitle>
+            <CardTitle className="text-lg">Assigned number</CardTitle>
             <CardDescription>
-              Irish Cliste DID from the pre-bought Twilio pool. The store
-              forwards its published line to this number using the divert setup
-              below.
+              The business forwards its published phone line to this HelloCara number.
             </CardDescription>
           </div>
           {phoneAssignedComplete ? (
@@ -80,7 +78,7 @@ export function IrishPhoneCard({
       <CardContent className="space-y-4">
         <div className="border-border bg-card rounded-lg border px-3 py-2 shadow-sm">
           <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-            Cliste number
+            HelloCara number
           </p>
           <p className="text-foreground mt-1 font-mono text-sm font-semibold tabular-nums">
             {hasNumber ? phoneNumber : "— none assigned —"}

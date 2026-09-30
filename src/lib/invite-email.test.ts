@@ -46,3 +46,12 @@ test("invitation carries accessible email structure and support guidance", () =>
   assert.match(bodies.text, /single-use/);
   assert.match(bodies.text, /expired/);
 });
+
+
+test("invitation renders the supplied logo and HelloCara charcoal brand without a green CTA", () => {
+  const bodies = buildInviteEmailBodies({ ...input, logoUrl: "cid:hellocara-logo" });
+  assert.match(bodies.html, /src="cid:hellocara-logo"/);
+  assert.match(bodies.html, /alt="HelloCara logo"/);
+  assert.match(bodies.html, /background:#353d42/);
+  assert.doesNotMatch(bodies.html, /#244936|Your store workspace/);
+});

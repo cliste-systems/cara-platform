@@ -11,6 +11,8 @@ import {
 } from "@/lib/retail-weekly-offers-search";
 import { retailSearchTokenMatchesText } from "@/lib/retail-search-fuzzy";
 import type { SupervaluFulfilment } from "@/lib/supervalu-offers-types";
+import { queryRequestsLowestPrice, type RetailPriceBasis } from "@/lib/retail-price-comparison";
+import { matchesBurgerProductContext } from "@/lib/retail-product-context";
 
 export type ClarificationMatch = {
   productName?: string;
@@ -20,7 +22,9 @@ export type ClarificationMatch = {
   serviceArea?: string | null;
   fulfilment?: string | null;
   current_price_eur?: number | null;
+  is_on_offer?: boolean;
   score?: number | null;
+  price_basis?: RetailPriceBasis;
 };
 
 export type ProductClarificationKind = "fulfilment" | "refinement";
@@ -93,12 +97,6 @@ function queryRequestsOwnBrand(query: string): boolean {
   );
 }
 
-function queryRequestsCheapest(query: string): boolean {
-  return /\b(?:cheapest|lowest|least expensive|best price|best value|budget|cheap(?:est)?)\b/i.test(
-    query,
-  );
-}
-
 const INGREDIENT_FORM_WORDS = new Set([
   "oil",
   "butter",
@@ -114,6 +112,19 @@ const INGREDIENT_FORM_WORDS = new Set([
   "marinade",
   "paste",
   "powder",
+  "dinner",
+  "dinners",
+  "meal",
+  "meals",
+  "bun",
+  "buns",
+  "relish",
+  "kit",
+  "mayonnaise",
+  "mayo",
+  "ketchup",
+  "cheese",
+  "mix",
 ]);
 
 const SEARCH_PREFERENCE_TOKENS = new Set([
@@ -164,7 +175,7 @@ function productFormScore(query: string, match: ClarificationMatch): number {
     if (nameIndex >= 0) {
       score += 4;
       const next = nameWords[nameIndex + 1] ?? "";
-      if (INGREDIENT_FORM_WORDS.has(next)) score -= 3;
+      if (INGREDIENT_FORM_WORDS.has(next) && !normalizedWords(query).includes(next)) score -= 3;
       continue;
     }
 
@@ -178,6 +189,13 @@ function productFormScore(query: string, match: ClarificationMatch): number {
     ) {
       score += 2;
     }
+  }
+
+  const requestedForm = productTokens.at(-1);
+  if (requestedForm && INGREDIENT_FORM_WORDS.has(requestedForm) && productTokens.length > 1) {
+    // "Burger sauce" is the sauce itself, not a prepared burger served with sauce.
+    const phrase = productTokens.map((token) => token.replace(/s$/, "")).join(" ");
+    if (nameWords.map((word) => word.replace(/s$/, "")).join(" ").includes(phrase)) score += 2;
   }
 
   if (queryRequestsFresh(query)) {
@@ -196,6 +214,18 @@ function productFormScore(query: string, match: ClarificationMatch): number {
   }
 
   return score;
+}
+
+function isUnrequestedProductForm(query: string, match: ClarificationMatch): boolean {
+  const requestedWords = normalizedWords(query);
+  const nameWords = normalizedWords(matchProductName(match));
+  if (/\bburgers?\b/i.test(query) && !/\b(?:snacks?|crisps|bites)\b/i.test(query) &&
+      /\b(?:snacks?|crisps)\b/i.test(`${matchProductName(match)} ${match.department ?? ""}`)) return true;
+  return literalProductTokens(query).some((token) => {
+    const index = nameWords.findIndex((word) => retailSearchTokenMatchesText(word, token));
+    const form = nameWords[index + 1];
+    return index >= 0 && form != null && INGREDIENT_FORM_WORDS.has(form) && !requestedWords.includes(form);
+  });
 }
 
 function fulfilmentClarificationAreaHint(serviceArea: string): string | null {
@@ -347,17 +377,24 @@ export function resolveProductSearchResponse<T extends ClarificationMatch>(
   matches: T[];
   clarificationHint: string | null;
   clarificationKind: ProductClarificationKind | null;
+  comparisonNote?: string;
 } {
+  const wantsCheapest = queryRequestsLowestPrice(query);
   let narrowed = filterOfferMatchesByExplicitFulfilment(
     matches,
     options?.fulfilment ?? inferWeeklyOfferFulfilmentFromQuery(query),
   );
+  narrowed = narrowed.filter((match) => matchesBurgerProductContext(query, matchProductName(match), String(match.department ?? "")));
 
   // Offer browsing is answerable now: return labelled products and prices
   // across counter/pre-pack instead of making the caller narrow first.
   // Explicit counter or aisle wording remains a hard constraint above.
-  if (options?.intent === "offer" || inferWeeklyOffersListIntent(query)) {
+  if (!wantsCheapest && (options?.intent === "offer" || inferWeeklyOffersListIntent(query))) {
     return { matches: narrowed, clarificationHint: null, clarificationKind: null };
+  }
+
+  if (wantsCheapest) {
+    narrowed = narrowed.filter((match) => !isUnrequestedProductForm(query, match));
   }
 
   // Rank the caller's intended product form before choosing a price. This keeps
@@ -380,9 +417,7 @@ export function resolveProductSearchResponse<T extends ClarificationMatch>(
     narrowed = narrowMatchesByProductTokens(query, narrowed);
   }
 
-  const wantsCheapest =
-    options?.intent === "price" && queryRequestsCheapest(query);
-  if (wantsCheapest && narrowed.length > 1) {
+  if (wantsCheapest) {
     const priced = narrowed
       .map((match, index) => ({
         match,
@@ -397,9 +432,27 @@ export function resolveProductSearchResponse<T extends ClarificationMatch>(
           b.sourceScore - a.sourceScore ||
           a.index - b.index,
       );
-    if (priced.length > 0) {
-      narrowed = [priced[0]!.match];
+    const lowestByBasis = new Map<RetailPriceBasis, T>();
+    for (const entry of priced) {
+      const basis = entry.match.price_basis ?? (matchFulfilment(entry.match) === "counter" ? "counter_unknown" : "pack");
+      if (basis !== "counter_unknown" && !lowestByBasis.has(basis)) lowestByBasis.set(basis, entry.match);
     }
+    // A counter amount without a verified selling unit cannot be ranked against
+    // pack totals or per-kilo rates. Keep one option as unranked context only.
+    const unrankedCounter = narrowed.find((match) =>
+      (match.price_basis ?? (matchFulfilment(match) === "counter" ? "counter_unknown" : "pack")) === "counter_unknown",
+    );
+    const unpricedOption = narrowed.find((match) =>
+      match !== unrankedCounter && !(Number(match.current_price_eur) > 0) &&
+      (priced.length === 0 || match.is_on_offer === true),
+    );
+    narrowed = [...lowestByBasis.values(), ...(unrankedCounter ? [unrankedCounter] : []), ...(unpricedOption ? [unpricedOption] : [])];
+    return {
+      matches: narrowed,
+      clarificationHint: null,
+      clarificationKind: null,
+      comparisonNote: "Compare only the matching listed prices checked: pack/item totals and per-kilo counter rates are separate comparisons, not an absolute cheapest product or best value per kilo. Pack sizes can differ. State the product form: prepared single-serve burgers are not equivalent to burgers for cooking. Options without a verified single price, or counter prices with an unconfirmed selling unit, are unranked and need confirmation. Keep all Rewards membership, multibuy quantity and availability conditions in the answer.",
+    };
   }
   const fulfilmentHint = buildOfferFulfilmentClarificationHint(
     narrowed,

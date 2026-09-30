@@ -8,6 +8,7 @@ import ts from "typescript";
 import * as teamRoles from "./team-roles";
 import * as identifiers from "./rate-limit-identifiers";
 import * as ownerAccess from "./account-owner-access";
+import * as staffPermissions from "./admin-permissions";
 
 // Exercise the real server entry points while preventing every external side effect.
 function isolated<T>(relativePath: string, imports: Record<string, unknown>): T {
@@ -30,12 +31,23 @@ function isolated<T>(relativePath: string, imports: Record<string, unknown>): T 
 
 function redirect(path: string): never { throw new Error(`REDIRECT:${path}`); }
 
-function adminGuards(level: "aal1" | "aal2", email = "brendan@clistesystems.ie") {
-  const user = { id: "audit-admin", email, app_metadata: {} };
+function adminGuards(
+  level: "aal1" | "aal2",
+  email = "brendan@clistesystems.ie",
+  options: { status?: "active" | "disabled"; role?: "owner" | "member"; permissions?: staffPermissions.AdminPermission[]; sessionActive?: boolean; needsPassword?: boolean; databaseError?: boolean } = {},
+) {
+  const user = { id: "audit-admin", email, app_metadata: { cliste_admin_console: true, admin_needs_password: options.needsPassword === true } };
   return isolated<typeof import("./admin-session")>("./admin-session.ts", {
     react: { cache: (fn: unknown) => fn },
     "next/navigation": { redirect },
     "@/lib/supabase-env": { allowAdminDevWithoutSupabase: () => false },
+    "@/lib/admin-permissions": staffPermissions,
+    "@/lib/admin-staff-access": { getAdminStaffRecord: async () => {
+      if (options.databaseError) throw new Error("Database unavailable");
+      return email === "brendan@clistesystems.ie" ? { user_id: user.id, email, display_name: "Audit", role: options.role ?? "owner", status: options.status ?? "active", permissions: options.permissions ?? [] } : null;
+    } },
+    "@/lib/admin-sessions": { isActiveAdminSession: async () => options.sessionActive !== false },
+    "@/utils/supabase/admin": { createAdminClient: () => { throw new Error("Unexpected privileged mutation"); } },
     "@/utils/supabase/server": { createClient: async () => ({ auth: {
       getUser: async () => ({ data: { user }, error: null }),
       mfa: { getAuthenticatorAssuranceLevel: async () => ({ data: { currentLevel: level }, error: null }) },
@@ -206,4 +218,131 @@ test("confirmation retries reserve stable network and email counters before succ
   assert.equal(reserved[0], reserved[2]);
   assert.equal(reserved[1], reserved[3]);
   assert.notEqual(reserved[0], reserved[1]);
+});
+
+
+test("staff membership and session revocation override stale metadata and email allowlists", async () => {
+  for (const options of [{ status: "disabled" as const }, { databaseError: true }, { sessionActive: false }]) {
+    await assert.rejects(adminGuards("aal2", undefined, options).requireAdminPermission("customers"), /REDIRECT:\/authenticate/);
+  }
+  await assert.rejects(adminGuards("aal2", undefined, { needsPassword: true }).requireAdminPermission("customers"), /REDIRECT:\/staff\/setup/);
+});
+
+test("scoped members can use granted features but cannot reach owners or billing through legacy guards", async () => {
+  const guards = adminGuards("aal2", undefined, { role: "member", permissions: ["support"] });
+  assert.equal((await guards.requireAdminPermission("support")).id, "audit-admin");
+  assert.equal((await guards.requireAdminStaffContext()).role, "member");
+  for (const permission of ["customers", "calls", "billing", "inbox", "team"] as const) {
+    await assert.rejects(guards.requireAdminPermission(permission), /REDIRECT:\/admin\/security\?access=denied/);
+  }
+  await assert.rejects(guards.requireAdminSessionUser(), /access=denied/);
+  await assert.rejects(guards.requireAdminMfaSessionUser(), /access=denied/);
+});
+
+test("inbox API obeys the same scoped MFA and active-session guard", async () => {
+  for (const permissions of [["support"], ["inbox"]] as staffPermissions.AdminPermission[][]) {
+    const guards = adminGuards("aal2", undefined, { role: "member", permissions });
+    const inbox = isolated<typeof import("./admin-inbox-access")>("./admin-inbox-access.ts", { "server-only": {}, "@/lib/admin-session": guards });
+    assert.equal((await inbox.checkAdminInboxApiAccess()).ok, permissions.includes("inbox"));
+  }
+  const revoked = isolated<typeof import("./admin-inbox-access")>("./admin-inbox-access.ts", { "server-only": {}, "@/lib/admin-session": adminGuards("aal2", undefined, { permissions: ["inbox"], sessionActive: false }) });
+  assert.equal((await revoked.checkAdminInboxApiAccess()).ok, false);
+});
+
+function adminActionsFor(guards: ReturnType<typeof adminGuards>, boundary: () => never) {
+  const path = "../app/(admin)/admin/actions.ts";
+  const filename = fileURLToPath(new URL(path, import.meta.url));
+  const tree = ts.createSourceFile(filename, readFileSync(filename, "utf8"), ts.ScriptTarget.ES2022);
+  const imports: Record<string, unknown> = {};
+  for (const statement of tree.statements) {
+    if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) imports[statement.moduleSpecifier.text] = {};
+  }
+  imports["@/lib/admin-session"] = guards;
+  imports["@/lib/organization-niche"] = { ADMIN_PROVISIONING_NICHES: ["retail"] };
+  imports["@/utils/supabase/admin"] = { createAdminClient: boundary };
+  return isolated<typeof import("../app/(admin)/admin/actions")>(path, imports);
+}
+
+test("support-only staff cannot call customer, deletion, impersonation or billing actions directly", async () => {
+  let privilegedCalls = 0;
+  const actions = adminActionsFor(adminGuards("aal2", undefined, { role: "member", permissions: ["support"] }), () => { privilegedCalls++; throw new Error("SERVICE_BOUNDARY"); });
+  const id = "11111111-1111-4111-8111-111111111111";
+  for (const action of [
+    () => actions.listClientAccounts(),
+    () => actions.deleteOrganization(id),
+    () => actions.createSupportDashboardLink(id),
+    () => actions.updateAccountPlanTier(id, "pro"),
+    () => actions.setOrganizationLive(id, true),
+  ]) await assert.rejects(action(), /access=denied/);
+  assert.equal(privilegedCalls, 0);
+  assert.equal((await actions.adminCloseSupportTicket(id)).ok, false);
+  assert.equal(privilegedCalls, 1);
+});
+
+test("customer permissions cannot mint a full dashboard impersonation session or delete a client", async () => {
+  const actions = adminActionsFor(adminGuards("aal2", undefined, { role: "member", permissions: ["customers"] }), () => { throw new Error("SERVICE_BOUNDARY"); });
+  await assert.rejects(actions.createSupportDashboardLink("11111111-1111-4111-8111-111111111111"), /access=denied/);
+  await assert.rejects(actions.deleteOrganization("11111111-1111-4111-8111-111111111111"), /access=denied/);
+});
+
+test("call API checks permission before loading live customer call data", async () => {
+  for (const permissions of [["support"], ["calls"]] as staffPermissions.AdminPermission[][]) {
+    let reads = 0;
+    const api = isolated<typeof import("../app/api/admin/demo-call/lines/route")>("../app/api/admin/demo-call/lines/route.ts", {
+      "next/server": { NextResponse: { json: (body: unknown, options?: { status?: number }) => ({ body, status: options?.status ?? 200 }) } },
+      "@/lib/admin-session": adminGuards("aal2", undefined, { role: "member", permissions }),
+      "@/lib/admin-demo-call": { loadAdminDemoCallLines: async () => { reads++; return []; } },
+    });
+    const response = await api.GET();
+    assert.equal(response.status, permissions.includes("calls") ? 200 : 401);
+    assert.equal(reads, permissions.includes("calls") ? 1 : 0);
+  }
+});
+
+test("staff without customer profiles can verify a divert and are recorded in the audit trail", async () => {
+  const path = "../app/(admin)/admin/organizations/[id]/store-setup/actions.ts";
+  const filename = fileURLToPath(new URL(path, import.meta.url));
+  const tree = ts.createSourceFile(filename, readFileSync(filename, "utf8"), ts.ScriptTarget.ES2022);
+  const imports: Record<string, unknown> = {};
+  for (const statement of tree.statements) {
+    if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) imports[statement.moduleSpecifier.text] = {};
+  }
+  let updated: Record<string, unknown> | null = null;
+  let actor: string | null = null;
+  const profile = { select: () => profile, eq: () => profile, maybeSingle: async () => ({ data: null }) };
+  imports["@/lib/admin-session"] = adminGuards("aal2", undefined, { role: "member", permissions: ["customers"] });
+  imports["@/utils/supabase/admin"] = { createAdminClient: () => ({ from: (table: string) => table === "profiles" ? profile : {
+    update: (value: Record<string, unknown>) => { updated = value; return { eq: async () => ({ error: null }) }; },
+  } }) };
+  imports["@/lib/security-events"] = { buildSecurityEventContext: () => ({}), logSecurityEvent: async (_context: unknown, entry: { actorUserId: string }) => { actor = entry.actorUserId; } };
+  imports["next/headers"] = { headers: async () => new Headers() };
+  imports["next/cache"] = { revalidatePath: () => {} };
+  const actions = isolated<typeof import("../app/(admin)/admin/organizations/[id]/store-setup/actions")>(path, imports);
+  assert.equal((await actions.markDivertVerified("11111111-1111-4111-8111-111111111111")).ok, true);
+  assert.ok(updated);
+  assert.equal((updated as Record<string, unknown>).divert_verified_by, null);
+  assert.equal(actor, "audit-admin");
+});
+
+
+test("new-client creation rejects inline organisation creation before database or email work", async () => {
+  let privilegedCalls = 0;
+  const actions = adminActionsFor(adminGuards("aal2"), () => { privilegedCalls++; throw new Error("SERVICE_BOUNDARY"); });
+  const result = await actions.createOrganization({ name: "Test store", slug: "test-store", tier: "native", niche: "retail", ownerEmail: "owner@example.invalid", ownerName: "Test Owner", account: { mode: "new", name: "Test group", billingEmail: "billing@example.invalid", billingAddress: "Dublin" } });
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.message, /Organisations first/);
+  assert.equal(privilegedCalls, 0);
+});
+
+test("organisation billing edits require both customer and billing permissions", async () => {
+  for (const permissions of [["customers"], ["billing"], ["support"]] as staffPermissions.AdminPermission[][]) {
+    let writes = 0;
+    const actions = isolated<typeof import("../app/(admin)/admin/organisations/actions")>("../app/(admin)/admin/organisations/actions.ts", {
+      "@/lib/admin-session": adminGuards("aal2", undefined, { role: "member", permissions }),
+      "@/utils/supabase/admin": { createAdminClient: () => { writes++; throw Error("Unexpected database access"); } },
+      "@/lib/admin-client-account": {}, "next/cache": {}, "next/headers": {}, "@/lib/security-events": {},
+    });
+    await assert.rejects(actions.saveBillingOrganisation(new FormData()), /access=denied/);
+    assert.equal(writes, 0);
+  }
 });

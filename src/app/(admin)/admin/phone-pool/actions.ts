@@ -1,6 +1,6 @@
 "use server";
 
-import { requireAdminSessionUser } from "@/lib/admin-session";
+import { requireAdminPermission } from "@/lib/admin-session";
 import {
   promoteExpiredCooldowns,
   refillPoolIfLow,
@@ -11,7 +11,7 @@ export async function triggerPhonePoolRefill(): Promise<{
   purchased: number;
   skippedReason?: string;
 }> {
-  await requireAdminSessionUser();
+  await requireAdminPermission("customers");
   const promoted = await promoteExpiredCooldowns();
   const result = await refillPoolIfLow();
   return {

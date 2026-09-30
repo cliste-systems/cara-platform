@@ -150,6 +150,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: { "/*": ["./public/m8x4p2n7.png"] },
   typescript: {
     ignoreBuildErrors: false,
   },

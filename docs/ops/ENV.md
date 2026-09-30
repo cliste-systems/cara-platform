@@ -24,8 +24,7 @@ Configure Sentry alert rules for: Stripe webhook handler errors, `usage-sync` / 
 
 Call completion queues an admin-only review at `/admin/call-analysis`; the voice
 worker sends raw transcript and final diagnostics for ordinary calls as well as
-test calls. `/api/cron/call-analysis` retries interrupted reviews every five
-minutes, two per run. Errors are retryable and do not mark the customer call as
+test calls. Supabase calls `/api/cron/call-analysis` every five minutes to retry interrupted reviews, two per run. The dedicated hidden `CALL_ANALYSIS_CRON_SECRET` matches the encrypted Vault `call_analysis_retry_key`; Vercel cron is not used for this five-minute schedule. Errors are retryable and do not mark the customer call as
 failed. Retained non-engineer calls missing reviews queue automatically; engineer calls
 are excluded. The local development server also runs the queue automatically,
 without requiring an admin-page click. Both the dashboard and voice worker changes must be released for
@@ -163,3 +162,7 @@ Then **Reload Window** in Cursor and toggle **supabase** under Settings → Tool
 
 Cloudflare edge rules: re-run `python3 scripts/cloudflare-harden.py` after deploy.
 Slow brute-force uses `security_auth_events` (no extra env).
+
+### Secure client dashboard support
+
+Set `CLISTE_SUPPORT_DASHBOARD_SECRET` to a dedicated random 32-byte (or longer) server-only secret in each deployment. Admin support cookies are signed and scoped to one user, organisation and business. Keep this value stable across instances; rotation invalidates existing support cookies. Never expose it through a `NEXT_PUBLIC_` variable. Local development uses `.env.local`.

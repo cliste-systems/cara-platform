@@ -1,3 +1,4 @@
+import { requireAdminPermission, requireAdminStaffContext } from "@/lib/admin-session";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Users } from "lucide-react";
@@ -88,6 +89,8 @@ export default async function AdminCustomersPage({
 }: {
   searchParams: Promise<{ type?: string }>;
 }) {
+  await requireAdminPermission("customers");
+  const staff = await requireAdminStaffContext();
   const { type: typeParam } = await searchParams;
   const filter = parseClientProvisionFilter(typeParam);
 
@@ -109,7 +112,7 @@ export default async function AdminCustomersPage({
     <AdminPageShell
       icon={Users}
       title="Customers"
-      description="Set up retail stores, connect their organisations, and manage client access."
+      description="Manage individual businesses, their organisations and client access."
     >
       {loadError ? (
         <p className="text-sm text-red-700" role="alert">
@@ -209,6 +212,7 @@ export default async function AdminCustomersPage({
                     </td>
                     <td className={`text-right ${adminTableTdClass}`}>
                       <TenantRowActions
+                          allowOwnerActions={staff.role === "owner"}
                         organizationId={row.orgId}
                         organizationName={row.name}
                         customerHref={adminCustomerPath(row.orgId)}

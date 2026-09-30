@@ -37,3 +37,9 @@ test("duplex audio timings produce the measured median with their capture source
   assert.equal(partial.value, "0.90 s");
   assert.equal(partial.status, "unknown");
 });
+
+test("measured static fails even when the transcript and network are healthy", () => {
+  const check = buildCallTechnicalHealth({ audioQuality: { measured: true, status: "static" } }, "complete").find(c => c.id === "audio")!;
+  assert.equal(check.status, "fail");
+  assert.equal(buildCallTechnicalHealth({ audioQuality: { status: "clear" } }, "complete").find(c => c.id === "audio")?.status, "unknown");
+});

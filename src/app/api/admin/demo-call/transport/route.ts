@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireAdminMfaSessionUser } from "@/lib/admin-session";
+import { requireAdminPermission } from "@/lib/admin-session";
 import { parseTransportBatch } from "@/lib/call-transport";
 import { isSameOriginRequest } from "@/lib/request-origin";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export async function POST(request: Request) {
-  try { await requireAdminMfaSessionUser(); } catch {
+  try { await requireAdminPermission("calls"); } catch {
     console.warn("[demo-call-transport] rejected: unauthorized");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

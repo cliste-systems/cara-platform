@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireAdminSessionUser } from "@/lib/admin-session";
+import { requireAdminPermission } from "@/lib/admin-session";
 import {
   finishRetailRegressionRun,
   loadRetailRegressionSuite,
@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 async function requireAdmin() {
   try {
-    await requireAdminSessionUser();
+    await requireAdminPermission("calls");
     return null;
   } catch {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });

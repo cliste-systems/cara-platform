@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { userNeedsPassword } from "@/lib/invite-onboarding";
 
-import { canAccessAdminConsole } from "@/lib/admin-session";
+import { getAdminStaffRecord } from "@/lib/admin-staff-access";
+import { isEnabledAdminStaff } from "@/lib/admin-permissions";
 import { redirectIfEmailUnconfirmed } from "@/lib/require-email-confirmed";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
@@ -54,12 +55,15 @@ export default async function PostLoginRoutePage() {
 
   redirectIfEmailUnconfirmed(user);
 
-  if (user.email) {
-    await stampAdminInviteAccepted(user.id, user.email);
+  const staff = await getAdminStaffRecord(user.id);
+  if (staff) {
+    if (!isEnabledAdminStaff(staff)) redirect("/authenticate?error=forbidden&message=Your%20staff%20access%20has%20been%20disabled.");
+    if (user.app_metadata?.admin_needs_password === true) redirect("/staff/setup");
+    redirect("/admin");
   }
 
-  if (canAccessAdminConsole(user)) {
-    redirect("/admin");
+  if (user.email) {
+    await stampAdminInviteAccepted(user.id, user.email);
   }
 
   if (userNeedsPassword(user)) redirect("/dashboard/set-password");

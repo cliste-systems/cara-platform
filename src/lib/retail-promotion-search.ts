@@ -484,6 +484,7 @@ export async function searchStructuredNationalPromotions(
     fulfilment?: SupervaluFulfilment | null;
     serviceArea?: SupervaluServiceArea | null;
     reference?: Date;
+    signal?: AbortSignal;
   },
 ): Promise<SupervaluCatalogMatch[]> {
   const parsed = parseRetailPromotionQuery(input.query);
@@ -491,7 +492,7 @@ export async function searchStructuredNationalPromotions(
   const reference = input.reference ?? new Date();
   const today = formatInTimeZone(reference, DUBLIN, "yyyy-MM-dd");
 
-  const { data, error } = await supabase.rpc(
+  const request = supabase.rpc(
     "search_retail_promotions_consensus",
     {
       p_retail_banner: input.retailBanner,
@@ -517,6 +518,7 @@ export async function searchStructuredNationalPromotions(
       ),
     },
   );
+  const { data, error } = await (input.signal ? request.abortSignal(input.signal) : request);
 
   if (error) {
     throw new Error(error.message);

@@ -1,3 +1,4 @@
+import { requireAdminPermission } from "@/lib/admin-session";
 import { CreditCard } from "lucide-react";
 
 import { AdminPageShell } from "@/components/admin/admin-page-shell";
@@ -33,6 +34,7 @@ function latestApiSyncLabel(rows: PlatformVendorCostRow[]): string | null {
 }
 
 export default async function PlatformSpendPage() {
+  await requireAdminPermission("billing");
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("platform_vendor_costs")
@@ -40,7 +42,7 @@ export default async function PlatformSpendPage() {
     .order("next_billing_date", { ascending: true, nullsFirst: false })
     .order("display_name", { ascending: true });
 
-  let loadError = error?.message ?? null;
+  const loadError = error?.message ?? null;
   const rows = applyComputedNextBillingDates((data ?? []) as PlatformVendorCostRow[]).sort(
     (a, b) => {
       if (a.next_billing_date && b.next_billing_date) {

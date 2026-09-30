@@ -51,6 +51,7 @@ export type SendTransactionalEmailInput = {
   replyTo?: EmailAddress;
   /** Stable key for retrying the exact same provider payload. */
   idempotencyKey?: string;
+  attachments?: { filename: string; content: Buffer; contentId?: string }[];
 };
 
 export type SendTransactionalEmailResult =
@@ -109,6 +110,7 @@ export async function sendTransactionalEmail(
     to: [to],
     subject,
     text: input.text,
+    ...(input.attachments ? { attachments: input.attachments } : {}),
     ...(input.html ? { html: input.html } : {}),
     ...(input.replyTo?.email.trim()
       ? {

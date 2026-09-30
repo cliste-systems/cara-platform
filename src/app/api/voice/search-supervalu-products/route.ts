@@ -9,6 +9,7 @@ import {
 } from "@/lib/retail-weekly-offers-search";
 import type { SupervaluFulfilment, SupervaluServiceArea } from "@/lib/supervalu-offers-types";
 import { resolveProductSearchResponse } from "@/lib/retail-product-clarification";
+import { isPreparedBurgerProduct } from "@/lib/retail-product-context";
 import {
   formatCatalogStockNoMatchQuote,
   inferCatalogSearchIntent,
@@ -179,29 +180,21 @@ export async function POST(request: Request) {
       : inferWeeklyOfferServiceAreaFromQuery(query);
 
   const reference = new Date();
-  const latestOfferWeekEnd = await loadLatestRetailOfferWeekEnd(admin, retailBanner, reference);
+  const sourceStoreId =
+    String(orgRow.retail_source_store_id ?? "").trim() || null;
+  const [latestOfferWeekEnd, { matches, ownBrandFallbackQuote }] = await Promise.all([
+    loadLatestRetailOfferWeekEnd(admin, retailBanner, reference),
+    searchSupervaluCatalogLiveWithFallback(query, {
+      intent, supabase: admin, retailBanner, fulfilment, serviceArea,
+      storeId: sourceStoreId ?? undefined, reference,
+    }),
+  ]);
   const offersFreshness = assessSyncedOffersFreshness({
     syncedAt:
       typeof orgRow.offers_synced_at === "string" ? orgRow.offers_synced_at : null,
     offerWeekEnd: latestOfferWeekEnd,
     reference,
   });
-
-  const sourceStoreId =
-    String(orgRow.retail_source_store_id ?? "").trim() || null;
-
-  const { matches, ownBrandFallbackQuote } = await searchSupervaluCatalogLiveWithFallback(
-    query,
-    {
-      intent,
-      supabase: admin,
-      retailBanner,
-      fulfilment,
-      serviceArea,
-      storeId: sourceStoreId ?? undefined,
-      reference,
-    },
-  );
 
   const mappedMatches = matches.map((match) => ({
     product_name: match.productName,
@@ -218,8 +211,9 @@ export async function POST(request: Request) {
     score: match.score,
     quote_text: match.quoteText,
     source: match.source ?? null,
+    price_basis: match.priceBasis ?? (match.fulfilment === "counter" ? "counter_unknown" as const : "pack" as const),
   }));
-  const { clarificationHint, matches: responseMatches } = resolveProductSearchResponse(
+  const { clarificationHint, comparisonNote, matches: responseMatches } = resolveProductSearchResponse(
     query,
     mappedMatches,
     { fulfilment, intent },
@@ -232,13 +226,6 @@ export async function POST(request: Request) {
     ...new Set(
       responseMatches
         .map((match) => String(match.sku ?? "").trim())
-        .filter(Boolean),
-    ),
-  ];
-  const matchNames = [
-    ...new Set(
-      responseMatches
-        .map((match) => String(match.product_name ?? "").trim())
         .filter(Boolean),
     ),
   ];
@@ -255,19 +242,28 @@ export async function POST(request: Request) {
       .from("retail_catalog_products")
       .select("id, sku, product_name")
       .eq("retail_banner", retailBanner)
-      .in("sku", matchSkus);
+      .in("sku", matchSkus)
+      .abortSignal(AbortSignal.timeout(1_000));
     if (error) {
       console.error("[voice/search-supervalu-products] assortment sku lookup", error);
     } else {
       catalogIdentityRows.push(...((data ?? []) as CatalogIdentityRow[]));
     }
   }
+  // Exact SKU identities already resolved above do not need a second,
+  // potentially expensive product-name scan. Optional enrichment has a short
+  // deadline; missing decisions remain conservatively "not_confirmed".
+  const resolvedSkus = new Set(catalogIdentityRows.map((row) => row.sku).filter(Boolean));
+  const matchNames = [...new Set(responseMatches
+    .filter((match) => !match.sku || !resolvedSkus.has(match.sku))
+    .map((match) => match.product_name.trim()).filter(Boolean))];
   if (matchNames.length > 0) {
     const { data, error } = await admin
       .from("retail_catalog_products")
       .select("id, sku, product_name")
       .eq("retail_banner", retailBanner)
-      .in("product_name", matchNames);
+      .in("product_name", matchNames)
+      .abortSignal(AbortSignal.timeout(1_000));
     if (error) {
       console.error("[voice/search-supervalu-products] assortment name lookup", error);
     } else {
@@ -291,7 +287,8 @@ export async function POST(request: Request) {
       .from("retail_store_product_assortment")
       .select("product_id, status")
       .eq("organization_id", orgId)
-      .in("product_id", productIds);
+      .in("product_id", productIds)
+      .abortSignal(AbortSignal.timeout(1_000));
     if (error) {
       console.error("[voice/search-supervalu-products] assortment override lookup", error);
     } else {
@@ -304,6 +301,13 @@ export async function POST(request: Request) {
   }
 
   const storeAwareMatches = responseMatches.map((match) => {
+    const comparisonLabel = !comparisonNote ? "" : !(Number(match.current_price_eur) > 0)
+      ? "Unranked option: no verified single-item price. "
+      : match.price_basis === "pack"
+      ? "Lowest listed pack/item total among the matching results checked. "
+      : match.price_basis === "per_kilo"
+        ? "Lowest listed per-kilo rate among the matching results checked. "
+        : "Unranked counter option: its selling unit needs confirmation. ";
     const sku = String(match.sku ?? "").trim();
     const nameKey = String(match.product_name ?? "").trim().toLowerCase();
     const productId =
@@ -320,7 +324,7 @@ export async function POST(request: Request) {
         productName: match.product_name,
         status: storeStatus,
         intent,
-        originalQuote: match.quote_text,
+        originalQuote: comparisonNote ? `${comparisonLabel}${isPreparedBurgerProduct(match.product_name, match.department) ? "This is a prepared single-serve or ready-meal product. " : ""}${match.quote_text} ${comparisonNote}` : match.quote_text,
       }),
     };
   });
@@ -338,6 +342,7 @@ export async function POST(request: Request) {
     service_area: serviceArea,
     fulfilment,
     clarification_hint: clarificationHint,
+    ...(comparisonNote ? { comparison_note: comparisonNote } : {}),
     offers_freshness: offersFreshness.stale ? offersFreshness.message : null,
     matches: storeAwareMatches,
     no_match_quote: noMatchQuote,

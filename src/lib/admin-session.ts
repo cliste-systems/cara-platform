@@ -4,6 +4,9 @@ import type { User } from "@supabase/supabase-js";
 
 import { allowAdminDevWithoutSupabase } from "@/lib/supabase-env";
 import { createClient } from "@/utils/supabase/server";
+import { activateAdminStaffMembership, getAdminStaffRecord, type AdminStaffRecord } from "@/lib/admin-staff-access";
+import { hasAdminPermission, isEnabledAdminStaff, type AdminPermission } from "@/lib/admin-permissions";
+import { isActiveAdminSession } from "@/lib/admin-sessions";
 
 const DEFAULT_ADMIN_EMAIL = "brendan@clistesystems.ie";
 const LOCAL_DEV_ADMIN_ID = "local-admin-gate";
@@ -36,11 +39,13 @@ export function isAdminEmailAllowlisted(
 }
 
 export function canAccessAdminConsole(user: User): boolean {
+  if (user.app_metadata?.admin_disabled === true || user.app_metadata?.admin_staff_status === "disabled") return false;
+  // Routing hint only; privileged access is always checked against admin_staff.
   return isAdminEmailAllowlisted(user.email) || hasConsoleAccessFlag(user);
 }
 
 type ResolveAdminAuth =
-  | { tag: "ok"; user: User }
+  | { tag: "ok"; user: User; staff: AdminStaffRecord }
   | { tag: "no_session" }
   | { tag: "forbidden" };
 
@@ -65,9 +70,10 @@ function devGateAdminUser(): User {
   };
 }
 
-async function resolveAdminAuth(): Promise<ResolveAdminAuth> {
+const resolveAdminAuth = cache(async (): Promise<ResolveAdminAuth> => {
   if (allowAdminDevWithoutSupabase()) {
-    return { tag: "ok", user: devGateAdminUser() };
+    const user = devGateAdminUser();
+    return { tag: "ok", user, staff: { user_id: user.id, email: user.email!, display_name: "Local administrator", role: "owner", permissions: [], status: "active" } };
   }
 
   let supabase;
@@ -83,14 +89,24 @@ async function resolveAdminAuth(): Promise<ResolveAdminAuth> {
     error,
   } = await supabase.auth.getUser();
   if (error || !user) return { tag: "no_session" };
-  if (!canAccessAdminConsole(user)) return { tag: "forbidden" };
-  return { tag: "ok", user };
-}
+  try {
+    const staff = await getAdminStaffRecord(user.id);
+    if (!staff || !isEnabledAdminStaff(staff)) return { tag: "forbidden" };
+    if (!(await isActiveAdminSession(user, supabase))) return { tag: "no_session" };
+    return { tag: "ok", user, staff };
+  } catch (error) {
+    console.error("[admin-session] Staff access unavailable", error);
+    return { tag: "forbidden" };
+  }
+});
 
 /** AAL1 is allowed only while enrolling or challenging the admin second factor. */
 export const requireAdminMfaSetupSessionUser = cache(async (): Promise<User> => {
   const r = await resolveAdminAuth();
-  if (r.tag === "ok") return r.user;
+  if (r.tag === "ok") {
+    if (r.user.app_metadata?.admin_needs_password === true) redirect("/staff/setup");
+    return r.user;
+  }
   if (r.tag === "forbidden") {
     redirect(
       "/authenticate?error=forbidden&message=This%20account%20is%20not%20allowed%20to%20access%20Admin."
@@ -102,7 +118,7 @@ export const requireAdminMfaSetupSessionUser = cache(async (): Promise<User> => 
 });
 
 
-export const requireAdminMfaSessionUser = cache(async (): Promise<User> => {
+const requireStaffMfaSessionUser = cache(async (): Promise<User> => {
   const user = await requireAdminMfaSetupSessionUser();
 
   // Local shell-only development may run without Supabase auth.
@@ -122,7 +138,29 @@ export const requireAdminMfaSessionUser = cache(async (): Promise<User> => {
   return user;
 });
 
-/** All privileged admin entry points enforce MFA, including legacy callers. */
+export type AdminStaffContext = AdminStaffRecord & { user: User };
+
+export const requireAdminStaffContext = cache(async (): Promise<AdminStaffContext> => {
+  const user = await requireStaffMfaSessionUser();
+  const result = await resolveAdminAuth();
+  if (result.tag !== "ok") redirect("/authenticate?error=admin");
+  let staff = result.staff;
+  if (staff.status === "invited" && !allowAdminDevWithoutSupabase()) {
+    const activated = await activateAdminStaffMembership(user.id);
+    if (!activated) redirect("/authenticate?error=forbidden&message=Your%20staff%20access%20is%20no%20longer%20active.");
+    staff = activated;
+  }
+  return { ...staff, user };
+});
+
+export async function requireAdminPermission(permission: AdminPermission | "team"): Promise<User> {
+  const staff = await requireAdminStaffContext();
+  if (!hasAdminPermission(staff, permission)) redirect("/admin/security?access=denied");
+  return staff.user;
+}
+
+/** Legacy unscoped callers are owner-only. New endpoints must request a capability explicitly. */
+export const requireAdminMfaSessionUser = cache(async (): Promise<User> => requireAdminPermission("team"));
 export const requireAdminSessionUser = requireAdminMfaSessionUser;
 
 export async function adminMfaAssuranceLevel(): Promise<"aal1" | "aal2" | null> {

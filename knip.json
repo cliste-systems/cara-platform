@@ -3,10 +3,21 @@
   "entry": [
     "middleware.ts",
     "src/app/**/{page,layout,template,loading,error,not-found,route,default}.{ts,tsx}",
-    "scripts/*.ts"
+    "scripts/*.ts",
+    "src/**/*.test.ts"
   ],
-  "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts"],
-  "ignore": ["src/components/ui/**"],
-  "ignoreDependencies": ["server-only", "tw-animate-css", "shadcn", "tailwindcss"],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "scripts/**/*.ts"
+  ],
+  "ignore": [
+    "src/components/ui/**"
+  ],
+  "ignoreDependencies": [
+    "server-only",
+    "tw-animate-css",
+    "shadcn",
+    "tailwindcss"
+  ],
   "ignoreExportsUsedInFile": true
 }

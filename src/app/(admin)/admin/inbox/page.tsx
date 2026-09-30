@@ -1,3 +1,4 @@
+import { requireAdminPermission } from "@/lib/admin-session";
 import type { Metadata } from "next";
 import { Mail } from "lucide-react";
 
@@ -13,7 +14,8 @@ export const metadata: Metadata = {
   title: `${PRODUCT_NAME} Admin — Inbox`,
 };
 
-export default function AdminInboxPage() {
+export default async function AdminInboxPage() {
+  await requireAdminPermission("inbox");
   const identities = adminInboxIdentities();
 
   return (

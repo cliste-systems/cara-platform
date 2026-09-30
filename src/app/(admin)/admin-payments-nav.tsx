@@ -62,7 +62,7 @@ export function AdminPaymentsNavGroup() {
           "group flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px]",
           sectionActive
             ? "bg-[#353d42] font-semibold text-white"
-            : "font-medium text-[#5f6f68] hover:bg-[#eef2ef] hover:text-[#11181d]",
+            : "font-medium text-[#667078] hover:bg-[#f1f3f5] hover:text-[#11181d]",
         )}
         aria-expanded={expanded}
       >
@@ -71,7 +71,7 @@ export function AdminPaymentsNavGroup() {
             "size-4 shrink-0 transition-colors",
             sectionActive
               ? "text-white"
-              : "text-[#8b9c94] group-hover:text-[#353d42]",
+              : "text-[#929aa1] group-hover:text-[#353d42]",
           )}
           strokeWidth={1.5}
           aria-hidden
@@ -79,7 +79,7 @@ export function AdminPaymentsNavGroup() {
         <span className="min-w-0 flex-1 truncate text-left">Payments</span>
         <ChevronDown
           className={cn(
-            "size-4 shrink-0 text-[#8b9c94] transition-transform duration-200 ease-out",
+            "size-4 shrink-0 text-[#929aa1] transition-transform duration-200 ease-out",
             expanded ? "rotate-0" : "-rotate-90",
           )}
           aria-hidden
@@ -97,8 +97,8 @@ export function AdminPaymentsNavGroup() {
                 adminNavLinkBaseClass,
                 "ml-6 flex min-h-9 items-center rounded-lg px-3 py-2 text-[13px]",
                 active
-                  ? "bg-[#e8eeea] font-semibold text-[#11181d]"
-                  : "font-medium text-[#6b7c75] hover:bg-[#eef2ef] hover:text-[#11181d]",
+                  ? "bg-[#e9ebed] font-semibold text-[#11181d]"
+                  : "font-medium text-[#667078] hover:bg-[#f1f3f5] hover:text-[#11181d]",
               )}
               aria-current={active ? "page" : undefined}
             >

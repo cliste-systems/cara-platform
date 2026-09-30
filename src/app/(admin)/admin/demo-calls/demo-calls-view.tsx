@@ -12,7 +12,9 @@ import { ConnectionState, RoomEvent, Track } from "livekit-client";
 
 import {
   ensureMicrophoneAccess,
+  listDemoCallMicrophones,
   publishDemoCallMicrophone,
+  releasePreflightMicrophone,
   unpublishDemoCallMicrophone,
 } from "@/lib/demo-call-microphone";
 import { Loader2, Mic, Phone, PhoneOff } from "lucide-react";
@@ -448,6 +450,9 @@ function ActiveCallPanel({
 }
 
 export function DemoCallsView({ lines }: DemoCallsViewProps) {
+  const [microphones, setMicrophones] = useState<Awaited<ReturnType<typeof listDemoCallMicrophones>>>([]);
+  const [selectedMicrophoneId, setSelectedMicrophoneId] = useState("");
+  const [activeMicrophoneLabel, setActiveMicrophoneLabel] = useState<string | null>(null);
   const [selectedE164, setSelectedE164] = useState<string | null>(
     lines[0]?.e164 ?? null,
   );
@@ -458,6 +463,22 @@ export function DemoCallsView({ lines }: DemoCallsViewProps) {
   const [sessionEndedAt, setSessionEndedAt] = useState<number | null>(null);
   const [callLog, setCallLog] = useState<CallLogSummary | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refreshMicrophones = () => {
+      void listDemoCallMicrophones().then((devices) => {
+        if (!cancelled) setMicrophones(devices);
+      }).catch(() => { /* Start reports microphone permission errors. */ });
+    };
+    refreshMicrophones();
+    navigator.mediaDevices?.addEventListener("devicechange", refreshMicrophones);
+    return () => {
+      cancelled = true;
+      navigator.mediaDevices?.removeEventListener("devicechange", refreshMicrophones);
+      releasePreflightMicrophone();
+    };
+  }, []);
 
   const engineeringLog = useDemoCallEngineeringLog({
     roomName: session?.roomName ?? null,
@@ -526,6 +547,7 @@ export function DemoCallsView({ lines }: DemoCallsViewProps) {
     if (!selectedLine) return;
     const startedAt = Date.now();
     setError(null);
+    setActiveMicrophoneLabel(null);
     setCallLog(null);
     setSessionEndedAt(null);
     engineeringLog.reset();
@@ -540,17 +562,18 @@ export function DemoCallsView({ lines }: DemoCallsViewProps) {
 
     try {
       engineeringLog.append("info", "browser", "Requesting microphone access");
-      await ensureMicrophoneAccess();
-      engineeringLog.append("success", "browser", "Microphone access granted");
+      const label = await ensureMicrophoneAccess(selectedMicrophoneId || undefined);
+      setActiveMicrophoneLabel(label);
+      setMicrophones(await listDemoCallMicrophones());
+      engineeringLog.append("success", "browser", `Microphone ready: ${label}`);
     } catch (err) {
+      releasePreflightMicrophone();
+      void listDemoCallMicrophones().then(setMicrophones).catch(() => {});
       setSession(null);
       setSessionStartedAt(null);
       setPhase("error");
       setError(friendlyDemoCallError(err));
       engineeringLog.append("error", "browser", friendlyDemoCallError(err));
-      // #region agent log
-      fetch('http://127.0.0.1:7662/ingest/95496c05-1739-4e32-b7be-319b56b1c5b5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0f50f3'},body:JSON.stringify({sessionId:'0f50f3',runId:'mic',hypothesisId:'A',location:'demo-calls-view.tsx:startCall',message:'mic_blocked_before_room',data:{name:err instanceof DOMException?err.name:err instanceof Error?err.name:'unknown',msg:err instanceof Error?err.message.slice(0,160):String(err)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       return;
     }
 
@@ -573,6 +596,7 @@ export function DemoCallsView({ lines }: DemoCallsViewProps) {
       setSession(data);
       setPhase("in_call");
     } catch (err) {
+      releasePreflightMicrophone();
       setSession(null);
       setSessionStartedAt(null);
       setPhase("error");
@@ -583,6 +607,7 @@ export function DemoCallsView({ lines }: DemoCallsViewProps) {
   };
 
   const endCall = useCallback(() => {
+    releasePreflightMicrophone();
     const roomName = session?.roomName;
     const endedAt = Date.now();
     setSessionEndedAt(endedAt);
@@ -603,12 +628,14 @@ export function DemoCallsView({ lines }: DemoCallsViewProps) {
   }, [engineeringLog, pollCallLog, session?.roomName, sessionStartedAt]);
 
   const reset = () => {
+    releasePreflightMicrophone();
     clearPoll();
     setSession(null);
     setSessionStartedAt(null);
     setSessionEndedAt(null);
     setCallLog(null);
     setError(null);
+    setActiveMicrophoneLabel(null);
     engineeringLog.reset();
     setPhase("idle");
   };
@@ -646,6 +673,9 @@ export function DemoCallsView({ lines }: DemoCallsViewProps) {
           description={`${session.orgName ?? selectedLine?.orgName ?? "Store"} · ${formatIrishE164Display(session.calledNumber)}`}
         >
           <div className="p-5">
+            {activeMicrophoneLabel ? (
+              <p className="mb-3 text-sm text-gray-600">Microphone: {activeMicrophoneLabel}</p>
+            ) : null}
             <LiveKitRoom
               key={session.roomName}
               serverUrl={session.livekitUrl}
@@ -729,6 +759,34 @@ export function DemoCallsView({ lines }: DemoCallsViewProps) {
         <p className="text-sm text-red-700" role="alert">
           {error}
         </p>
+      ) : null}
+
+      {showLinePicker ? (
+        <div className="space-y-2">
+          <label htmlFor="demo-call-microphone" className="block text-sm font-medium text-gray-900">
+            Microphone
+          </label>
+          <select
+            id="demo-call-microphone"
+            value={selectedMicrophoneId}
+            onChange={(event) => setSelectedMicrophoneId(event.target.value)}
+            className="w-full max-w-md rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+          >
+            <option value="">Automatic — prefer built-in microphone</option>
+            {selectedMicrophoneId && !microphones.some((device) => device.deviceId === selectedMicrophoneId) ? (
+              <option value={selectedMicrophoneId} disabled>Previously selected microphone unavailable</option>
+            ) : null}
+            {microphones.map((device, index) => (
+              <option key={device.deviceId} value={device.deviceId}>
+                {device.label || `Microphone ${index + 1}`}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500">
+            Automatic prefers your MacBook or built-in mic and avoids iPhone microphones.
+            Device names appear after microphone permission is granted.
+          </p>
+        </div>
       ) : null}
 
       {showLinePicker ? (

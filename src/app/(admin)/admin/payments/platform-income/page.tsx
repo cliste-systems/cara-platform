@@ -1,3 +1,4 @@
+import { requireAdminPermission } from "@/lib/admin-session";
 import { CreditCard, ExternalLink } from "lucide-react";
 
 import { AdminPageShell } from "@/components/admin/admin-page-shell";
@@ -50,6 +51,7 @@ function date(value: string | null) {
 }
 
 export default async function PlatformIncomePage() {
+  await requireAdminPermission("billing");
   const admin = createAdminClient();
   const [paymentsResult, invoicesResult, syncResult, accountsResult] = await Promise.all([
     admin.from("billing_payments").select("*").order("created_at", { ascending: false }).limit(50),

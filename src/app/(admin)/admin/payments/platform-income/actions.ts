@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type Stripe from "stripe";
 
-import { requireAdminSessionUser } from "@/lib/admin-session";
+import { requireAdminPermission } from "@/lib/admin-session";
 import { getStripeClient } from "@/lib/stripe";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -13,7 +13,7 @@ const OPERATION_ID_RE = /^[a-zA-Z0-9_-]{8,128}$/;
 type ActionResult = { ok: boolean; message: string; invoiceId?: string };
 
 async function assertAdmin() {
-  await requireAdminSessionUser();
+  await requireAdminPermission("billing");
 }
 
 function amountInMinorUnits(raw: FormDataEntryValue | null) {

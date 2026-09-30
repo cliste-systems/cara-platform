@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 
 import { supabaseFetch } from "./fetch-with-timeout";
 
-export async function createClient() {
+export async function createClient(options: { userAgent?: string | null } = {}) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
   if (!url || !anonKey) {
@@ -14,9 +14,15 @@ export async function createClient() {
   }
 
   const cookieStore = await cookies();
+  // Informational only: preserve the browser label when a server action signs in.
+  // Never forward an arbitrary header map or use this value for authorization.
+  const userAgent = options.userAgent?.replace(/[\r\n]/g, "").slice(0, 512).trim();
 
   return createServerClient(url, anonKey, {
-    global: { fetch: supabaseFetch },
+    global: {
+      fetch: supabaseFetch,
+      ...(userAgent ? { headers: { "User-Agent": userAgent } } : {}),
+    },
     cookies: {
       getAll() {
         return cookieStore.getAll();

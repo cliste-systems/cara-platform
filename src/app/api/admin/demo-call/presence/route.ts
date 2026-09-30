@@ -1,10 +1,10 @@
-import { requireAdminMfaSessionUser } from "@/lib/admin-session";
+import { requireAdminPermission } from "@/lib/admin-session";
 import { isSameOriginRequest } from "@/lib/request-origin";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { RoomServiceClient } from "livekit-server-sdk";
 import { livekitHttpHostFromEnv } from "@/lib/livekit-phone-numbers";
 export async function POST(request:Request) {
-  try { await requireAdminMfaSessionUser(); } catch { return Response.json({error:"Unauthorized"},{status:401}); }
+  try { await requireAdminPermission("calls"); } catch { return Response.json({error:"Unauthorized"},{status:401}); }
   if(!isSameOriginRequest(request)) return Response.json({error:"Invalid origin"},{status:403});
   let roomName:string, ended:boolean;
   try {const body=await request.json();roomName=body.roomName;ended=body.ended===true;if(typeof roomName!=="string"||!/^admin-demo-[a-f0-9-]{36}$/.test(roomName))throw new Error();}catch{return Response.json({error:"Invalid session"},{status:400});}
