@@ -1468,3 +1468,13 @@ it("loads every offer across overlapping pages without returning a partial catal
   assert.ok(peak > 1 && peak <= 3);
   assert.equal(active, 0);
 });
+
+
+it("accepts both ends of a promotion's shared-unit weight range without accepting outside packs",()=>{
+ for(const grams of [150,160,180]){
+  const quote=formatWeeklyOfferQuote({productName:`Macroom Buffalo Buratta (${grams} g)`,currentPriceEur:4.75,discountLabel:'2 for €8 Macroom Buffalo Range 150-180g',fulfilment:'prepack'});
+  assert.match(quote,/two for eight euro/i);
+  assert.doesNotMatch(quote,/Eligibility for this exact pack is not verified/);
+ }
+ for(const grams of [149,181])assert.match(formatWeeklyOfferQuote({productName:`Macroom Buffalo Buratta (${grams} g)`,currentPriceEur:4.75,discountLabel:'2 for €8 Macroom Buffalo Range 150-180g',fulfilment:'prepack'}),/Eligibility for this exact pack is not verified/);
+});

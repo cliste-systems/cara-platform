@@ -8,6 +8,14 @@ import {
 } from "@/lib/retail-promotion-search";
 
 describe("retail promotion query parsing", () => {
+  it("does not confuse product fat or alcohol percentages with discounts", () => {
+    for (const query of ["Total 0% Greek Yogurt 150 g", "milk 1% fat", "beer 4.5% 500ml"]) {
+      assert.equal(shouldUseStructuredPromotionSearch(query), false, query);
+    }
+    assert.equal(parseRetailPromotionQuery("what has 20% off?").percent, 20);
+    assert.equal(parseRetailPromotionQuery("any 15% discount offers?").percent, 15);
+  });
+
   it("parses the failed 3-for-10 produce call as a multibuy browse", () => {
     const parsed = parseRetailPromotionQuery(
       "what are the 3 for €10 offers in the fruit and veg?",
