@@ -1120,6 +1120,7 @@ async function fetchRetailWeeklyOffersForBanner(
       .order("service_area", { ascending: true })
       .order("department", { ascending: true })
       .order("product_name", { ascending: true })
+      .order("id", { ascending: true })
       .range(from, from + pageSize - 1);
 
     const { data, error } = await query;
@@ -1207,7 +1208,7 @@ export function searchSyncedWeeklyOffersInRows(
       && filterWeeklyOffersByPromotionQuery([row],request).length > 0;
   });
   if (literalMatches.length > 0) return literalMatches.slice(0,tokenLimit).map(row=>rowToMatch(row,1));
-  rows = filterWeeklyOffersByPromotionQuery(activeRows, trimmed);
+  rows = filterWeeklyOffersByPromotionQuery(activeRows, stripAlternativePromotionComparison(query));
   const filters = resolveWeeklyOfferSearchFilters(trimmed, options);
   const excludeMeat = inferWeeklyOffersExcludeMeat(trimmed);
   const alcoholOnly = inferAlcoholOnlyFromQuery(trimmed);
