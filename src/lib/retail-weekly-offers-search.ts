@@ -252,6 +252,7 @@ function isRewardsOfferRow(row: RetailWeeklyOfferRow): boolean {
 export function inferWeeklyOffersListIntent(query: string): boolean {
   const trimmed = query.trim();
   if (!trimmed) return true;
+  if (offerSearchProductIdentityTokens(trimmed).length > 2 && /\b\d+(?:[.,]\d+)?\s*(?:g|kg|ml|cl|litres?|liters?|l|bags?|packs?|pieces?)\b/i.test(trimmed)) return false;
   if (inferRewardsPricePointFromQuery(trimmed) != null) return true;
   if (shouldUseStructuredPromotionSearch(trimmed)) return true;
   if (

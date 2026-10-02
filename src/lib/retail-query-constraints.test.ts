@@ -50,3 +50,8 @@ it("smoked salmon, gluten-free bread and dog kibble cannot be replaced by soup, 
   assert.equal(matchesRetailQueryConstraints("adult dog dry kibble","Cadbury Dairy Milk","Chocolate"),false);
   assert.equal(matchesRetailQueryConstraints("adult dog dry kibble","Pedigree Adult Complete Beef","Dry Dog Food"),true);
 });
+
+it("adult dog kibble treats dry food as a category and excludes puppy-specific food",()=>{
+  assert.equal(positiveRetailQuery("adult dog dry kibble"),"dog dry food");
+  assert.equal(matchesRetailQueryConstraints("adult dog dry kibble","Perfect Fit Rich Chicken Puppy Food","Dry Dog Food"),false);
+});
