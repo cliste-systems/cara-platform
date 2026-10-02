@@ -502,6 +502,15 @@ describe("supervalu offers sync helpers", () => {
     assert.ok(percentIndex >= 0 && nowIndex > percentIndex);
   });
 
+  it("does not label packaged offers outside the butcher department as meat", () => {
+    for (const serviceArea of ["dairy", "bakery", "produce", "grocery", "off_licence"] as const) {
+      const quote = formatWeeklyOfferQuote({ productName: "Department product", offerChannel: "prepack", serviceArea, fulfilment: "prepack", currentPriceEur: 2 });
+      assert.doesNotMatch(quote, /meat aisle|butcher counter/i, serviceArea);
+      assert.match(quote, /two euro/i);
+    }
+    assert.doesNotMatch(formatWeeklyOfferQuote({ productName: "Packaged product", offerChannel: "prepack", currentPriceEur: 2 }), /meat aisle/i);
+  });
+
   it("formats pre-pack offers in short clear sentences", () => {
     const quote = formatWeeklyOfferQuote({
       productName: "SuperValu Signature Tastes Thick Cut Chops with Pepper Sauce (600 g)",
@@ -1338,4 +1347,25 @@ it("does not turn a product pack count into a Rewards price-only browse",()=>{
  assert.equal(inferRewardsPricePointFromQuery("Kinetica Strawberry Protein Milkshake (330 ml) Rewards Price"),null);
  assert.equal(inferRewardsPricePointFromQuery("Kinetica Strawberry Protein Milkshake (330 ml) Rewards Price Only €2.50"),null);
  assert.equal(inferRewardsPricePointFromQuery("Rewards Price for €2.50"),2.5);
+});
+
+describe('customer promotion questions and literal pack identities', () => {
+  const make = (id: string, name: string, label: string) => mockOfferRow({id,product_name:name,search_text:`${name} ${label}`.toLowerCase(),department:'Food Cupboard',service_area:'grocery',fulfilment:'prepack',offer_channel:'grocery',discount_label:label,current_price_eur:4});
+  it('retains the requested bottle size when punctuation or ampersands change', () => {
+    const rows=[make('small','Heinz Tomato Ketchup 50% Less Sugar & Salt (400 ml)','2 for €6'),make('large','Heinz Tomato Ketchup 50% Less Sugar & Salt (800 ml)','Rewards Price')];
+    for(const query of ['Heinz Tomato Ketchup 50% Less Sugar & Salt 800 ml','Heinz Tomato Ketchup 50% Less Sugar and Salt 800ml']) {
+      assert.deepEqual(searchSyncedWeeklyOffersInRows(rows,query).map(r=>r.id),['large']);
+    }
+  });
+  it('checks either promotion type instead of requiring both words to match a product', () => {
+    const rows=[make('prunes','Forest Feast Orchard Prunes (200 g)','Rewards Price'),make('bars','Kind Caramel Almond & Sea Salt Bar (40 g)','2 for €4')];
+    assert.deepEqual(searchSyncedWeeklyOffersInRows(rows,'Forest Feast Orchard Prunes 200 g multibuy or reduced price').map(r=>r.id),['prunes']);
+    assert.deepEqual(searchSyncedWeeklyOffersInRows(rows,'Kind Caramel Almond & Sea Salt Bar 40g multibuy reduced price').map(r=>r.id),['bars']);
+    assert.deepEqual(searchSyncedWeeklyOffersInRows(rows,'only multibuy Forest Feast Orchard Prunes 200g').map(r=>r.id),[]);
+  });
+  it('does not conflate decimal sizes or plus variants', () => {
+    const rows=[make('decimal','Test Bottle (1.5 L)','Only €4'),make('whole','Test Bottle (15 L)','Only €4'),make('plus','Test Nappies Size 4+ (66 Piece)','Only €4'),make('normal','Test Nappies Size 4 (66 Piece)','Only €4')];
+    assert.deepEqual(searchSyncedWeeklyOffersInRows(rows,'Test Bottle 1.5L').map(r=>r.id),['decimal']);
+    assert.deepEqual(searchSyncedWeeklyOffersInRows(rows,'Test Nappies Size 4+ 66 Piece').map(r=>r.id),['plus']);
+  });
 });

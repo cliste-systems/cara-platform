@@ -890,10 +890,8 @@ function resolveOfferChannelPrefix(input: {
   if (serviceArea === "off_licence") {
     return "On the off-licence range this week";
   }
-  if (input.offerChannel === "prepack") {
-    return "In the pre-pack meat aisle this week";
-  }
-  if (input.offerChannel === "butcher_counter") {
+  // Packaged is a fulfilment type across every department, not a meat aisle.
+  if (!input.serviceArea && input.offerChannel === "butcher_counter") {
     return "At the butcher counter this week";
   }
   return "This week on the SuperValu national range";
@@ -1094,13 +1092,34 @@ export async function loadLatestRetailOfferWeekEnd(
   return end || null;
 }
 
+/** Compare literal identities across spoken/typed punctuation, retaining sizes and + variants. */
+function literalProductIdentity(text: string): {key: string; offsets: number[]} {
+  let key = ""; const offsets: number[] = [];
+  for (const token of text.toLowerCase().matchAll(/\d+(?:\.\d+)?|[a-z]+|\+/g)) {
+    if (token[0] === "and") continue;
+    key += token[0];
+    for (let i=0;i<token[0].length;i++) offsets.push(token.index!+i);
+  }
+  return {key,offsets};
+}
+
+function stripAlternativePromotionComparison(query: string): string {
+  // "Is it a multibuy or a reduced price?" asks which applies; it is not a
+  // request to hide every non-multibuy product. Keep restrictive filters intact.
+  if (/\bmulti[- ]?buys?\b/i.test(query) && /\breduced\s+price\b/i.test(query)
+      && !/\b(?:only|not|without|exclude|excluding)\b/i.test(query)) {
+    return query.replace(/\bmulti[- ]?buys?\b|\breduced\s+price\b/gi," ");
+  }
+  return query;
+}
+
 /** Product-token search on synced weekly offers, with category/list browse fallback. */
 export function searchSyncedWeeklyOffersInRows(
   rows: RetailWeeklyOfferRow[],
   query: string,
   options?: WeeklyOfferSearchFilters & { limit?: number; reference?: Date },
 ): WeeklyOfferMatch[] {
-  const trimmed = query.trim().slice(0, RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS);
+  const trimmed = stripAlternativePromotionComparison(query).trim().slice(0, RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS);
   if (!trimmed) return [];
 
   const reference = options?.reference ?? new Date();
@@ -1109,10 +1128,14 @@ export function searchSyncedWeeklyOffersInRows(
   const tokenLimit = options?.limit ?? RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS;
   // Resolve a supplied full product name before interpreting its ingredients,
   // cocoa/fat percentage, "Loose" name, or pack count as search instructions.
+  const identity = literalProductIdentity(trimmed);
   const literalMatches = activeRows.filter((row) => {
-    const index = trimmed.toLowerCase().indexOf(row.product_name.toLowerCase());
+    const product = literalProductIdentity(row.product_name).key;
+    const index = product ? identity.key.indexOf(product) : -1;
     if (index < 0) return false;
-    const request = trimmed.slice(0,index) + " " + trimmed.slice(index+row.product_name.length);
+    const start = identity.offsets[index];
+    const end = identity.offsets[index+product.length-1]+1;
+    const request = trimmed.slice(0,start) + " " + trimmed.slice(end);
     const scope = resolveWeeklyOfferSearchFilters(request, options);
     return rowMatchesFilters(row, scope, {excludeMeat:inferWeeklyOffersExcludeMeat(request),alcoholOnly:inferAlcoholOnlyFromQuery(request)})
       && filterWeeklyOffersByPromotionQuery([row],request).length > 0;
