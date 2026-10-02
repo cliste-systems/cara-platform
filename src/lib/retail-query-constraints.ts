@@ -5,11 +5,18 @@ export function positiveRetailQuery(query: string): string {
     .replace(/\b(?:that\s+)?(?:expir(?:e|es|ing)|end(?:s|ing)?)\b.*?(?:this Sunday|\d{4}-\d{2}-\d{2})/gi, " ")
     .replace(/\b(?:not|no(?!\s+(?:drain|added\s+sugar|artificial\s+(?:colours?|colors?|flavou?rs?)))|without|excluding|except|rather than)\s+(?:the\s+)?[^,.!?;]+/gi, " ")
     .replace(/\b(?:standard price|regular price|bundle price|anything is fine|any make|any brand|in cans please|solid block|sealed packets)\b/gi, " ")
+    .replace(/\bsealed\b/gi, " ")
+    .replace(/\bkibble\b/gi, "dry food")
     .replace(/\bdark\s+(?=stout)/gi, "")
     .replace(/\s+/g, " ").trim();
 }
 export function matchesRetailQueryConstraints(query: string, name: string, category = ""): boolean {
   const text = `${name} ${category}`.toLowerCase();
+  const positive = positiveRetailQuery(query);
+  if (/\bsmoked salmon\b/i.test(positive) && !/\bsmoked\b/i.test(text) || /\bsmoked salmon\b/i.test(positive) && !/\bsalmon\b/i.test(text)) return false;
+  if (/\bgluten[- ]free\b/i.test(positive) && /\bbread\b/i.test(positive) && (!/\b(?:bread|crispbread|breadrolls?)\b/i.test(text) || /\bbreaded\b/i.test(name))) return false;
+  if (/\bdogs?\b/i.test(positive) && /\b(?:dry|kibble)\b/i.test(query) && (!/\b(?:dogs?|canine)\b/i.test(text) || !/\b(?:dry|kibble|complete)\b/i.test(text))) return false;
+  if (/\bcats?\b/i.test(positive) && /\bdry\b/i.test(query) && (!/\bcats?\b/i.test(text) || !/\b(?:dry|complete)\b/i.test(text))) return false;
   if (/\bpasta\b/i.test(query) && /\b(?:boil|cooking|cook)\b/i.test(query)) {
     if (!/\b(?:pasta|spaghetti|penne|fusilli|linguine|ravioli|tortellini|tagliatelle|rigatoni|macaroni)\b/i.test(text) || /\b(?:instant|ready to heat|microwave|hot snacks)\b/i.test(text)) return false;
   }

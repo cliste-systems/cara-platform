@@ -199,7 +199,7 @@ export function stripCatalogSearchBoilerplate(query: string): string {
 export function stripCatalogPackagingNoise(query: string): string {
   return query
     .replace(
-      /\b(packets?|packs?|pre\s*-?\s*pack(?:ed|s)?|packaged|chilled|aisle|tray|fridge|shelf|counter|loose|fresh sliced)\b/gi,
+      /\b(packets?|packs?|pre\s*-?\s*pack(?:ed|s)?|packaged|sealed|chilled|aisle|tray|fridge|shelf|counter|loose|fresh sliced)\b/gi,
       " ",
     )
     .replace(/\s{2,}/g, " ")

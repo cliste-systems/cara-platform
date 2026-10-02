@@ -42,3 +42,11 @@ it("a dairy-free ice cream request cannot be satisfied by dairy-free milk",()=>{
   assert.equal(matchesRetailQueryConstraints("dairy-free ice cream, not dairy ice cream","Alpro Dairy Free Soya Milk","Dairy Free"),false);
   assert.equal(matchesRetailQueryConstraints("dairy-free ice cream, not dairy ice cream","Swedish Glace Dairy Free Vanilla Ice Cream","Ice Cream"),true);
 });
+
+
+it("smoked salmon, gluten-free bread and dog kibble cannot be replaced by soup, breaded fish or chocolate",()=>{
+  assert.equal(matchesRetailQueryConstraints("sealed smoked salmon packets","Erin Chicken Soup","Soup"),false);
+  assert.equal(matchesRetailQueryConstraints("gluten-free bread","Kilmore Gluten Free Breaded Cod","Fish"),false);
+  assert.equal(matchesRetailQueryConstraints("adult dog dry kibble","Cadbury Dairy Milk","Chocolate"),false);
+  assert.equal(matchesRetailQueryConstraints("adult dog dry kibble","Pedigree Adult Complete Beef","Dry Dog Food"),true);
+});
