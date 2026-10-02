@@ -33,7 +33,7 @@ import {
   speakEmbeddedEurAmounts,
 } from "@/lib/spoken-eur-price";
 
-export const SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS = 120;
+export const SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS = 240;
 export const SUPERVALU_CATALOG_SEARCH_MAX_RESULTS = 5;
 
 const CATALOG_BRAND_QUERY_TOKENS = new Set(["supervalu", "own", "brand"]);

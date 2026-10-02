@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS,
   mergeGatewayWithSyncedOffers,
   expandSupervaluCatalogSearchQueries,
   filterCatalogMatchesByQuery,
@@ -424,4 +425,10 @@ it("the final catalogue filter preserves a regular Guinness pack requested with 
  const match=normalizeSupervaluCatalogProduct({sku:"regular",name,priceNumeric:16,attributes:{altCategory:"Beer"}})!;
  assert.equal(filterCatalogMatchesByQuery("regular Guinness Draught 8 pack 500ml cans, not Nitrosurge",[match])[0]?.productName,name);
  assert.equal(filterCatalogMatchesByQuery("regular Guinness Draught eight pack 500 ml cans, not Nitrosurge",[match])[0]?.productName,name);
+});
+
+it("long named products and caller savings questions fit the shared request limit",()=>{
+ const query="What’s the saving on the 2-pack deal for Prepared By Our Butcher Chicken Fillets with Garlic, Herb & Lemon Crumb 1 Piece compared with 2 at the listed single price?";
+ assert.ok(query.length>120);
+ assert.ok(query.length<=SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS);
 });
