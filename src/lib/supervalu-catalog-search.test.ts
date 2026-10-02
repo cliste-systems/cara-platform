@@ -45,7 +45,8 @@ describe("supervalu catalog search", () => {
     });
     assert.match(quote, /four euro seventy nine/i);
     assert.match(quote, /regular price/i);
-    assert.match(quote, /not on offer this week/i);
+    assert.match(quote, /couldn.t verify a current offer/i);
+    assert.doesNotMatch(quote, /not on offer this week/i);
   });
 
   it("formats promotional catalog prices with spoken was price", () => {
