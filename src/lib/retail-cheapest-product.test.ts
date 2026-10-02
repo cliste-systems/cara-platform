@@ -25,7 +25,8 @@ function database(catalog: Row[], offers: Row[], stallConsensus = false) {
       return {
         select() { return this; },
         eq(key: string, value: unknown) { filters.push((row) => row[key] === value); return this; },
-        gte(key: string, value: number) { filters.push((row) => Number(row[key]) >= value); return this; },
+        gte(key: string, value: number | string) { filters.push((row) => row[key] >= value); return this; },
+        lte(key: string, value: string) { filters.push((row) => row[key] <= value); return this; },
         ilike(key: string, value: string) { filters.push((row) => String(row[key]).toLowerCase().includes(value.replaceAll("%", "").toLowerCase())); return this; },
         order() { return this; },
         async range(from: number, to: number) { return { data: rows.filter((row) => filters.every((filter) => filter(row))).slice(from, to + 1), error: null }; },

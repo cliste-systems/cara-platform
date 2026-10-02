@@ -55,6 +55,7 @@ export function requestedNappySize(query: string): string|null {
 
 export function matchesNappySizeContext(query: string, productName: string, category=""): boolean {
   const wanted=requestedNappySize(query);if(!wanted)return true;
+  if (!/\b(?:napp(?:y|ies)|diapers?|pampers|huggies)\b/i.test(`${productName} ${category}`)) return false;
   const size=`${productName} ${category}`.match(/\bsize\s*([0-9]+)(?:\s*(\+|plus))?/i);
   return Boolean(size && `${size[1]}${size[2]?"+":""}`===wanted);
 }

@@ -65,6 +65,8 @@ function mockSupabaseRows(rows: RetailWeeklyOfferRow[]) {
       error: null,
     }),
     eq: () => chain,
+    lte: () => chain,
+    gte: () => chain,
   };
   return {
     from: () => ({
@@ -1390,7 +1392,7 @@ describe("customer cooking and browse edge cases", () => {
     assert.equal(searchSyncedWeeklyOffersInRows(rows,"multibuys across different departments examples").length,2);
   });
 
-  it("coalesces live offer loads, expires quickly, and never caches a failed load", async () => {
+  it("serves date-checked offers during a transient refresh stall and refuses an old snapshot", async () => {
     const clock=Date.now;let now=clock();let reads=0;let fail=false;
     const row=mockOfferRow({product_name:"Live offer",current_price_eur:2,discount_label:"Only €2"});
     const client={supabaseUrl:"https://cache-regression.invalid",from:()=>{reads++;if(fail)throw Error("temporary outage");return mockSupabaseRows([row]).from();}};
@@ -1399,10 +1401,11 @@ describe("customer cooking and browse edge cases", () => {
       const [a,b]=await Promise.all([loadRetailWeeklyOffersForBanner(client as never,"supervalu"),loadRetailWeeklyOffersForBanner(client as never,"supervalu")]);
       assert.equal(reads,1);assert.equal(a.length,1);assert.equal(b.length,1);
       a.length=0;assert.equal((await loadRetailWeeklyOffersForBanner(client as never,"supervalu")).length,1);
-      now+=15001;row.product_name="Updated Thursday offer";
-      assert.equal((await loadRetailWeeklyOffersForBanner(client as never,"supervalu"))[0]?.product_name,"Updated Thursday offer");assert.equal(reads,2);
-      now+=15001;fail=true;await assert.rejects(loadRetailWeeklyOffersForBanner(client as never,"supervalu"),/temporary outage/);
-      fail=false;assert.equal((await loadRetailWeeklyOffersForBanner(client as never,"supervalu")).length,1);assert.equal(reads,4);
+      now+=60001;fail=true;
+      assert.equal((await loadRetailWeeklyOffersForBanner(client as never,"supervalu"))[0]?.product_name,"Live offer");
+      await new Promise(resolve=>setImmediate(resolve));assert.equal(reads,2);
+      now+=300001;await assert.rejects(loadRetailWeeklyOffersForBanner(client as never,"supervalu"),/temporary outage/);
+      fail=false;assert.equal((await loadRetailWeeklyOffersForBanner(client as never,"supervalu")).length,1);
     } finally {Date.now=clock;}
   });
 });

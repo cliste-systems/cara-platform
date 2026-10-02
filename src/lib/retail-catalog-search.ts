@@ -1,3 +1,4 @@
+import { positiveRetailQuery, matchesRetailQueryConstraints } from "@/lib/retail-query-constraints";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { offerSearchProductIdentityTokens, scoreSupervaluSearchText } from "@/lib/retail-weekly-offers-search";
@@ -58,7 +59,7 @@ function queryRequestsSupervaluBrand(query: string): boolean {
 }
 
 function productSearchTokens(query: string): string[] {
-  return offerSearchProductIdentityTokens(query).filter(
+  return offerSearchProductIdentityTokens(positiveRetailQuery(query)).filter(
     (token) => !OWN_LABEL_QUERY_TOKENS.has(token),
   );
 }
@@ -212,6 +213,23 @@ type NationalCatalogRow = {
   national_regular_price_eur: number | null;
 };
 
+// Public national candidate data only; tenant/store decisions are never cached here.
+const nationalCandidates = new Map<string, {at:number; rows?:NationalCatalogRow[]; refresh?:Promise<NationalCatalogRow[]>}>();
+async function loadNationalCandidateRows(key:string|null,load:()=>Promise<NationalCatalogRow[]>):Promise<NationalCatalogRow[]> {
+  if (!key) return load();
+  let entry=nationalCandidates.get(key);
+  if (!entry) {
+    entry={at:0};
+    if(nationalCandidates.size>=256)nationalCandidates.delete(nationalCandidates.keys().next().value!);
+    nationalCandidates.set(key,entry);
+  }
+  const cache=entry;
+  if(cache.rows && Date.now()-cache.at<60_000)return cache.rows;
+  if(!cache.refresh)cache.refresh=load().then(rows=>{cache.rows=rows;cache.at=Date.now();return rows;}).finally(()=>{cache.refresh=undefined;});
+  if(cache.rows && Date.now()-cache.at<300_000){void cache.refresh.catch(()=>{});return cache.rows;}
+  return cache.refresh;
+}
+
 export async function searchNationalRetailCatalog(
   supabase: SupabaseClient,
   input: {
@@ -236,9 +254,12 @@ export async function searchNationalRetailCatalog(
 
   let candidateRows: NationalCatalogRow[] = [];
   for (const candidate of candidateTokens) {
-    const rows: NationalCatalogRow[] = [];
+    const project = (supabase as unknown as {supabaseUrl?: string}).supabaseUrl;
+    const key = project ? `${project}:${input.retailBanner}:${input.serviceArea ?? "all"}:${input.fulfilment ?? "all"}:${candidate}` : null;
+    const rows = await loadNationalCandidateRows(key, async () => {
+      const rows: NationalCatalogRow[] = [];
     const pageSize = 500;
-    for (let from = 0; ; from += pageSize) {
+      for (let from = 0; ; from += pageSize) {
       let query = supabase
         .from("retail_catalog_products")
         .select(
@@ -256,7 +277,10 @@ export async function searchNationalRetailCatalog(
       rows.push(...((data ?? []) as NationalCatalogRow[]));
       if ((data ?? []).length < pageSize) break;
     }
+      return rows;
+    });
     const relevantRows = rows.filter((row) => {
+      if (!matchesRetailQueryConstraints(input.query,row.product_name,row.department)) return false;
       const compactQuery = normalizeSearchText(input.query).replace(/[^a-z0-9]/g, "");
       const compactName = normalizeSearchText(row.product_name).replace(/[^a-z0-9]/g, "");
       if (compactName.length >= 4 && compactQuery.includes(compactName)) return true;

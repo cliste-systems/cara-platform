@@ -29,7 +29,7 @@ function database(offers: RetailWeeklyOfferRow[], products: unknown[] = []) {
     from(table: string) {
       const rows = table === "retail_weekly_offers" ? offers : products;
       return {
-        select() { return this; }, eq() { return this; }, gte() { return this; },
+        select() { return this; }, eq() { return this; }, gte() { return this; }, lte() { return this; },
         ilike() { return this; }, order() { return this; },
         async range(from: number, to: number) { return { data: rows.slice(from, to + 1), error: null }; },
       };

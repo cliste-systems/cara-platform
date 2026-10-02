@@ -197,6 +197,8 @@ export async function POST(request: Request) {
   });
 
   const mappedMatches = matches.map((match) => ({
+    offer_week_start: match.offerWeekStart ?? null,
+    offer_week_end: match.offerWeekEnd ?? null,
     price_conflict: match.priceConflict === true,
     product_name: match.productName,
     department: match.department,

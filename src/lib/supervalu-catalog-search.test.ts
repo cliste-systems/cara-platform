@@ -337,6 +337,7 @@ describe("national product tool integration", () => {
         return {
           select() { return this; },
           eq(key: string, value: unknown) { equals.push([key, value]); return this; },
+          gte() { return this; }, lte() { return this; },
           order() { return this; },
           async range(from: number, to: number) {
             return { data: rows.filter((row) => equals.every(([key, value]) => row[key] === value)).slice(from, to + 1), error: null };

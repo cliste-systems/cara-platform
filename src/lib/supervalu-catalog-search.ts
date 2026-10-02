@@ -1,3 +1,4 @@
+import { positiveRetailQuery } from "@/lib/retail-query-constraints";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { fetchSupervaluGatewaySearch, SUPERVALU_GATEWAY_PAGE_SIZE } from "@/lib/supervalu-gateway";
@@ -255,6 +256,8 @@ export type SupervaluCatalogProduct = {
 };
 
 export type SupervaluCatalogMatch = {
+  offerWeekStart?: string;
+  offerWeekEnd?: string;
   priceConflict?: boolean;
   productName: string;
   department: string;
@@ -498,7 +501,9 @@ function syncedOfferToCatalogMatch(offer: WeeklyOfferMatch): SupervaluCatalogMat
   return {
     productName: offer.productName,
     department: offer.department,
-    sku: null,
+    sku: offer.sku ?? null,
+    offerWeekStart: offer.offerWeekStart,
+    offerWeekEnd: offer.offerWeekEnd,
     currentPriceEur: offer.currentPriceEur,
     wasPriceEur: offer.wasPriceEur,
     discountLabel: offer.discountLabel,
@@ -680,7 +685,7 @@ async function searchSupervaluCatalogLiveInternal(
   const comparePrices = queryRequestsLowestPrice(trimmed);
   const resultLimit = comparePrices ? Infinity : listIntent ? RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS : SUPERVALU_CATALOG_SEARCH_MAX_RESULTS;
 
-  const filters = resolveWeeklyOfferSearchFilters(trimmed, {
+  const filters = resolveWeeklyOfferSearchFilters(positiveRetailQuery(trimmed), {
     fulfilment: options?.fulfilment,
     serviceArea: options?.serviceArea,
   });

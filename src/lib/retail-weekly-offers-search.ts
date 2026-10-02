@@ -1,3 +1,4 @@
+import { positiveRetailQuery, matchesRetailQueryConstraints } from "@/lib/retail-query-constraints";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { stripPriceComparisonWords, type RetailPriceBasis } from "@/lib/retail-price-comparison";
 import { matchesNappySizeContext, requestedNappySize, matchesMeatCookingContext, queryRequestsMeatBurgers, stripBurgerSearchContext } from "@/lib/retail-product-context";
@@ -365,7 +366,7 @@ export function inferWeeklyOfferServiceAreaFromQuery(
   // A meat preference for burgers does not require the butcher department;
   // frozen or pre-pack meat burgers may belong to other catalogue areas.
   const q = (queryRequestsMeatBurgers(query) && !/\b(?:butcher|counter|department|section|aisle)\b/i.test(query)
-    ? stripBurgerSearchContext(query) : query).toLowerCase();
+    ? stripBurgerSearchContext(query) : positiveRetailQuery(query)).toLowerCase();
   // Named products get their department from catalogue evidence. Ingredient
   // words inside a specific product name must not hard-scope the lookup.
   if (!/\b(?:counter|department|section|aisle|butcher|deli|bakery|off[ -]licen[cs]e)\b/.test(q)
@@ -376,7 +377,7 @@ export function inferWeeklyOfferServiceAreaFromQuery(
       /\b(?:wine gums|beer batter|fish fingers|fish cakes|cream clean|ice cream|peanut butter|butter beans|coconut milk|almond milk|oat milk|meat[ -]free|plant[ -]based|dog food|cat food|pet food)\b/.test(q)) return null;
   if (/\b(?:apart from|not|non[- ]|except)\s*meat\b/.test(q)) return null;
   if (
-    /off[- ]licence|off licence|wine|beer|spirits|cider|alcohol|alcoholic|liquor|liqueur|drinks aisle/i.test(
+    /off[- ]licence|off licence|wine|beer|stout|lager|guinness|spirits|cider|alcohol|alcoholic|liquor|liqueur|drinks aisle/i.test(
       q,
     )
   ) {
@@ -425,7 +426,8 @@ export function inferWeeklyOfferServiceAreaFromQuery(
 export function inferWeeklyOfferFulfilmentFromQuery(
   query: string,
 ): SupervaluFulfilment | null {
-  const q = query.toLowerCase();
+  const q = positiveRetailQuery(query).toLowerCase();
+  if (/sealed (?:packets|packs)|\b(?:not|rather than|without)\b.*\bcounter\b/i.test(query)) return "prepack";
   if (
     /pre\s*-?\s*pack|packaged|quick fry|meat aisle|fish aisle|chilled aisle|chilled pack|in the aisle|on the shelf|shelf pack/i.test(
       q,
@@ -793,6 +795,9 @@ function preferProductNameMatches<
 
 export type WeeklyOfferMatch = {
   id: string;
+  sku?: string | null;
+  offerWeekStart?: string;
+  offerWeekEnd?: string;
   productName: string;
   department: string;
   offerChannel: SupervaluOfferChannel;
@@ -1011,6 +1016,9 @@ function rowToMatch(row: RetailWeeklyOfferRow, score: number): WeeklyOfferMatch 
   const fulfilment = row.fulfilment ?? "prepack";
   return {
     id: row.id,
+    sku: row.sku,
+    offerWeekStart: row.offer_week_start,
+    offerWeekEnd: row.offer_week_end,
     productName: row.product_name,
     department: row.department,
     offerChannel,
@@ -1044,31 +1052,45 @@ function rowToMatch(row: RetailWeeklyOfferRow, score: number): WeeklyOfferMatch 
 
 // National offers are shared read-only data. Coalesce concurrent loads for the
 // same project/department; a short expiry keeps new Thursday publications fresh.
-const weeklyOfferLoads = new Map<string, { expiresAt: number; promise: Promise<RetailWeeklyOfferRow[]> }>();
-const WEEKLY_OFFER_CACHE_MS = 15_000;
+type OfferCacheEntry = { refreshedAt: number; rows?: RetailWeeklyOfferRow[]; refresh?: Promise<RetailWeeklyOfferRow[]> };
+const weeklyOfferLoads = new Map<string, OfferCacheEntry>();
+const WEEKLY_OFFER_CACHE_MS = 60_000;
+const WEEKLY_OFFER_FALLBACK_MS = 5 * 60_000;
 
 export async function loadRetailWeeklyOffersForBanner(
   supabase: SupabaseClient,
   retailBanner: string,
   options?: { serviceArea?: SupervaluServiceArea | null; reference?: Date },
 ): Promise<RetailWeeklyOfferRow[]> {
+  if (options?.serviceArea) {
+    const rows = await loadRetailWeeklyOffersForBanner(supabase,retailBanner,{reference:options.reference});
+    return rows.filter(row=>row.service_area===options.serviceArea);
+  }
   const project = (supabase as unknown as { supabaseUrl?: string }).supabaseUrl;
   if (!project) return fetchRetailWeeklyOffersForBanner(supabase, retailBanner, options);
-  const day = retailCalendarDay(options?.reference ?? new Date());
-  const key = `${project}:${retailBanner}:${options?.serviceArea ?? "all"}:${day}`;
-  const existing = weeklyOfferLoads.get(key);
-  if (existing && existing.expiresAt > Date.now()) return [...await existing.promise];
-  const entry = { expiresAt: Infinity, promise: Promise.resolve([] as RetailWeeklyOfferRow[]) };
-  entry.promise = fetchRetailWeeklyOffersForBanner(supabase, retailBanner, options).then(rows => {
-    entry.expiresAt = Date.now() + WEEKLY_OFFER_CACHE_MS;
-    return rows;
-  }).catch(error => {
-    if (weeklyOfferLoads.get(key) === entry) weeklyOfferLoads.delete(key);
-    throw error;
-  });
-  if (weeklyOfferLoads.size >= 32) weeklyOfferLoads.delete(weeklyOfferLoads.keys().next().value!);
-  weeklyOfferLoads.set(key, entry);
-  return [...await entry.promise];
+  const reference = options?.reference ?? new Date();
+  const key = `${project}:${retailBanner}:${options?.serviceArea ?? "all"}:${retailCalendarDay(reference)}`;
+  let entry = weeklyOfferLoads.get(key);
+  if (!entry) {
+    entry = {refreshedAt: 0};
+    if (weeklyOfferLoads.size >= 32) weeklyOfferLoads.delete(weeklyOfferLoads.keys().next().value!);
+    weeklyOfferLoads.set(key, entry);
+  }
+  const cache = entry;
+  const safeRows = () => filterRetailWeeklyOffersToActiveWeek(cache.rows ?? [], reference);
+  if (cache.rows && Date.now() - cache.refreshedAt < WEEKLY_OFFER_CACHE_MS) return [...safeRows()];
+  if (!cache.refresh) {
+    cache.refresh = fetchRetailWeeklyOffersForBanner(supabase, retailBanner, options).then(rows => {
+      cache.rows = rows; cache.refreshedAt = Date.now(); return rows;
+    }).finally(() => {cache.refresh = undefined;});
+  }
+  // A short verified snapshot covers transient database stalls. Date and source
+  // freshness are checked again on every read; expired offers never survive.
+  if (cache.rows && Date.now() - cache.refreshedAt < WEEKLY_OFFER_FALLBACK_MS) {
+    void cache.refresh.catch(() => {});
+    return [...safeRows()];
+  }
+  return [...await cache.refresh];
 }
 
 async function fetchRetailWeeklyOffersForBanner(
@@ -1086,7 +1108,9 @@ async function fetchRetailWeeklyOffersForBanner(
       .from("retail_weekly_offers")
       .select("*")
       .eq("retail_banner", retailBanner)
-      .eq("is_national", true);
+      .eq("is_national", true)
+      .lte("offer_week_start", retailCalendarDay(reference))
+      .gte("offer_week_end", retailCalendarDay(reference));
 
     if (options?.serviceArea) {
       query = query.eq("service_area", options.serviceArea);
@@ -1122,21 +1146,8 @@ export async function loadLatestRetailOfferWeekEnd(
   retailBanner: string,
   reference = new Date(),
 ): Promise<string | null> {
-  const { data, error } = await supabase
-    .from("retail_weekly_offers")
-    .select("offer_week_end")
-    .eq("retail_banner", retailBanner)
-    .eq("is_national", true)
-    .lte("offer_week_start", formatInTimeZone(reference, DUBLIN, "yyyy-MM-dd"))
-    .gte("offer_week_end", formatInTimeZone(reference, DUBLIN, "yyyy-MM-dd"))
-    .gte("synced_at", new Date(reference.getTime() - RETAIL_OFFER_MAX_SOURCE_AGE_MS).toISOString())
-    .lte("synced_at", reference.toISOString())
-    .order("offer_week_end", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  const end = String(data?.offer_week_end ?? "").trim();
-  return end || null;
+  const rows = await loadRetailWeeklyOffersForBanner(supabase, retailBanner, {reference});
+  return rows.reduce<string | null>((latest,row) => !latest || row.offer_week_end > latest ? row.offer_week_end : latest, null);
 }
 
 /** Compare literal identities across spoken/typed punctuation, retaining sizes and + variants. */
@@ -1166,12 +1177,18 @@ export function searchSyncedWeeklyOffersInRows(
   query: string,
   options?: WeeklyOfferSearchFilters & { limit?: number; reference?: Date },
 ): WeeklyOfferMatch[] {
-  const trimmed = stripAlternativePromotionComparison(query).trim().slice(0, RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS);
+  const trimmed = positiveRetailQuery(stripAlternativePromotionComparison(query)).trim().slice(0, RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS);
   if (!trimmed) return [];
 
   const reference = options?.reference ?? new Date();
+  const sunday = new Date(`${retailCalendarDay(reference)}T12:00:00Z`);
+  sunday.setUTCDate(sunday.getUTCDate() + (7 - sunday.getUTCDay()) % 7);
+  const expiry = /\b(?:expir(?:e|es|ing)|end(?:s|ing)?)\b.*\bthis Sunday\b/i.test(query) ? sunday.toISOString().slice(0,10)
+    : query.match(/\b(?:expir(?:e|es|ing)|end(?:s|ing)?)\b.*?(\d{4}-\d{2}-\d{2})/i)?.[1];
   const activeRows = rows.filter((row) =>
+    (!expiry || row.offer_week_end === expiry) &&
     isRetailOfferWeekActive(row, reference) && isRetailOfferObservationFresh(row.synced_at, reference) &&
+    matchesRetailQueryConstraints(query, row.product_name, `${row.department} ${row.category_breadcrumb ?? ""}`) &&
     matchesMeatCookingContext(trimmed, row.product_name, `${row.department} ${row.category_breadcrumb ?? ""}`) &&
     matchesNappySizeContext(trimmed,row.product_name,row.category_breadcrumb ?? ""));
   const tokenLimit = options?.limit ?? RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS;
