@@ -47,7 +47,9 @@ export function matchesMeatCookingContext(query: string, productName: string, ca
 
 export function requestedNappySize(query: string): string|null {
   if (!/\b(?:napp(?:y|ies)|diapers?)\b/i.test(query)) return null;
-  const size=query.match(/\bsize\s*([0-9]+)(?:\s*(\+|plus))?/i);
+  const words:Record<string,string>={one:"1",two:"2",three:"3",four:"4",five:"5",six:"6",seven:"7",eight:"8",nine:"9"};
+  const normalized=query.replace(/\b(one|two|three|four|five|six|seven|eight|nine)\b/gi,word=>words[word.toLowerCase()] ?? word);
+  const size=normalized.match(/\bsize\s*([0-9]+)(?:\s*(\+|plus))?/i);
   return size ? `${size[1]}${size[2]?"+":""}` : null;
 }
 

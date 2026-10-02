@@ -276,7 +276,8 @@ export function inferWeeklyOffersListIntent(query: string): boolean {
   ) {
     return false;
   }
-  if (tokens.filter((token) => inferWeeklyOffersBrowseCategories(trimmed).includes(token)).length >= 2) {
+  if (tokens.filter((token) => inferWeeklyOffersBrowseCategories(trimmed).includes(token)).length >= 2 &&
+      offerSearchProductTokens(trimmed).every(token=>inferWeeklyOffersBrowseCategories(trimmed).includes(token))) {
     return true;
   }
   if (
@@ -1194,7 +1195,7 @@ export function searchSyncedWeeklyOffersInRows(
   const excludeMeat = inferWeeklyOffersExcludeMeat(trimmed);
   const alcoholOnly = inferAlcoholOnlyFromQuery(trimmed);
   const nappySize=requestedNappySize(trimmed);
-  if(nappySize && offerSearchProductIdentityTokens(trimmed).every(token=>/^(?:baby|nappies|nappy|diaper|diapers|size|plus|[0-9]+)$/.test(token))) {
+  if(nappySize && offerSearchProductIdentityTokens(trimmed).every(token=>/^(?:baby|nappies|nappy|diaper|diapers|size|plus|one|two|three|four|five|six|seven|eight|nine|[0-9]+)$/.test(token))) {
     return rows.filter(row=>rowMatchesFilters(row,filters,{excludeMeat,alcoholOnly})).slice(0,tokenLimit).map(row=>rowToMatch(row,1));
   }
   const listIntent = inferWeeklyOffersListIntent(trimmed);

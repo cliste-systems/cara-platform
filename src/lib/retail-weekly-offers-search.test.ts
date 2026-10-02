@@ -1424,6 +1424,15 @@ it("keeps the caller's nappy size across generic queries and never substitutes a
     mockOfferRow({product_name:"Pampers Baby Dry Jumbo Pack Size 4+ (66 Piece)",category_breadcrumb:"Grocery/Baby/Baby Nappies & Pants/Size 4+",service_area:"grocery",fulfilment:"prepack",department:"Size 4+",current_price_eur:16.5,discount_label:"2 for €28",search_text:"pampers baby dry nappies size 4+"}),
   ];
   assert.deepEqual(searchSyncedWeeklyOffersInRows(rows,"baby nappies size 2").map(x=>x.productName),[rows[0]!.product_name]);
+  assert.deepEqual(searchSyncedWeeklyOffersInRows(rows,"baby nappies size two").map(x=>x.productName),[rows[0]!.product_name]);
+  assert.deepEqual(searchSyncedWeeklyOffersInRows(rows,"nappies size four plus").map(x=>x.productName),[rows[1]!.product_name]);
   assert.deepEqual(searchSyncedWeeklyOffersInRows(rows,"nappies size 4+ offers").map(x=>x.productName),[rows[1]!.product_name]);
   assert.equal(searchSyncedWeeklyOffersInRows(rows,"nappies size 3 offers").length,0);
+});
+
+
+it("keeps a misspelled named product with multiple ingredients out of department browsing", () => {
+  const rows=[mockOfferRow({product_name:"Charleville Spreadable Cheese with Ham (125 g)",current_price_eur:1.75,discount_label:"Rewards Price Only €1.75",search_text:"charleville spreadable cheese with ham 125g"}),mockOfferRow({product_name:"Unrelated cheese",current_price_eur:2,discount_label:"Only €2",search_text:"unrelated cheese"})];
+  assert.equal(inferWeeklyOffersListIntent("Charlevile Spreadable Cheese with Ham 125 g"),false);
+  assert.deepEqual(searchSyncedWeeklyOffersInRows(rows,"Charlevile Spreadable Cheese with Ham 125 g").map(x=>x.productName),[rows[0]!.product_name]);
 });
