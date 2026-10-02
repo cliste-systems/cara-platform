@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { fetchSupervaluGatewaySearch, SUPERVALU_GATEWAY_PAGE_SIZE } from "@/lib/supervalu-gateway";
 import { queryRequestsLowestPrice, stripPriceComparisonWords, type RetailPriceBasis } from "@/lib/retail-price-comparison";
-import { matchesBurgerProductContext, stripBurgerSearchContext } from "@/lib/retail-product-context";
+import { matchesNappySizeContext, matchesMeatCookingContext, matchesBurgerProductContext, stripBurgerSearchContext } from "@/lib/retail-product-context";
 import {
   searchNationalRetailCatalog,
   searchStoredRetailCatalog,
@@ -85,7 +85,7 @@ export function filterCatalogMatchesByQuery(
   query: string,
   matches: SupervaluCatalogMatch[],
 ): SupervaluCatalogMatch[] {
-  matches = matches.filter((match) => matchesBurgerProductContext(query, match.productName, match.department));
+  matches = matches.filter((match) => matchesBurgerProductContext(query, match.productName, match.department) && matchesMeatCookingContext(query, match.productName, match.department) && matchesNappySizeContext(query,match.productName,match.department));
   if (matches.length === 0 || inferWeeklyOffersListIntent(query)) return matches;
 
   const productTokens = catalogProductTokens(query);

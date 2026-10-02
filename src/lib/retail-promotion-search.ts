@@ -106,6 +106,7 @@ const PROMOTION_NOISE = new Set([
   "value",
   "multibuy",
   "multibuys",
+  "across", "different", "department", "departments", "example", "examples", "few", "including",
   "multi",
   "buys",
   "earn",

@@ -188,3 +188,9 @@ it("keeps fresh RPC campaign membership and full source offer conditions", async
   assert.match(matches[0]?.quoteText ?? "", /Activate coupon before paying/);
   assert.match(matches[0]?.quoteText ?? "", /Limit per product 4/);
 });
+
+
+it("does not treat examples across departments as named promotion products", () => {
+  assert.deepEqual(parseRetailPromotionQuery("multibuys across different departments examples").subjectTokens,[]);
+  assert.deepEqual(parseRetailPromotionQuery("3 for 10 offers across different departments examples").subjectTokens,[]);
+});

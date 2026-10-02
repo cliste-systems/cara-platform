@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { stripPriceComparisonWords, type RetailPriceBasis } from "@/lib/retail-price-comparison";
-import { queryRequestsMeatBurgers, stripBurgerSearchContext } from "@/lib/retail-product-context";
+import { matchesNappySizeContext, requestedNappySize, matchesMeatCookingContext, queryRequestsMeatBurgers, stripBurgerSearchContext } from "@/lib/retail-product-context";
 
 import type {
   RetailWeeklyOfferRow,
@@ -651,7 +651,7 @@ const STOPWORDS = new Set([
   "any", "there", "some", "just", "hello", "yeah", "yep", "well", "also",
   "actually", "whats", "like", "right", "so", "wondering", "know", "tell", "best", "highlights", "surprise", "apart", "not", "non", "except",
   "could", "would", "thanks", "thank", "hi", "em", "uh", "um",
-  "product", "products", "item", "items", "range",
+  "product", "products", "item", "items", "range", "across", "different", "example", "examples", "few", "including",
 ]);
 
 export function tokenizeSupervaluSearchQuery(query: string): string[] {
@@ -719,6 +719,7 @@ const FULFILMENT_QUERY_TOKENS = new Set([
   "butchers",
   "deli",
   "prepack",
+  "prepacked",
   "packaged",
   "aisle",
   "fresh",
@@ -757,7 +758,7 @@ const FULFILMENT_QUERY_TOKENS = new Set([
 
 /** Keep nouns that identify products (fish fingers, wine gums, frozen pizza). */
 export function offerSearchProductIdentityTokens(query: string): string[] {
-  const structural = new Set(["counter", "prepack", "packaged", "aisle", "section", "department", "departments", "wall", "back", "off", "licence", "license", "shop", "store", "per", "kilo", "kg", "weight", "loose"]);
+  const structural = new Set(["counter", "prepack", "prepacked", "packaged", "aisle", "section", "department", "departments", "wall", "back", "off", "licence", "license", "shop", "store", "per", "kilo", "kg", "weight", "loose"]);
   return tokenizeSupervaluSearchQuery(query).filter((token) => !structural.has(token));
 }
 
@@ -897,6 +898,21 @@ function resolveOfferChannelPrefix(input: {
   return "This week on the SuperValu national range";
 }
 
+/** Only derive a unit rate when one explicit pack weight/volume is unambiguous. */
+function verifiedPackUnitPrice(input: {productName:string;currentPriceEur:number|null;pricePerUnit?:string|null;fulfilment?:SupervaluFulfilment}): string|null|undefined {
+  if (input.fulfilment === "counter" || !(Number(input.currentPriceEur)>0) || !input.pricePerUnit) return input.pricePerUnit;
+  const size=input.productName.match(/\(([0-9]+(?:[.,][0-9]+)?)\s*(kg|g|ml|l)\)\s*$/i);
+  const rate=input.pricePerUnit.match(/€?\s*[0-9]+(?:[.,][0-9]+)?\s*\/\s*(kg|l|100g|100ml)\b/i);
+  if (!size || !rate || /\b[0-9]+\s*(?:packs?|pieces?|x)\b/i.test(input.productName)) return input.pricePerUnit;
+  const units=size[2]!.toLowerCase();const quantity=Number(size[1]!.replace(",","."));
+  const basis=rate[1]!.toLowerCase();
+  const compatible=/^(?:kg|g)$/.test(units)?/^(?:kg|100g)$/.test(basis):/^(?:l|100ml)$/.test(basis);
+  if (!compatible || !(quantity>0)) return input.pricePerUnit;
+  const baseQuantity=quantity*(units==="kg"||units==="l"?1000:1);
+  const price=Number(input.currentPriceEur)/(baseQuantity/(basis==="kg"||basis==="l"?1000:100));
+  return `€${price.toFixed(2)}/${basis}`;
+}
+
 export function formatWeeklyOfferQuote(input: {
   productName: string;
   offerChannel?: SupervaluOfferChannel;
@@ -910,6 +926,7 @@ export function formatWeeklyOfferQuote(input: {
   sellBy?: string | null;
   isAlcohol?: boolean;
 }): string {
+  input = {...input, pricePerUnit: verifiedPackUnitPrice(input)};
   const perKilo = quoteUsesPerKilo(input);
   const price = input.currentPriceEur != null && input.currentPriceEur > 0 ? formatSpokenEurAmount(input.currentPriceEur) : null;
   const productName = shortProductNameForOfferQuote(input.productName);
@@ -1002,7 +1019,7 @@ function rowToMatch(row: RetailWeeklyOfferRow, score: number): WeeklyOfferMatch 
     wasPriceEur:
       row.was_price_eur == null ? null : Number(row.was_price_eur),
     discountLabel: row.discount_label,
-    pricePerUnit: row.price_per_unit,
+    pricePerUnit: verifiedPackUnitPrice({productName:row.product_name,currentPriceEur:row.current_price_eur,pricePerUnit:row.price_per_unit,fulfilment}) ?? null,
     priceBasis: quoteUsesPerKilo({ priceUnitType: row.price_unit_type, sellBy: row.sell_by, pricePerUnit: row.price_per_unit, serviceArea, fulfilment }) ? "per_kilo" : "pack",
     isAlcohol: row.is_alcohol === true,
     campaignNames: row.campaign_names ?? [],
@@ -1024,7 +1041,36 @@ function rowToMatch(row: RetailWeeklyOfferRow, score: number): WeeklyOfferMatch 
   };
 }
 
+// National offers are shared read-only data. Coalesce concurrent loads for the
+// same project/department; a short expiry keeps new Thursday publications fresh.
+const weeklyOfferLoads = new Map<string, { expiresAt: number; promise: Promise<RetailWeeklyOfferRow[]> }>();
+const WEEKLY_OFFER_CACHE_MS = 15_000;
+
 export async function loadRetailWeeklyOffersForBanner(
+  supabase: SupabaseClient,
+  retailBanner: string,
+  options?: { serviceArea?: SupervaluServiceArea | null; reference?: Date },
+): Promise<RetailWeeklyOfferRow[]> {
+  const project = (supabase as unknown as { supabaseUrl?: string }).supabaseUrl;
+  if (!project) return fetchRetailWeeklyOffersForBanner(supabase, retailBanner, options);
+  const day = retailCalendarDay(options?.reference ?? new Date());
+  const key = `${project}:${retailBanner}:${options?.serviceArea ?? "all"}:${day}`;
+  const existing = weeklyOfferLoads.get(key);
+  if (existing && existing.expiresAt > Date.now()) return [...await existing.promise];
+  const entry = { expiresAt: Infinity, promise: Promise.resolve([] as RetailWeeklyOfferRow[]) };
+  entry.promise = fetchRetailWeeklyOffersForBanner(supabase, retailBanner, options).then(rows => {
+    entry.expiresAt = Date.now() + WEEKLY_OFFER_CACHE_MS;
+    return rows;
+  }).catch(error => {
+    if (weeklyOfferLoads.get(key) === entry) weeklyOfferLoads.delete(key);
+    throw error;
+  });
+  if (weeklyOfferLoads.size >= 32) weeklyOfferLoads.delete(weeklyOfferLoads.keys().next().value!);
+  weeklyOfferLoads.set(key, entry);
+  return [...await entry.promise];
+}
+
+async function fetchRetailWeeklyOffersForBanner(
   supabase: SupabaseClient,
   retailBanner: string,
   options?: { serviceArea?: SupervaluServiceArea | null; reference?: Date },
@@ -1124,7 +1170,9 @@ export function searchSyncedWeeklyOffersInRows(
 
   const reference = options?.reference ?? new Date();
   const activeRows = rows.filter((row) =>
-    isRetailOfferWeekActive(row, reference) && isRetailOfferObservationFresh(row.synced_at, reference));
+    isRetailOfferWeekActive(row, reference) && isRetailOfferObservationFresh(row.synced_at, reference) &&
+    matchesMeatCookingContext(trimmed, row.product_name, `${row.department} ${row.category_breadcrumb ?? ""}`) &&
+    matchesNappySizeContext(trimmed,row.product_name,row.category_breadcrumb ?? ""));
   const tokenLimit = options?.limit ?? RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS;
   // Resolve a supplied full product name before interpreting its ingredients,
   // cocoa/fat percentage, "Loose" name, or pack count as search instructions.
@@ -1145,6 +1193,10 @@ export function searchSyncedWeeklyOffersInRows(
   const filters = resolveWeeklyOfferSearchFilters(trimmed, options);
   const excludeMeat = inferWeeklyOffersExcludeMeat(trimmed);
   const alcoholOnly = inferAlcoholOnlyFromQuery(trimmed);
+  const nappySize=requestedNappySize(trimmed);
+  if(nappySize && offerSearchProductIdentityTokens(trimmed).every(token=>/^(?:baby|nappies|nappy|diaper|diapers|size|plus|[0-9]+)$/.test(token))) {
+    return rows.filter(row=>rowMatchesFilters(row,filters,{excludeMeat,alcoholOnly})).slice(0,tokenLimit).map(row=>rowToMatch(row,1));
+  }
   const listIntent = inferWeeklyOffersListIntent(trimmed);
   const browseCategories = inferWeeklyOffersBrowseCategories(trimmed);
   const listLimit = Math.max(tokenLimit, RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS);

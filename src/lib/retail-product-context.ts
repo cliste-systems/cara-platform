@@ -12,7 +12,7 @@ export function queryRequestsMeatBurgers(query: string): boolean {
 
 export function stripBurgerSearchContext(query: string): string {
   let result = query;
-  if (queryRequestsBurgersForCooking(query)) result = result.replace(/\b(?:bbq|barbecues?|barbeques?|barbecuing|barbequing|grill|grilling|raw|uncooked|cooking)\b/gi, " ");
+  if (queryRequestsBurgersForCooking(query) || queryRequestsMeatForCooking(query)) result = result.replace(/\b(?:bbq|barbecues?|barbeques?|barbecuing|barbequing|grill|grilling|raw|uncooked|cooking)\b/gi, " ");
   if (queryRequestsMeatBurgers(query)) result = result.replace(/\bmeat\b/gi, " ");
   return result.replace(/\s{2,}/g, " ").trim();
 }
@@ -29,4 +29,30 @@ export function matchesBurgerProductContext(query: string, productName: string, 
   const text = `${productName} ${department}`;
   if (/\b(?:vegetarian|vegan|veggie|plant[ -]based|meat[ -]free|meatless|no[ -]beef)\b/i.test(text)) return false;
   return /\b(?:beef|chicken|turkey|lamb|pork|steak|venison|bison|buffalo|duck|meats?)\b/i.test(text);
+}
+
+/** Explicit cooking intent must not turn into a barbecue-flavoured deli search. */
+export function queryRequestsMeatForCooking(query: string): boolean {
+  return /\b(?:chicken|turkey|pork|beef|lamb|meat|steaks?|sausages?|burgers?)\b/i.test(query) &&
+    /\b(?:for\s+(?:the\s+)?(?:bbq|barbecues?|barbeques?|grill|grilling|cooking)|to\s+(?:cook|grill|barbecue)|raw|uncooked)\b/i.test(query) &&
+    !/\b(?:sauce|marinade|rub|seasoning)\b/i.test(query);
+}
+
+export function matchesMeatCookingContext(query: string, productName: string, category = ""): boolean {
+  if (!queryRequestsMeatForCooking(query)) return true;
+  return !/\b(?:cooked|rotisserie|ready[ -]meals?|ready[ -]to[ -]eat|microwavable|microwave|sliced cooked meats)\b/i.test(`${productName} ${category}`) &&
+    !/\broast(?:ed)?\b.{0,40}\b(?:chicken|turkey)\s+(?:pieces|slices)\b/i.test(productName);
+}
+
+
+export function requestedNappySize(query: string): string|null {
+  if (!/\b(?:napp(?:y|ies)|diapers?)\b/i.test(query)) return null;
+  const size=query.match(/\bsize\s*([0-9]+)(?:\s*(\+|plus))?/i);
+  return size ? `${size[1]}${size[2]?"+":""}` : null;
+}
+
+export function matchesNappySizeContext(query: string, productName: string, category=""): boolean {
+  const wanted=requestedNappySize(query);if(!wanted)return true;
+  const size=`${productName} ${category}`.match(/\bsize\s*([0-9]+)(?:\s*(\+|plus))?/i);
+  return Boolean(size && `${size[1]}${size[2]?"+":""}`===wanted);
 }

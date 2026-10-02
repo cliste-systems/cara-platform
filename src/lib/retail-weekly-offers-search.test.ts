@@ -1369,3 +1369,61 @@ describe('customer promotion questions and literal pack identities', () => {
     assert.deepEqual(searchSyncedWeeklyOffersInRows(rows,'Test Nappies Size 4+ 66 Piece').map(r=>r.id),['plus']);
   });
 });
+
+
+describe("customer cooking and browse edge cases", () => {
+  it("finds raw chicken for a barbecue without choosing cooked deli flavour names", () => {
+    const rows = [
+      mockOfferRow({product_name:"Carroll's Roast Smokey Barbeque Chicken Pieces (100 g)",department:"Poultry",category_breadcrumb:"Grocery/Chilled Food/Sliced Cooked Meats/Poultry",service_area:"deli",fulfilment:"prepack",current_price_eur:3.29,discount_label:"2 for €5.50",search_text:"carroll roast smokey barbeque chicken pieces"}),
+      mockOfferRow({product_name:"SuperValu Fresh Irish Chicken Fillets (1 kg)",department:"Chicken",category_breadcrumb:"Grocery/Meat & Poultry/Chicken/Pre-pack",service_area:"butcher",fulfilment:"prepack",current_price_eur:9.99,discount_label:"Rewards Price Only €9.99",search_text:"supervalu fresh irish chicken fillets"}),
+    ];
+    assert.deepEqual(searchSyncedWeeklyOffersInRows(rows,"chicken for the barbecue, prepacked").map(x=>x.productName),["SuperValu Fresh Irish Chicken Fillets (1 kg)"]);
+    assert.equal(searchSyncedWeeklyOffersInRows(rows,"Carroll's Roast Smokey Barbeque Chicken Pieces (100 g)")[0]?.productName,rows[0]!.product_name);
+  });
+
+  it("keeps cross-department presentation wording out of promotion product constraints", () => {
+    const rows = [
+      mockOfferRow({product_name:"Chicken burgers",current_price_eur:3.99,discount_label:"3 for €10",search_text:"chicken burgers"}),
+      mockOfferRow({product_name:"Fruit packs",current_price_eur:4,discount_label:"3 for €10",search_text:"fruit packs",service_area:"produce"}),
+    ];
+    assert.equal(searchSyncedWeeklyOffersInRows(rows,"3 for 10 offers across different departments examples").length,2);
+    assert.equal(searchSyncedWeeklyOffersInRows(rows,"multibuys across different departments examples").length,2);
+  });
+
+  it("coalesces live offer loads, expires quickly, and never caches a failed load", async () => {
+    const clock=Date.now;let now=clock();let reads=0;let fail=false;
+    const row=mockOfferRow({product_name:"Live offer",current_price_eur:2,discount_label:"Only €2"});
+    const client={supabaseUrl:"https://cache-regression.invalid",from:()=>{reads++;if(fail)throw Error("temporary outage");return mockSupabaseRows([row]).from();}};
+    Date.now=()=>now;
+    try {
+      const [a,b]=await Promise.all([loadRetailWeeklyOffersForBanner(client as never,"supervalu"),loadRetailWeeklyOffersForBanner(client as never,"supervalu")]);
+      assert.equal(reads,1);assert.equal(a.length,1);assert.equal(b.length,1);
+      a.length=0;assert.equal((await loadRetailWeeklyOffersForBanner(client as never,"supervalu")).length,1);
+      now+=15001;row.product_name="Updated Thursday offer";
+      assert.equal((await loadRetailWeeklyOffersForBanner(client as never,"supervalu"))[0]?.product_name,"Updated Thursday offer");assert.equal(reads,2);
+      now+=15001;fail=true;await assert.rejects(loadRetailWeeklyOffersForBanner(client as never,"supervalu"),/temporary outage/);
+      fail=false;assert.equal((await loadRetailWeeklyOffersForBanner(client as never,"supervalu")).length,1);assert.equal(reads,4);
+    } finally {Date.now=clock;}
+  });
+});
+
+
+it("corrects stale per-kilo source rates for an unambiguous offer pack", () => {
+  const quote=formatWeeklyOfferQuote({productName:"SuperValu Washed Rooster Potatoes Carry Pack (5 kg)",currentPriceEur:6.99,pricePerUnit:"€1.60/kg",fulfilment:"prepack",serviceArea:"produce",discountLabel:"Rewards Price Only €6.99"});
+  assert.match(quote,/one euro forty per kilo/i);assert.doesNotMatch(quote,/one euro sixty per kilo/i);
+  const counter=formatWeeklyOfferQuote({productName:"Ham (1 kg)",currentPriceEur:22,pricePerUnit:"€22/kg",fulfilment:"counter",serviceArea:"deli"});
+  assert.match(counter,/twenty two euro per kilo/i);
+  const multipack=formatWeeklyOfferQuote({productName:"Tuna 4 Pack (145 g)",currentPriceEur:4.5,pricePerUnit:"€7.76/kg",fulfilment:"prepack"});
+  assert.match(multipack,/seven euro seventy six per kilo/i);
+});
+
+
+it("keeps the caller's nappy size across generic queries and never substitutes another size", () => {
+  const rows=[
+    mockOfferRow({product_name:"Pampers Premium Protection Essential Pack Size 2 (44 Piece)",category_breadcrumb:"Grocery/Baby/Baby Nappies & Pants/Size 2",service_area:"grocery",fulfilment:"prepack",department:"Size 2",current_price_eur:8,discount_label:"Rewards Price Only €8",search_text:"pampers premium protection baby nappies size 2"}),
+    mockOfferRow({product_name:"Pampers Baby Dry Jumbo Pack Size 4+ (66 Piece)",category_breadcrumb:"Grocery/Baby/Baby Nappies & Pants/Size 4+",service_area:"grocery",fulfilment:"prepack",department:"Size 4+",current_price_eur:16.5,discount_label:"2 for €28",search_text:"pampers baby dry nappies size 4+"}),
+  ];
+  assert.deepEqual(searchSyncedWeeklyOffersInRows(rows,"baby nappies size 2").map(x=>x.productName),[rows[0]!.product_name]);
+  assert.deepEqual(searchSyncedWeeklyOffersInRows(rows,"nappies size 4+ offers").map(x=>x.productName),[rows[1]!.product_name]);
+  assert.equal(searchSyncedWeeklyOffersInRows(rows,"nappies size 3 offers").length,0);
+});
