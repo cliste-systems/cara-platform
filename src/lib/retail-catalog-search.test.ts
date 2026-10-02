@@ -186,3 +186,14 @@ it("checks absent product candidates concurrently without declaring absence befo
   assert.ok(peak > 1 && peak <= 3, "reads overlap with a bounded database load");
   assert.equal(active, 0, "no unfinished read may establish absence");
 });
+
+
+it("keeps requested pack constraints without searching the entire catalogue by bare units", async () => {
+ const requested: string[] = [];
+ const rows = [{id:'right',sku:'right',product_name:'Acme Shampoo (913 ml)',department:'Shampoo',search_text:'acme shampoo 913 ml',brand:'Acme',national_regular_price_eur:2,national_store_count:5}, {id:'wrong',sku:'wrong',product_name:'Acme Shampoo (500 ml)',department:'Shampoo',search_text:'acme shampoo 500 ml',brand:'Acme',national_regular_price_eur:2,national_store_count:5}];
+ const source=makeSupabaseRows(rows);
+ const db={from(){const q=source.from();const ilike=q.ilike.bind(q);q.ilike=(column,pattern)=>{requested.push(pattern);return ilike(column,pattern);};return q;}};
+ const result=await searchNationalRetailCatalog(db as never,{retailBanner:'supervalu',query:'Acme Shampoo 913 ml',intent:'stock'});
+ assert.deepEqual(result.map(x=>x.sku),['right']);
+ assert.ok(!requested.includes('%ml%')&&!requested.includes('%913%'));
+});
