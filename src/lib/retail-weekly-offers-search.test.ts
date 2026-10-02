@@ -1446,3 +1446,25 @@ it("conflicting advertised bundle weight does not confirm this pack qualifies",(
   assert.match(quote,/Eligibility for this exact pack is not verified/);
   assert.match(quote,/single price two euro fifty/);
 });
+
+
+it("loads every offer across overlapping pages without returning a partial catalogue", async () => {
+  const rows = Array.from({length: 3394}, (_, i) => mockOfferRow({id: String(i), product_name: `Offer ${i}`, search_text: `offer ${i}`, current_price_eur: 2, discount_label: "Only €2"}));
+  let active = 0, peak = 0;
+  const db = {from() {
+    const query = mockSupabaseRows(rows).from().select().eq();
+    const range = query.range.bind(query);
+    query.range = async (from: number, to: number) => {
+      active++; peak = Math.max(peak, active);
+      await new Promise(resolve => setTimeout(resolve, 15));
+      try { return await range(from, to); } finally {active--;}
+    };
+    return {select: () => query};
+  }};
+  const loaded = await loadRetailWeeklyOffersForBanner(db as never, "supervalu");
+  assert.equal(loaded.length, rows.length);
+  assert.equal(new Set(loaded.map(row => row.id)).size, rows.length);
+  assert.equal(loaded.at(-1)?.id, "3393");
+  assert.ok(peak > 1 && peak <= 3);
+  assert.equal(active, 0);
+});
