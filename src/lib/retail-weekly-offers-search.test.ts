@@ -1439,3 +1439,10 @@ it("keeps a misspelled named product with multiple ingredients out of department
   assert.equal(inferWeeklyOffersListIntent("Charlevile Spreadable Cheese with Ham 125 g"),false);
   assert.deepEqual(searchSyncedWeeklyOffersInRows(rows,"Charlevile Spreadable Cheese with Ham 125 g").map(x=>x.productName),[rows[0]!.product_name]);
 });
+
+
+it("conflicting advertised bundle weight does not confirm this pack qualifies",()=>{
+  const quote=formatWeeklyOfferQuote({productName:"SuperValu Semi Sundried Tomatoes (120 g)",currentPriceEur:2.5,discountLabel:"3 for €6 Spanish Omelette Range 200g",fulfilment:"prepack"});
+  assert.match(quote,/Eligibility for this exact pack is not verified/);
+  assert.match(quote,/single price two euro fifty/);
+});
