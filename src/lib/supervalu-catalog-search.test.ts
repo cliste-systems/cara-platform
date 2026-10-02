@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  mergeGatewayWithSyncedOffers,
   expandSupervaluCatalogSearchQueries,
   filterCatalogMatchesByQuery,
   formatCatalogStockNoMatchQuote,
@@ -408,3 +409,12 @@ it("stops a repeated gateway page while comparing prices", async (t) => {
   assert.equal(requests, 2);
   assert.equal(matches.length, 100);
 });
+
+ it("a bundle with no single price does not erase a verified exact-SKU regular price",()=>{
+ const product={productName:"Tic Tac Spearmint (38.5 g)",department:"Mints",sku:"same",currentPriceEur:2.25,wasPriceEur:null,discountLabel:null,isOnOffer:false,score:1,quoteText:"Verified regular price"};
+ const offer={...product,id:"test",offerChannel:"prepack" as const,serviceArea:"grocery" as const,fulfilment:"prepack" as const,pricePerUnit:null,isAlcohol:false,campaignNames:[],currentPriceEur:null,discountLabel:"2 for €3.60 Tic Tac Selected Range 48g",isOnOffer:true};
+ assert.equal(mergeGatewayWithSyncedOffers([product],[offer],"price")[0]?.currentPriceEur,2.25);
+ assert.equal(mergeGatewayWithSyncedOffers([product],[offer],"price")[0]?.discountLabel,null);
+ assert.equal(mergeGatewayWithSyncedOffers([product],[offer],"offer")[0]?.currentPriceEur,null);
+ assert.equal(mergeGatewayWithSyncedOffers([{...product,priceConflict:true}],[offer],"price")[0]?.currentPriceEur,null);
+ });
