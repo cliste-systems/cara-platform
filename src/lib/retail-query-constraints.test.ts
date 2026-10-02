@@ -25,3 +25,15 @@ it("offer expiry requests do not substitute products ending on another day",()=>
 it("negative scope and price explanations are not product identity tokens",()=>{
   assert.equal(positiveRetailQuery("Back Bacon Joint 700 g standard price rather than bundle price"),"Back Bacon Joint 700 g");
 });
+
+it("a cross-product beer and crisps bundle does not hide the crisps single price",()=>{
+  const rows=[offer("Doritos BBQ Corn Chips Bag (180 g)","Crisps",{current_price_eur:2.5,discount_label:"Bundle Offer Heineken 4pk + Dorito Sharing Only €7 Minimum quantity: 2."})];
+  const found=searchSyncedWeeklyOffersInRows(rows,"Doritos BBQ Corn Chips Bag 180 g",{reference});
+  assert.equal(found[0]?.currentPriceEur,2.5);
+  assert.match(found[0]?.quoteText??"",/cross-product bundle/);
+});
+
+it("No Drain in a full tuna name is product identity, not an exclusion",()=>{
+  const rows=[offer("John West No Drain Tuna Steak In Sunflower Oil (110 g)","Tuna")];
+  assert.equal(searchSyncedWeeklyOffersInRows(rows,"John West No Drain Tuna Steak In Sunflower Oil 110 g",{reference})[0]?.productName,rows[0]!.product_name);
+});

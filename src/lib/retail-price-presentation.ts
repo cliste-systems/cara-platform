@@ -74,6 +74,8 @@ export function parseRetailMultibuyLabel(label: string | null | undefined): {
     const totalEur = Number(total[2]!.replace(",", "."));
     return quantity >= 2 && totalEur > 0 ? { ...base, kind: "quantity_total", quantity, totalEur } : null;
   }
+  const crossBundle = text.match(/\bbundle\s+offer\b.*?\bonly\s*€\s*(\d+(?:[.,]\d{1,2})?)/);
+  if (crossBundle) return {...base,kind:"generic",totalEur:Number(crossBundle[1]!.replace(",","."))};
   const buyGet = text.match(/\bbuy\s+(\d+)\s+(?:and\s+)?get\s+(\d+)\s+(free|half\s+price|\d+\s*%\s*off)/);
   if (buyGet && Number(buyGet[1]) > 0 && Number(buyGet[2]) > 0) {
     return { ...base, kind: "buy_get", buyQuantity: Number(buyGet[1]), getQuantity: Number(buyGet[2]), benefit: buyGet[3]!.replace(/\s+/g, " ") };

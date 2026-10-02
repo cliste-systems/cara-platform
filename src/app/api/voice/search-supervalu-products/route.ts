@@ -206,6 +206,7 @@ export async function POST(request: Request) {
     current_price_eur: match.currentPriceEur,
     was_price_eur: match.wasPriceEur,
     discount_label: match.discountLabel,
+    mix_match_verified: /\bmix\s*(?:and|&)\s*match\b/i.test(match.discountLabel ?? "") ? true : null,
     is_on_offer: match.isOnOffer,
     service_area: match.serviceArea ?? null,
     fulfilment: match.fulfilment ?? null,
@@ -335,7 +336,7 @@ export async function POST(request: Request) {
   const noMatchQuote: string | null =
     mappedMatches.length === 0 || (responseMatches.length === 0 && !clarificationHint)
       ? ownBrandFallbackQuote ?? (intent === "offer"
-        ? `I couldn't confirm a current national offer matching "${query}" from the latest verified offers. That does not mean there are no offers in store; a team member can check locally.`
+        ? `I couldn't confirm a current national offer matching "${query}" from the latest verified offers. `
         : formatCatalogStockNoMatchQuote(query))
       : null;
 

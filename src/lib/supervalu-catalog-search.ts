@@ -1,4 +1,4 @@
-import { positiveRetailQuery } from "@/lib/retail-query-constraints";
+import { positiveRetailQuery, matchesRetailQueryConstraints } from "@/lib/retail-query-constraints";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { fetchSupervaluGatewaySearch, SUPERVALU_GATEWAY_PAGE_SIZE } from "@/lib/supervalu-gateway";
@@ -86,6 +86,8 @@ export function filterCatalogMatchesByQuery(
   query: string,
   matches: SupervaluCatalogMatch[],
 ): SupervaluCatalogMatch[] {
+  matches = matches.filter(match=>matchesRetailQueryConstraints(query,match.productName,match.department));
+  query = positiveRetailQuery(query);
   matches = matches.filter((match) => matchesBurgerProductContext(query, match.productName, match.department) && matchesMeatCookingContext(query, match.productName, match.department) && matchesNappySizeContext(query,match.productName,match.department));
   if (matches.length === 0 || inferWeeklyOffersListIntent(query)) return matches;
 
@@ -106,6 +108,7 @@ export function filterCatalogMatchesByQuery(
     return applyOwnLabelFilter(strictMatches);
   }
 
+  if (productTokens.length >= 3) return [];
   const broadMatches = matches.filter((match) =>
     productTokens.some((token) =>
       productNameMatchesTokens(match.productName, [token]),

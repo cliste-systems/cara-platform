@@ -93,7 +93,7 @@ export function isRetailOfferPriceSemanticallyValid(
   const explicitOfferPrice = label.match(
     /(?:rewards?\s+price(?:\s+only)?|\bonly)\s*€\s*([0-9]+(?:[.,][0-9]{1,2})?)/i,
   );
-  if (explicitOfferPrice) {
+  if (explicitOfferPrice && !validBundle) {
     const amount = Number(explicitOfferPrice[1]!.replace(",", "."));
     if (!Number.isFinite(amount) || Math.abs(current - amount) > 0.02) {
       return false;
@@ -351,7 +351,7 @@ export function inferWeeklyOffersBrowseCategories(query: string): string[] {
     return ["chocolate", "crisps", "yogurt", "bread", "fruit"];
   }
   if (
-    /\blist\b|\bfive\b|\b5\b|weekly offers|best deal|sample|highlights/i.test(
+    /\blist\b|\b(?:show|give|choose|list)\s+(?:me\s+)?(?:five|5)\b|weekly offers|best deal|sample|highlights/i.test(
       trimmed,
     )
   ) {
@@ -952,6 +952,7 @@ export function formatWeeklyOfferQuote(input: {
       const terms = (spokenLabel ?? `${formatSpokenInteger(quantity)} for ${formatSpokenEurAmount(total)}`)
         .replace(/\brewards?\s+price\b/gi, "with Real Rewards");
       sentences.push(/[.!?]$/.test(terms) ? terms : `${terms}.`);
+      if (!/mix\s*(?:and|&)\s*match/i.test(input.discountLabel ?? "")) sentences.push("Eligibility to mix different products is not verified by this listing.");
       if (price != null) {
         sentences.push(perKilo ? `Single price ${price} per kilo.` : `Single price ${price} each.`);
       }
@@ -967,7 +968,14 @@ export function formatWeeklyOfferQuote(input: {
     }
   }
 
-  if (parseRetailMultibuyLabel(input.discountLabel) && spokenLabel) {
+  const genericBundle = parseRetailMultibuyLabel(input.discountLabel);
+  if (genericBundle && !genericBundle.totalEur && !genericBundle.buyQuantity && !genericBundle.mixMatch && /minimum quantity/i.test(input.discountLabel ?? "")) {
+    if (price != null) sentences.push(`Listed single-pack price ${price}.`);
+    sentences.push("A multibuy is advertised, but its bundle total or discount is not supplied. The minimum quantity refers to the multibuy; it does not establish that the listed single-pack price requires multiple packs.");
+    return sentences.join(" ");
+  }
+  if (genericBundle && spokenLabel) {
+    if (/bundle\s+offer/i.test(input.discountLabel ?? "")) sentences.push("This is a cross-product bundle requiring the named items, not multiple packs of this product alone.");
     sentences.push(`${spokenLabel}.`);
     if (price != null) sentences.push(perKilo ? `Single price ${price} per kilo.` : `Single price ${price} each.`);
     return sentences.join(" ");
@@ -1178,36 +1186,38 @@ export function searchSyncedWeeklyOffersInRows(
   query: string,
   options?: WeeklyOfferSearchFilters & { limit?: number; reference?: Date },
 ): WeeklyOfferMatch[] {
-  const trimmed = positiveRetailQuery(stripAlternativePromotionComparison(query)).trim().slice(0, RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS);
-  if (!trimmed) return [];
-
+  const original = stripAlternativePromotionComparison(query).trim().slice(0, RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS);
+  if (!original) return [];
   const reference = options?.reference ?? new Date();
+  const tokenLimit = options?.limit ?? RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS;
   const sunday = new Date(`${retailCalendarDay(reference)}T12:00:00Z`);
   sunday.setUTCDate(sunday.getUTCDate() + (7 - sunday.getUTCDay()) % 7);
   const expiry = /\b(?:expir(?:e|es|ing)|end(?:s|ing)?)\b.*\bthis Sunday\b/i.test(query) ? sunday.toISOString().slice(0,10)
     : query.match(/\b(?:expir(?:e|es|ing)|end(?:s|ing)?)\b.*?(\d{4}-\d{2}-\d{2})/i)?.[1];
-  const activeRows = rows.filter((row) =>
-    (!expiry || row.offer_week_end === expiry) &&
-    isRetailOfferWeekActive(row, reference) && isRetailOfferObservationFresh(row.synced_at, reference) &&
-    matchesRetailQueryConstraints(query, row.product_name, `${row.department} ${row.category_breadcrumb ?? ""}`) &&
-    matchesMeatCookingContext(trimmed, row.product_name, `${row.department} ${row.category_breadcrumb ?? ""}`) &&
-    matchesNappySizeContext(trimmed,row.product_name,row.category_breadcrumb ?? ""));
-  const tokenLimit = options?.limit ?? RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS;
-  // Resolve a supplied full product name before interpreting its ingredients,
-  // cocoa/fat percentage, "Loose" name, or pack count as search instructions.
-  const identity = literalProductIdentity(trimmed);
-  const literalMatches = activeRows.filter((row) => {
-    const product = literalProductIdentity(row.product_name).key;
-    const index = product ? identity.key.indexOf(product) : -1;
-    if (index < 0) return false;
-    const start = identity.offsets[index];
-    const end = identity.offsets[index+product.length-1]+1;
-    const request = trimmed.slice(0,start) + " " + trimmed.slice(end);
-    const scope = resolveWeeklyOfferSearchFilters(request, options);
-    return rowMatchesFilters(row, scope, {excludeMeat:inferWeeklyOffersExcludeMeat(request),alcoholOnly:inferAlcoholOnlyFromQuery(request)})
-      && filterWeeklyOffersByPromotionQuery([row],request).length > 0;
+  const dateChecked = rows.filter(row=>(!expiry || row.offer_week_end===expiry) && isRetailOfferWeekActive(row,reference) && isRetailOfferObservationFresh(row.synced_at,reference));
+  // A full name wins before interpreting "No Drain", "No Added Sugar",
+  // ingredient names, sizes or packaging as customer search instructions.
+  const identity = literalProductIdentity(original);
+  const literalMatches = dateChecked.filter(row=>{
+    const product=literalProductIdentity(row.product_name).key;
+    const index=product ? identity.key.indexOf(product) : -1;
+    if(index<0)return false;
+    const start=identity.offsets[index]!;
+    const end=identity.offsets[index+product.length-1]!+1;
+    const request=original.slice(0,start)+" "+original.slice(end);
+    const scope=resolveWeeklyOfferSearchFilters(positiveRetailQuery(request),options);
+    return matchesRetailQueryConstraints(request,row.product_name,`${row.department} ${row.category_breadcrumb ?? ""}`)
+      && rowMatchesFilters(row,scope,{excludeMeat:inferWeeklyOffersExcludeMeat(request),alcoholOnly:inferAlcoholOnlyFromQuery(request)})
+      && filterWeeklyOffersByPromotionQuery([row],request).length>0;
   });
-  if (literalMatches.length > 0) return literalMatches.slice(0,tokenLimit).map(row=>rowToMatch(row,1));
+  if(literalMatches.length)return literalMatches.slice(0,tokenLimit).map(row=>rowToMatch(row,1));
+
+  const trimmed=positiveRetailQuery(original);
+  if(!trimmed)return [];
+  const activeRows=dateChecked.filter(row=>(!expiry || row.offer_week_end===expiry)
+    && matchesRetailQueryConstraints(original,row.product_name,`${row.department} ${row.category_breadcrumb ?? ""}`)
+    && matchesMeatCookingContext(trimmed,row.product_name,`${row.department} ${row.category_breadcrumb ?? ""}`)
+    && matchesNappySizeContext(trimmed,row.product_name,row.category_breadcrumb ?? ""));
   rows = filterWeeklyOffersByPromotionQuery(activeRows, stripAlternativePromotionComparison(query));
   const filters = resolveWeeklyOfferSearchFilters(trimmed, options);
   const excludeMeat = inferWeeklyOffersExcludeMeat(trimmed);
