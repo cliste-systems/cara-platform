@@ -59,7 +59,7 @@ it("adult dog kibble treats dry food as a category and excludes puppy-specific f
 it("spoken beer pack refinements preserve size, exclude Nitrosurge and resolve regular versus zero",()=>{
  const rows=[offer("Guinness Draught Stout Can 8 Pack (500 ml)","Beer",{service_area:"off_licence",is_alcohol:true}),offer("Guinness Draught 0.0% Can 8 Pack (500 ml)","Beer",{service_area:"off_licence"}),offer("Guinness Draught Nitrosurge Can 6 Pack (558 ml)","Beer",{service_area:"off_licence",is_alcohol:true})];
  const query="regular Guinness Draught 8 pack 500ml cans not Nitrosurge";
- assert.equal(positiveRetailQuery(query),"Guinness Draught 8 pack 500 ml cans");
+ assert.equal(positiveRetailQuery(query),"Guinness Draught 8 pack 500 ml can");
  assert.equal(matchesRetailQueryConstraints(query,rows[1]!.product_name,"Beer"),false);
  assert.equal(matchesRetailQueryConstraints("Guinness Draught not Nitrosurge",rows[2]!.product_name,"Beer"),false);
  assert.deepEqual(searchSyncedWeeklyOffersInRows(rows,query,{reference,serviceArea:"off_licence"}).map(x=>x.productName),[rows[0]!.product_name]);

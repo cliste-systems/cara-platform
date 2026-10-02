@@ -418,3 +418,9 @@ it("stops a repeated gateway page while comparing prices", async (t) => {
  assert.equal(mergeGatewayWithSyncedOffers([product],[offer],"offer")[0]?.currentPriceEur,null);
  assert.equal(mergeGatewayWithSyncedOffers([{...product,priceConflict:true}],[offer],"price")[0]?.currentPriceEur,null);
  });
+
+it("the final catalogue filter preserves a regular Guinness pack requested with plural cans and joined units",()=>{
+ const name="Guinness Draught Stout Can 8 Pack (500 ml)";
+ const match=normalizeSupervaluCatalogProduct({sku:"regular",name,priceNumeric:16,attributes:{altCategory:"Beer"}})!;
+ assert.equal(filterCatalogMatchesByQuery("regular Guinness Draught 8 pack 500ml cans, not Nitrosurge",[match])[0]?.productName,name);
+});
