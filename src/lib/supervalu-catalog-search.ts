@@ -87,6 +87,13 @@ export function filterCatalogMatchesByQuery(
   matches: SupervaluCatalogMatch[],
 ): SupervaluCatalogMatch[] {
   matches = matches.filter(match=>matchesRetailQueryConstraints(query,match.productName,match.department));
+  const identity = (text:string)=>normalizeSearchText(text).replace(/[^a-z0-9]/g, "");
+  const requestKey=identity(query);
+  const namedMatches=matches.filter(match=>{
+    const nameKey=identity(match.productName);
+    return nameKey.length>=5 && requestKey.includes(nameKey);
+  });
+  if(namedMatches.length)return namedMatches;
   query = positiveRetailQuery(query);
   matches = matches.filter((match) => matchesBurgerProductContext(query, match.productName, match.department) && matchesMeatCookingContext(query, match.productName, match.department) && matchesNappySizeContext(query,match.productName,match.department));
   if (matches.length === 0 || inferWeeklyOffersListIntent(query)) return matches;

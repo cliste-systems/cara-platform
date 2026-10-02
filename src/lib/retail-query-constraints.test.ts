@@ -37,3 +37,8 @@ it("No Drain in a full tuna name is product identity, not an exclusion",()=>{
   const rows=[offer("John West No Drain Tuna Steak In Sunflower Oil (110 g)","Tuna")];
   assert.equal(searchSyncedWeeklyOffersInRows(rows,"John West No Drain Tuna Steak In Sunflower Oil 110 g",{reference})[0]?.productName,rows[0]!.product_name);
 });
+
+it("a dairy-free ice cream request cannot be satisfied by dairy-free milk",()=>{
+  assert.equal(matchesRetailQueryConstraints("dairy-free ice cream, not dairy ice cream","Alpro Dairy Free Soya Milk","Dairy Free"),false);
+  assert.equal(matchesRetailQueryConstraints("dairy-free ice cream, not dairy ice cream","Swedish Glace Dairy Free Vanilla Ice Cream","Ice Cream"),true);
+});

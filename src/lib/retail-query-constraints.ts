@@ -13,6 +13,7 @@ export function matchesRetailQueryConstraints(query: string, name: string, categ
   if (/\bpasta\b/i.test(query) && /\b(?:boil|cooking|cook)\b/i.test(query)) {
     if (!/\b(?:pasta|spaghetti|penne|fusilli|linguine|ravioli|tortellini|tagliatelle|rigatoni|macaroni)\b/i.test(text) || /\b(?:instant|ready to heat|microwave|hot snacks)\b/i.test(text)) return false;
   }
+  if (/\bice cream\b/i.test(query) && !/\bice cream\b/i.test(text)) return false;
   const negatives = [...query.matchAll(/\b(?:not|no(?!\s+(?:drain|added\s+sugar|artificial\s+(?:colours?|colors?|flavou?rs?)))|without|excluding|except|rather than)\s+(?:the\s+)?([^,.!?;]+)/gi)];
   for (const negative of negatives) {
     const clause = negative[1]!;
