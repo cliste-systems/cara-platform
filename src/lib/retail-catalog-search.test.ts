@@ -159,3 +159,30 @@ it("withholds conflicting prices for indistinguishable catalogue names",async()=
  assert.equal(matches.length,2);
  for(const match of matches){assert.equal(match.currentPriceEur,null);assert.equal(match.priceConflict,true);assert.match(match.quoteText,/price needs confirmation/);assert.doesNotMatch(match.quoteText,/3\.99|4\.19/);}
 });
+
+
+it("checks absent product candidates concurrently without declaring absence before all reads finish", async () => {
+  let active = 0;
+  let peak = 0;
+  let reads = 0;
+  const source = makeSupabaseRows([]);
+  const supabase = {
+    from() {
+      const query = source.from();
+      const range = query.range.bind(query);
+      query.range = async (from, to) => {
+        reads++; active++; peak = Math.max(peak, active);
+        await new Promise(resolve => setTimeout(resolve, 15));
+        try { return await range(from, to); } finally { active--; }
+      };
+      return query;
+    },
+  };
+  const result = await searchNationalRetailCatalog(supabase as never, {
+    retailBanner: "supervalu", query: "Zogblatt purple pineapple shampoo 913 ml", intent: "stock",
+  });
+  assert.deepEqual(result, []);
+  assert.ok(reads >= 4, "all distinct candidate words must be checked");
+  assert.ok(peak > 1 && peak <= 3, "reads overlap with a bounded database load");
+  assert.equal(active, 0, "no unfinished read may establish absence");
+});
