@@ -423,4 +423,5 @@ it("the final catalogue filter preserves a regular Guinness pack requested with 
  const name="Guinness Draught Stout Can 8 Pack (500 ml)";
  const match=normalizeSupervaluCatalogProduct({sku:"regular",name,priceNumeric:16,attributes:{altCategory:"Beer"}})!;
  assert.equal(filterCatalogMatchesByQuery("regular Guinness Draught 8 pack 500ml cans, not Nitrosurge",[match])[0]?.productName,name);
+ assert.equal(filterCatalogMatchesByQuery("regular Guinness Draught eight pack 500 ml cans, not Nitrosurge",[match])[0]?.productName,name);
 });
