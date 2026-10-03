@@ -433,3 +433,19 @@ it("long named products and caller savings questions fit the shared request limi
  assert.ok(query.length>120);
  assert.ok(query.length<=SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS);
 });
+
+
+it("counter locations never become extra product-name requirements",()=>{
+ for(const [query,name,area] of [
+  ["price of striploin steak from the butcher counter","SuperValu Fresh Irish Beef Striploin Steak (1 kg)","butcher"],
+  ["beef steaks on offer at meat counter","Fresh Irish Beef Steaks (1 kg)","butcher"],
+  ["sliced ham from the deli counter","SuperValu Sliced Ham","deli"],
+  ["salmon from the fish counter","Fresh Salmon","fish"],
+  ["bread at the bakery counter","Fresh Bread","bakery"]
+ ]) {
+  const match={productName:name!,department:"Counter",sku:"test",currentPriceEur:22.77,wasPriceEur:33.99,discountLabel:"Save 33%",isOnOffer:true,score:1,quoteText:"Verified current price",serviceArea:area as never,fulfilment:"counter" as const};
+  assert.equal(filterCatalogMatchesByQuery(query!,[match]).length,1,query);
+ }
+ const named={productName:"Prepared By Our Butcher Beef Burgers",department:"Burgers",sku:"named",currentPriceEur:5,wasPriceEur:null,discountLabel:null,isOnOffer:false,score:1,quoteText:"Verified"};
+ assert.equal(filterCatalogMatchesByQuery("Prepared By Our Butcher Beef Burgers",[named]).length,1);
+});

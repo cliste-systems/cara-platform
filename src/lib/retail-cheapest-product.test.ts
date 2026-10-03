@@ -176,3 +176,16 @@ describe("cheapest product requests", () => {
     }
   });
 });
+
+it("keeps the published striploin offer ahead of its historical reference through counter follow-ups",async()=>{
+ const name="SuperValu Fresh Irish Beef Striploin Steak (1 kg)";
+ const range={...catalogRow(name,33.99,"counter"),department:"Beef Steaks"};
+ const published={...offerRow(name,22.77,"counter","Save 33%"),department:"Beef Steaks",was_price_eur:33.99};
+ for(const query of ["beef steaks on offer at butcher counter","striploin steak from the butcher counter","price of striploin steak from the butcher counter","fresh beef striploin steak per kilo"]) {
+  const {response}=await lookup(query,[range],[published],"counter");
+  assert.equal(response.matches.length,1,query);
+  assert.equal(response.matches[0]?.current_price_eur,22.77,query);
+  assert.equal(response.matches[0]?.price_basis,"per_kilo",query);
+  assert.match(response.matches[0]?.quote_text??"",/twenty two euro seventy seven.*per kilo/i,query);
+ }
+});
