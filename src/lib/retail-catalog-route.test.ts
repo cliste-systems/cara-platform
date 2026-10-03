@@ -74,26 +74,27 @@ async function lookup() {
 }
 
 describe("catalogue voice route optional assortment deadlines", () => {
-  it("skips the name scan for resolved SKUs and preserves price when assortment times out", async (t) => {
+  it("skips the name scan for resolved SKUs and withholds historical reference price when assortment times out", async (t) => {
     const calls = stubCatalogue(t, { resolveSku: true, stall: "assortment" });
     const start = Date.now();
     const response = await lookup();
     const body = await response.json();
     assert.equal(response.status, 200);
-    assert.equal(body.matches[0]?.current_price_eur, 3);
+    assert.equal(body.matches[0]?.current_price_eur, null);
     assert.equal(body.matches[0]?.store_assortment_status, "not_confirmed");
-    assert.match(body.matches[0]?.quote_text, /three euro/i);
+    assert.doesNotMatch(body.matches[0]?.quote_text, /three euro/i);
+    assert.match(body.matches[0]?.quote_text, /No current price or promotion status is verified/);
     assert.match(body.matches[0]?.quote_text, /does not prove that this store carries/i);
     assert.deepEqual(calls, { name: 0, assortment: 1, aborted: 1 });
     assert.ok(Date.now() - start < 3_000, "optional enrichment must not recreate the nine-second timeout");
   });
 
-  it("keeps national prices and unknown availability when unresolved-name enrichment times out", async (t) => {
+  it("keeps national range evidence and unknown availability when unresolved-name enrichment times out", async (t) => {
     const calls = stubCatalogue(t, { resolveSku: false, stall: "name" });
     const response = await lookup();
     const body = await response.json();
     assert.equal(response.status, 200);
-    assert.equal(body.matches[0]?.current_price_eur, 3);
+    assert.equal(body.matches[0]?.current_price_eur, null);
     assert.equal(body.matches[0]?.store_assortment_status, "not_confirmed");
     assert.equal(body.no_match_quote, null);
     assert.deepEqual(calls, { name: 1, assortment: 0, aborted: 1 });

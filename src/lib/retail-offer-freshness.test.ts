@@ -88,7 +88,8 @@ describe("48-hour source observation guard", () => {
     assert.deepEqual(offers, []);
     const range = await searchSupervaluCatalogLive("price of milk", { supabase: client as never, retailBanner: "supervalu", reference });
     assert.equal(range.length, 1);
-    assert.equal(range[0]?.currentPriceEur, 2.5);
+    assert.equal(range[0]?.currentPriceEur, null);
+    assert.match(range[0]?.quoteText ?? "", /No current price or promotion status is verified/);
     assert.equal(range[0]?.isOnOffer, false);
   });
 

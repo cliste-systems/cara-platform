@@ -197,3 +197,14 @@ it("keeps requested pack constraints without searching the entire catalogue by b
  assert.deepEqual(result.map(x=>x.sku),['right']);
  assert.ok(!requested.includes('%ml%')&&!requested.includes('%913%'));
 });
+
+
+it("never quotes the striploin historical reference as its current price when offer publication is incomplete", async () => {
+ const db=makeSupabaseRows([{id:"striploin",sku:"1023229001",product_name:"SuperValu Fresh Irish Beef Striploin Steak (1 kg)",brand:"SuperValu",department:"Beef Steaks",service_area:"butcher",fulfilment:"counter",is_alcohol:false,search_text:"supervalu fresh irish beef striploin steak 1 kg",national_store_count:27,national_regular_price_eur:33.99}]);
+ const matches=await searchNationalRetailCatalog(db as never,{retailBanner:"supervalu",query:"striploin steak",intent:"price",fulfilment:"counter"});
+ assert.equal(matches.length,1);
+ assert.equal(matches[0].currentPriceEur,null);
+ assert.doesNotMatch(matches[0].quoteText,/33[.,]99|thirty three/i);
+ assert.match(matches[0].quoteText,/No current price or promotion status is verified/);
+ assert.match(matches[0].quoteText,/do not.*conclude that no offer exists/i);
+});

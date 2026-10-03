@@ -61,7 +61,7 @@ describe("cheapest product requests", () => {
   it("compares past both the top-five result cutoff and the first database page", async () => {
     const rows = Array.from({ length: 505 }, (_, index) => catalogRow(`A Beef Burgers ${index}`, 6));
     rows.push(catalogRow("Z Beef Burgers", 2));
-    const { candidates, response } = await lookup("cheapest burgers", rows, []);
+    const { candidates, response } = await lookup("cheapest burgers", rows, rows.map(row=>offerRow(String(row.product_name), Number(row.national_regular_price_eur))));
     assert.equal(candidates.length, 506);
     assert.deepEqual(response.matches.map((match) => match.product_name), ["Z Beef Burgers"]);
   });
@@ -149,13 +149,14 @@ describe("cheapest product requests", () => {
   });
 
   it("treats explicit meat as a burger preference across departments, not literal name or beef-only", async () => {
-    const { response } = await lookup("cheapest meat burgers for barbecue", [
+    const rows = [
       catalogRow("Vegetarian Burgers", 1),
       { ...catalogRow("Plant Based Beef Burgers", 1.5), department: "Meat Free" },
       catalogRow("Beef Burgers 8 Pack", 3),
       { ...catalogRow("Chicken Burgers 4 Pack", 2.5), department: "Chicken Burgers", service_area: "grocery" },
       catalogRow("Turkey Burgers 4 Pack", 4),
-    ], []);
+    ];
+    const { response } = await lookup("cheapest meat burgers for barbecue", rows, rows.map(row=>({...offerRow(String(row.product_name), Number(row.national_regular_price_eur)),department:row.department,service_area:row.service_area})));
     assert.deepEqual(response.matches.map((match) => match.product_name), ["Chicken Burgers 4 Pack"]);
   });
 
