@@ -173,8 +173,17 @@ begin
       and other.offer_price_eur is distinct from c.offer_price_eur and other.stores>=c.stores);
   create index on supervalu_positive_consensus(product_id);
   drop table if exists pg_temp.supervalu_positive_campaigns;
+  -- Reuse only already published, fresh, current national campaign evidence.
+  -- Full publication verifies new campaign memberships; the minute job must not
+  -- rescan hundreds of thousands of campaign rows or infer new memberships.
   create temporary table supervalu_positive_campaigns on commit drop as
-    select * from public.current_retail_campaign_consensus('supervalu');
+    select w.sku,array_agg(distinct campaign.name) campaign_names,min(w.synced_at) source_observed_at
+    from public.retail_weekly_offers w cross join lateral unnest(w.campaign_names) campaign(name)
+    where w.retail_banner='supervalu' and w.organization_id is null and w.is_national and w.national_store_count>=3
+      and w.synced_at>=now()-interval '48 hours' and w.synced_at<=now()
+      and w.offer_week_start<=(now() at time zone 'Europe/Dublin')::date
+      and w.offer_week_end>=(now() at time zone 'Europe/Dublin')::date
+    group by w.sku;
   -- Only supersede the same observed offer; preserve other simultaneous mechanics.
   delete from public.retail_weekly_offers old using supervalu_positive_consensus c,public.retail_catalog_products p
     where p.id=c.product_id and old.retail_banner='supervalu' and old.organization_id is null and old.sku=p.sku
