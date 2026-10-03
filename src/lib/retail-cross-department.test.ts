@@ -14,6 +14,7 @@ const cases:[string,string,string,string][]=[
  ['Smoked mackerel offers','Smoked Mackerel','Smoked Rainbow Trout','Smoked Fish'],
  ['Wholemeal bread offers','Wholemeal Bread','Wholemeal Spaghetti','Ready Meals'],
  ['Wholemeal bread please','Wholemeal Bread','Wholemeal Tortilla Wraps','Bread'],
+ ['Laundry liquid offers','Ariel Original Liquid Detergent 50 Washes','Dishwashing Liquid','Liquid & Gel'],
  ['Laundry liquid offers','Laundry Liquid Detergent','Dishwashing Liquid','Cleaning'],
  ['Orange juice offers','Orange Juice','Orange Yogurt','Dairy'],
  ['Vanilla yogurt offers','Vanilla Yogurt','Vanilla Ice Cream','Dairy'],
