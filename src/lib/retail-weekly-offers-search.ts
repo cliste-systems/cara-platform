@@ -809,6 +809,7 @@ function preferProductNameMatches<
 }
 
 export type WeeklyOfferMatch = {
+  categoryBreadcrumb?: string | null;
   id: string;
   sku?: string | null;
   offerWeekStart?: string;
@@ -1062,6 +1063,7 @@ function rowToMatch(row: RetailWeeklyOfferRow, score: number): WeeklyOfferMatch 
     offerWeekEnd: row.offer_week_end,
     productName: row.product_name,
     department: row.department,
+    categoryBreadcrumb: row.category_breadcrumb ?? null,
     offerChannel,
     serviceArea,
     fulfilment,

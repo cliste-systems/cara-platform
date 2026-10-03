@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {it} from 'node:test';
+import {filterCatalogMatchesByQuery} from './supervalu-catalog-search';
 import {matchesRetailQueryConstraints} from './retail-query-constraints';
-import {stripRetailCounterLocation,offerSearchProductIdentityTokens} from './retail-weekly-offers-search';
+import {stripRetailCounterLocation,offerSearchProductIdentityTokens,searchSyncedWeeklyOffersInRows} from './retail-weekly-offers-search';
 
 // Customer requests paired with correct evidence and plausible wrong substitutions.
 const cases:[string,string,string,string][]=[
@@ -88,4 +89,16 @@ it('full public department titles are locations, including comma and ampersand l
  for(const department of ['Fruit & Vegetables','Meat & Poultry','Fish & Seafood','Milk, Yogurt, Butter & Eggs','Health & Wellness','Beauty & Personal Care','Household & Cleaning','Wine, Beer & Spirits','Newsagent & Tobacconist']) {
   assert.equal(stripRetailCounterLocation(`Acme in the ${department} section`),'Acme in the  ',department);
  }
+});
+
+it('preserves full category evidence for a wine with a country as its leaf department',()=>{
+ const rows=[{id:'wine',organization_id:null,retail_banner:'supervalu',sync_batch_id:'test',product_name:'Dona Paula Sauvignon Blanc (75 cl)',department:'Argentina',category_breadcrumb:'Grocery/Wine Beer & Spirits/Wine/White Wine/Argentina',search_text:'Dona Paula Sauvignon Blanc White Wine Argentina',offer_channel:'grocery' as const,service_area:'off_licence' as const,fulfilment:'prepack' as const,is_alcohol:true,current_price_eur:10,was_price_eur:null,discount_label:'Only €10',price_per_unit:null,brand:null,sku:'wine',offer_week_start:'2026-10-01',offer_week_end:'2026-10-07',source_url:null,synced_at:'2026-10-02T09:00:00Z'}];
+ const matches=searchSyncedWeeklyOffersInRows(rows,'white wine offers',{reference:new Date('2026-10-02T10:00:00Z')});
+ assert.equal(matches[0]?.categoryBreadcrumb,rows[0]!.category_breadcrumb);
+});
+
+it('catalogue filtering uses the same full category evidence as offer filtering',()=>{
+ const wine={productName:'Dona Paula Sauvignon Blanc (75 cl)',department:'Argentina',categoryBreadcrumb:'Wine/White Wine/Argentina',sku:'wine',currentPriceEur:10,wasPriceEur:null,discountLabel:'Only €10',isOnOffer:true,score:5,quoteText:''};
+ assert.equal(filterCatalogMatchesByQuery('white wine',[wine]).length,1);
+ assert.equal(filterCatalogMatchesByQuery('red wine',[wine]).length,0);
 });

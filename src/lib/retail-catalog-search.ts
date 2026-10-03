@@ -29,6 +29,7 @@ type CatalogRow = {
   product_name: string;
   brand: string | null;
   department: string;
+  category_breadcrumb?: string | null;
   service_area: string;
   fulfilment: string;
   is_alcohol: boolean;
@@ -128,7 +129,7 @@ export async function searchStoredRetailCatalog(
       let query = supabase
         .from("retail_catalog_products")
         .select(
-          "id,sku,product_name,brand,department,service_area,fulfilment,is_alcohol,search_text,retail_store_products!inner(id,regular_price_eur,display_price_eur,price_per_unit,source_price_label,is_listed,retail_promotions(promotion_type,loyalty_required,loyalty_program,offer_price_eur,regular_price_eur,label,valid_from,valid_to,synced_at))",
+          "id,sku,product_name,brand,department,category_breadcrumb,service_area,fulfilment,is_alcohol,search_text,retail_store_products!inner(id,regular_price_eur,display_price_eur,price_per_unit,source_price_label,is_listed,retail_promotions(promotion_type,loyalty_required,loyalty_program,offer_price_eur,regular_price_eur,label,valid_from,valid_to,synced_at))",
         )
         .eq("retail_banner", input.retailBanner)
         .eq("retail_store_products.source_store_id", input.sourceStoreId)
@@ -178,6 +179,7 @@ export async function searchStoredRetailCatalog(
       return {
         productName: row.product_name,
         department: row.department,
+        categoryBreadcrumb: row.category_breadcrumb ?? null,
         sku: row.sku,
         currentPriceEur: currentPrice,
         wasPriceEur: isOnOffer ? regularPrice : null,
@@ -205,6 +207,7 @@ type NationalCatalogRow = {
   product_name: string;
   brand: string | null;
   department: string;
+  category_breadcrumb?: string | null;
   service_area: string;
   fulfilment: string;
   is_alcohol: boolean;
@@ -269,7 +272,7 @@ export async function searchNationalRetailCatalog(
       let query = supabase
         .from("retail_catalog_products")
         .select(
-          "id,sku,product_name,brand,department,service_area,fulfilment,is_alcohol,search_text,national_store_count,national_regular_price_eur",
+          "id,sku,product_name,brand,department,category_breadcrumb,service_area,fulfilment,is_alcohol,search_text,national_store_count,national_regular_price_eur",
         )
         .eq("retail_banner", input.retailBanner)
         .eq("is_national", true)
@@ -286,7 +289,7 @@ export async function searchNationalRetailCatalog(
       return rows;
     });
     const relevantRows = rows.filter((row) => {
-      if (!matchesRetailQueryConstraints(input.query,row.product_name,row.department)) return false;
+      if (!matchesRetailQueryConstraints(input.query,row.product_name,`${row.department} ${row.category_breadcrumb ?? ""}`)) return false;
       const compactQuery = normalizeSearchText(input.query).replace(/[^a-z0-9]/g, "");
       const compactName = normalizeSearchText(row.product_name).replace(/[^a-z0-9]/g, "");
       if (compactName.length >= 4 && compactQuery.includes(compactName)) return true;
@@ -339,6 +342,7 @@ export async function searchNationalRetailCatalog(
         priceConflict,
         productName: row.product_name,
         department: row.department,
+        categoryBreadcrumb: row.category_breadcrumb ?? null,
         sku: row.sku,
         currentPriceEur: safePrice,
         wasPriceEur: null,
