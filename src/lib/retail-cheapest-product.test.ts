@@ -182,10 +182,23 @@ it("keeps the published striploin offer ahead of its historical reference throug
  const range={...catalogRow(name,33.99,"counter"),department:"Beef Steaks"};
  const published={...offerRow(name,22.77,"counter","Save 33%"),department:"Beef Steaks",was_price_eur:33.99};
  for(const query of ["beef steaks on offer at butcher counter","striploin steak from the butcher counter","price of striploin steak from the butcher counter","fresh beef striploin steak per kilo"]) {
-  const {response}=await lookup(query,[range],[published],"counter");
+  const pork={...offerRow("Fresh Irish Marinated Pork Steak",5,"counter"),department:"Butcher"};
+  const {response}=await lookup(query,[range],[published,pork],"counter");
   assert.equal(response.matches.length,1,query);
   assert.equal(response.matches[0]?.current_price_eur,22.77,query);
   assert.equal(response.matches[0]?.price_basis,"per_kilo",query);
   assert.match(response.matches[0]?.quote_text??"",/twenty two euro seventy seven.*per kilo/i,query);
  }
+});
+
+
+it("never substitutes pork or a different cut when the requested beef offer is missing",async()=>{
+ const pork={...offerRow("Fresh Irish Marinated Pork Steak",5,"counter"),department:"Butcher"};
+ const sirloin={...offerRow("Fresh Irish Beef Sirloin Steak",15,"counter"),department:"Beef Steaks"};
+ for(const query of ["striploin steak offers at butcher counter","beef striploin offers"]) {
+  const {response}=await lookup(query,[],[pork,sirloin],"counter");
+  assert.deepEqual(response.matches,[],query);
+ }
+ const beefOnly=await lookup("beef steaks on offer at butcher counter",[],[pork],"counter");
+ assert.deepEqual(beefOnly.response.matches,[]);
 });
