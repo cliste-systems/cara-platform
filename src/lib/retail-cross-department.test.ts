@@ -76,3 +76,9 @@ it('plant-based or meat-free wording alone is not evidence of a vegan label',()=
  assert.equal(matchesRetailQueryConstraints('Vegan burgers','Meat Free Burgers','Frozen'),false);
  assert.equal(matchesRetailQueryConstraints('Vegan burgers','Plant Based Burgers','Vegan Frozen Food'),true);
 });
+
+it('full public department titles are locations, including comma and ampersand lists',()=>{
+ for(const department of ['Fruit & Vegetables','Meat & Poultry','Fish & Seafood','Milk, Yogurt, Butter & Eggs','Health & Wellness','Beauty & Personal Care','Household & Cleaning','Wine, Beer & Spirits','Newsagent & Tobacconist']) {
+  assert.equal(stripRetailCounterLocation(`Acme in the ${department} section`),'Acme in the  ',department);
+ }
+});
