@@ -70,3 +70,9 @@ it('structural locations do not contaminate named product identity across the sh
 it('qualifiers stay contextual and absent qualifiers do not narrow a broad product search',()=>{
  for(const [query,name] of [['White chocolate','Milk Chocolate'],['Coffee pods','Coffee Capsules'],['Smoked paprika','Paprika'],['Ham','Shredded Ham'],['Milk','Whole Milk']])assert.equal(matchesRetailQueryConstraints(query,name),true);
 });
+
+it('plant-based or meat-free wording alone is not evidence of a vegan label',()=>{
+ assert.equal(matchesRetailQueryConstraints('Vegan burgers','Plant Based Burgers','Frozen'),false);
+ assert.equal(matchesRetailQueryConstraints('Vegan burgers','Meat Free Burgers','Frozen'),false);
+ assert.equal(matchesRetailQueryConstraints('Vegan burgers','Plant Based Burgers','Vegan Frozen Food'),true);
+});
