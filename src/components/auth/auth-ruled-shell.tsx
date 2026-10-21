@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 
@@ -25,11 +23,6 @@ export function AuthRuledShell({ title, subtitle, urlError, contentExiting = fal
     <div className={`${styles.frame} min-h-0 flex-1 overflow-y-auto bg-white text-[#0b1220] antialiased`}>
       <main data-auth-frame className="mx-auto flex min-h-dvh w-[calc(100%-32px)] max-w-[840px] flex-col justify-center border-x border-slate-200/70 py-6 sm:w-[calc(100%-64px)] sm:py-10">
         <div className="border-y border-slate-200/70">
-          <div className="flex items-center border-b border-slate-200/70 px-3 py-1.5 sm:px-6">
-            <Link href="/" className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500">
-              <ArrowLeft className="size-3.5" aria-hidden />Back
-            </Link>
-          </div>
           <OnboardingEnterProvider>
             <section className="px-5 py-8 sm:px-10 sm:py-10">
               <motion.div
