@@ -62,7 +62,7 @@ export async function inviteTeamMember(
       : null) ??
     (await headers()).get("origin") ??
     "http://localhost:3001";
-  const inviteRedirectTo = `${appOrigin}/auth/callback?next=/dashboard/set-password`;
+  const inviteRedirectTo = `${appOrigin}/auth/callback`;
 
   const { data: orgRow } = await admin
     .from("organizations")

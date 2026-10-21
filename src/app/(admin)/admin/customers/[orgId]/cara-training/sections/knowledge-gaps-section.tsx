@@ -39,7 +39,7 @@ export function KnowledgeGapsSection({ organizationId, gaps }: Props) {
                   className={
                     gap.gapKind === "live_info"
                       ? "rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-700"
-                      : "rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-blue-800"
+                      : "rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-800"
                   }
                 >
                   {gap.gapKind === "live_info" ? "Live info" : "Learnable"}

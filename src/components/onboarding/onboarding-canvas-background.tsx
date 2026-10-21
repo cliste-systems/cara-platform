@@ -118,7 +118,7 @@ function normalizeBackgroundPath(pathname: string): string {
 }
 
 function backgroundForPath(pathname: string): BackgroundConfig {
-  const path = normalizeBackgroundPath(pathname);
+  const path = pathname === "/signup/voice" ? "/onboarding/voice" : pathname.startsWith("/signup/plan") ? "/onboarding/plan" : normalizeBackgroundPath(pathname);
 
   if (path === "/onboarding/profile") {
     return heroBackgroundConfig(PROFILE_BACKGROUND, "42% 48%");
@@ -374,6 +374,10 @@ export function OnboardingCanvasBackground() {
   const prefersReducedMotion = useReducedMotion() ?? false;
   const ready = useOnboardingAnimateIn();
   const animationKey = `${backgroundAssetKey(config)}-${ready ? "on" : "off"}`;
+  const signupPath=pathname.replace(/^\/dev\/onboarding/,"/signup");
+  const scene=signupPath==="/signup/voice" ? PUBLIC_ASSETS.signupScenes.voice : signupPath.startsWith("/signup/plan/checkout") ? PUBLIC_ASSETS.signupScenes.billing : signupPath==="/signup/plan" ? PUBLIC_ASSETS.signupScenes.plans : null;
+  if(scene) return <div aria-hidden className="absolute inset-0 bg-white" />;
+
 
   if (config.layout === "solid") {
     return (

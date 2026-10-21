@@ -41,6 +41,7 @@ export async function assignFromPoolForOrg(
   admin: PhoneNumbersAdmin,
   organizationId: string,
   country: "IE" | "US" = "IE",
+  options?: { twilioOnly?: boolean },
 ): Promise<AssignFromPoolResult> {
   const preferredE164 = devPreferredPoolE164();
 
@@ -48,7 +49,7 @@ export async function assignFromPoolForOrg(
     let candidate: { id: string; e164: string } | null = null;
     let pickErr: { message: string; code?: string } | null = null;
 
-    if (attempt === 0 && preferredE164) {
+    if (attempt === 0 && preferredE164 && !options?.twilioOnly) {
       const { data, error } = await admin
         .from("phone_numbers")
         .select("id, e164")
@@ -61,11 +62,9 @@ export async function assignFromPoolForOrg(
     }
 
     if (!candidate) {
-      const { data, error } = await admin
-        .from("phone_numbers")
-        .select("id, e164")
-        .eq("status", "available")
-        .eq("country_code", country)
+      let query = admin.from("phone_numbers").select("id, e164").eq("status", "available").eq("country_code", country);
+      if (options?.twilioOnly) query = query.eq("provider", "twilio").not("provider_sid", "is", null).not("livekit_sip_trunk_id", "is", null);
+      const { data, error } = await query
         .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle();

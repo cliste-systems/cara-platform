@@ -1,3 +1,5 @@
+import { headers } from "next/headers";
+import { adminReturnPath } from "@/lib/admin-return-path";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
@@ -132,7 +134,8 @@ const requireStaffMfaSessionUser = cache(async (): Promise<User> => {
     await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 
   if (error || data.currentLevel !== "aal2") {
-    redirect("/admin/mfa");
+    const returnTo = adminReturnPath((await headers()).get("x-pathname"));
+    redirect(`/admin/mfa?next=${encodeURIComponent(returnTo)}`);
   }
 
   return user;

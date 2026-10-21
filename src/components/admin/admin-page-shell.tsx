@@ -1,129 +1,23 @@
 import type { ComponentType, ReactNode } from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
-
-import { adminMutedLinkClass } from "@/components/admin/admin-interactive";
 import { cn } from "@/lib/utils";
 
 type IconType = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
-
-type AdminPageShellMaxWidth = "full" | "6xl" | "3xl";
-
-const MAX_WIDTH_CLASS: Record<AdminPageShellMaxWidth, string> = {
-  full: "max-w-[1600px]",
-  "6xl": "max-w-[1600px]",
-  "3xl": "max-w-[1600px]",
-};
-
-/** Shared horizontal padding for all admin pages. */
-export const ADMIN_PAGE_X_PADDING = "px-4 sm:px-6 xl:px-8";
-
-type AdminPageShellProps = {
-  icon: IconType;
-  title: string;
-  description?: ReactNode;
-  actions?: ReactNode;
-  maxWidth?: AdminPageShellMaxWidth;
-  backHref?: string;
-  backLabel?: string;
-  children: ReactNode;
-  className?: string;
-  /** Lock page to viewport height (pairs with AdminListCard). */
-  fillViewport?: boolean;
-  compact?: boolean;
-};
-
-export function AdminPageShell({
-  icon: Icon,
-  title,
-  description,
-  actions,
-  maxWidth = "full",
-  backHref,
-  backLabel,
-  children,
-  className,
-  fillViewport = false,
-  compact = false,
-}: AdminPageShellProps) {
-  return (
-    <div
-      {...(fillViewport ? { "data-admin-fill": true } : {})}
-      className={cn(
-        "mx-auto w-full min-w-0",
-        ADMIN_PAGE_X_PADDING,
-        fillViewport
-          ? "flex min-h-0 flex-1 flex-col gap-5 overflow-x-hidden py-5 sm:py-6 lg:overflow-hidden"
-          : "space-y-5 overflow-x-hidden py-5 sm:py-6",
-        MAX_WIDTH_CLASS[maxWidth],
-        compact && "gap-3 py-3 sm:py-4",
-        className,
-      )}
-    >
-      {backHref ? (
-        <Link
-          href={backHref}
-          className={cn(adminMutedLinkClass, "shrink-0")}
-        >
-          <ChevronLeft className="size-4" aria-hidden />
-          {backLabel ?? "Back"}
-        </Link>
-      ) : null}
-
-      <header
-        className={cn("relative flex shrink-0 flex-wrap items-center justify-between gap-4 overflow-hidden rounded-xl border border-[#e0e3e6] bg-[#ffffff] px-5 py-5 shadow-[0_1px_0_rgba(17,24,29,0.05),0_14px_34px_-28px_rgba(17,24,29,0.26)] sm:px-6 sm:py-6", compact && "py-3 sm:py-3")}
-      >
-        <div className="relative min-w-0">
-          <h1 className="flex items-center gap-3 text-[24px] font-semibold leading-tight tracking-tight text-[#11181d] sm:text-[28px]">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-[#e0e3e6] bg-white/80 text-[#353d42]"><Icon className="size-[18px]" aria-hidden /></span>
-            {title}
-          </h1>
-          {description ? (
-            <p className="mt-2 max-w-3xl text-[13px] leading-5 text-[#667078]">{description}</p>
-          ) : null}
-        </div>
-        {actions ? <div className="relative flex shrink-0 items-center gap-2">{actions}</div> : null}
-      </header>
-
-      {fillViewport ? (
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
-      ) : (
-        children
-      )}
-    </div>
-  );
+export const ADMIN_PAGE_X_PADDING = "px-6";
+type Props = { icon: IconType; title: string; description?: ReactNode; actions?: ReactNode; maxWidth?: "full" | "6xl" | "3xl"; backHref?: string; backLabel?: string; children: ReactNode; className?: string; fillViewport?: boolean; compact?: boolean };
+export function AdminPageShell({ icon: Icon, title, description, actions, backHref, backLabel, children, className, fillViewport = true, compact = false }: Props) {
+  return <div data-admin-fill={fillViewport || undefined} className={cn("admin-page mx-auto flex w-full min-w-0 flex-col gap-4 px-4 py-5 sm:px-6", fillViewport && "min-h-0 flex-1 overflow-hidden", compact && "gap-3 py-4", className)}>
+    <header className="flex shrink-0 flex-wrap items-start justify-between gap-4">
+      <div className="min-w-0">
+        {backHref ? <Link href={backHref} className="mb-2 inline-flex items-center gap-1 text-xs text-[#697078] hover:text-[#11181d]"><ChevronLeft className="size-3.5" aria-hidden />{backLabel || "Back"}</Link> : null}
+        <h1 className="flex items-center gap-2.5 text-[26px] font-semibold leading-tight tracking-tight text-[#11181d]"><Icon className="size-5 shrink-0 text-[#697078]" aria-hidden />{title}</h1>
+        {description ? <div className="mt-1.5 text-[13px] leading-5 text-[#697078]">{description}</div> : null}
+      </div>
+      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+    </header>
+    <div className={cn("admin-page-content flex min-h-0 min-w-0 flex-1 flex-col gap-4", fillViewport && "overflow-y-auto")}>{children}</div>
+  </div>;
 }
-
-export function AdminPageEmptyState({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border border-dashed border-[#e0e3e6] bg-[#fafafa] px-5 py-10 text-center text-sm text-[#667078]",
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-export function AdminErrorCard({
-  message,
-  hint,
-}: {
-  message: string;
-  hint?: ReactNode;
-}) {
-  return (
-    <div className="rounded-lg border border-red-200/80 bg-white p-6 shadow-sm">
-      <p className="text-sm font-semibold text-red-700">{message}</p>
-      {hint ? <div className="mt-2 text-sm text-red-600/90">{hint}</div> : null}
-    </div>
-  );
-}
+export function AdminPageEmptyState({ children, className }: { children: ReactNode; className?: string }) { return <div className={cn("rounded-lg border border-[#e0e3e6] bg-white px-5 py-10 text-center text-sm text-[#697078]", className)}>{children}</div>; }
+export function AdminErrorCard({ message, hint }: { message: string; hint?: ReactNode }) { return <div role="alert" className="shrink-0 rounded-lg border border-red-200 bg-white p-4"><p className="text-sm font-medium text-red-700">{message}</p>{hint ? <div className="mt-2 text-xs text-[#697078]">{hint}</div> : null}</div>; }

@@ -122,6 +122,7 @@ export function formatBankHolidaysForAgent(
   config: BankHolidayConfig | undefined,
 ): string {
   if (!config?.configured) return "";
+  if (config.usualHours) return "On bank and public holidays, follow the usual weekly opening hours for that day.";
   if (!config.open) return "Closed on bank and public holidays.";
   return `Bank & public holidays: ${formatHoursRange(config.start, config.end)}.`;
 }

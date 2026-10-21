@@ -3,7 +3,6 @@
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { forwardRef } from "react";
 
-import { ONBOARDING_PROFILE_FIELD_BOX } from "@/components/onboarding/onboarding-ui";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -14,8 +13,8 @@ type Props = {
 };
 
 /**
- * Compact Turnstile in a glass field. Keep this mounted for the life of the form
- * (the parent visually hides it after success) so a fresh single-use token can be
+ * Run verification in the background, showing Cloudflare only if interaction is
+ * required. Keep this mounted for the life of the form so a single-use token can be
  * read on submit and the widget can be reset in place after a server rejection.
  * Do NOT unmount on success — remounting replays the challenge and burns tokens.
  */
@@ -26,9 +25,9 @@ export const AuthTurnstileField = forwardRef<TurnstileInstance, Props>(
   ) {
     return (
       <div
+        data-auth-turnstile
         className={cn(
-          ONBOARDING_PROFILE_FIELD_BOX,
-          "flex justify-center px-2 py-2",
+          "flex w-full shrink-0 justify-center",
           className,
         )}
       >
@@ -39,7 +38,8 @@ export const AuthTurnstileField = forwardRef<TurnstileInstance, Props>(
           onExpire={onExpire}
           options={{
             theme: "light",
-            size: "compact",
+            size: "flexible",
+            appearance: "interaction-only",
           }}
         />
       </div>

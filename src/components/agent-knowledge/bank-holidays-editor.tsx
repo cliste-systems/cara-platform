@@ -6,7 +6,7 @@ import {
 } from "@/lib/business-hours";
 import { cn } from "@/lib/utils";
 
-type BankHolidayMode = "not_set" | "closed" | "open";
+type BankHolidayMode = "not_set" | "usual" | "closed" | "open";
 
 type Props = {
   value: BankHolidayConfig;
@@ -21,12 +21,14 @@ const timeClass =
 
 const MODE_OPTIONS: { id: BankHolidayMode; label: string }[] = [
   { id: "not_set", label: "Not set" },
+  { id: "usual", label: "Usual hours" },
   { id: "closed", label: "Closed" },
   { id: "open", label: "Open" },
 ];
 
 function modeFromConfig(config: BankHolidayConfig): BankHolidayMode {
   if (!config.configured) return "not_set";
+  if (config.usualHours) return "usual";
   return config.open ? "open" : "closed";
 }
 
@@ -36,9 +38,11 @@ function configFromMode(
 ): BankHolidayConfig {
   const defaults = defaultBankHolidayConfig();
   if (mode === "not_set") return defaultBankHolidayConfig();
+  if (mode === "usual") return {...current, configured:true, usualHours:true, open:true};
   if (mode === "closed") {
     return {
       configured: true,
+      usualHours: false,
       open: false,
       start: current.start || defaults.start,
       end: current.end || defaults.end,
@@ -46,6 +50,7 @@ function configFromMode(
   }
   return {
     configured: true,
+    usualHours: false,
     open: true,
     start: current.start || defaults.start,
     end: current.end || defaults.end,
@@ -125,6 +130,7 @@ export function BankHolidaysEditor({
             </p>
           ) : null}
 
+          {mode === "usual" && <p className="text-[12.5px] text-slate-600">Cara will use your usual weekly hours on bank and public holidays.</p>}
           {mode === "closed" ? (
             <p className="animate-in text-[12.5px] text-slate-600 fade-in duration-200 motion-reduce:animate-none">
               Cara will say you&apos;re closed on bank and public holidays.

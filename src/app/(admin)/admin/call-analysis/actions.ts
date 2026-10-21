@@ -7,6 +7,7 @@ import { requireAdminPermission } from "@/lib/admin-session";
 import { adminCallAnalysisPath } from "@/lib/admin-route-paths";
 import { enqueueCallAnalysis, runCallAnalysis } from "@/lib/call-analysis-server";
 import { CALL_ANALYSIS_VERSION } from "@/lib/call-analysis-simple";
+import { deleteAdminCall } from "@/lib/delete-admin-call";
 import { createCallRecordingSignedUrl } from "@/lib/call-recordings-server";
 import { CALL_ANALYSIS_ID_RE, loadCallAnalysisDetail } from "./load-call-analysis";
 
@@ -47,4 +48,20 @@ export async function fetchAdminCallRecording(callLogId: string): Promise<{ url:
     storagePath: call.audio_storage_path,
   });
   return { url };
+}
+
+export async function deleteCallHistory(callLogId: string): Promise<{ ok: boolean; message: string }> {
+  await requireAdminPermission("calls");
+  if (!CALL_ANALYSIS_ID_RE.test(callLogId)) return { ok: false, message: "This call could not be found." };
+  try {
+    await deleteAdminCall(callLogId);
+    revalidatePath("/admin");
+    revalidatePath(adminCallAnalysisPath());
+    revalidatePath(adminCallAnalysisPath(callLogId));
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/call-history");
+    return { ok: true, message: "Call deleted." };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Could not delete this call." };
+  }
 }

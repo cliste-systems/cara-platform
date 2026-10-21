@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { userNeedsPassword } from "./invite-onboarding";
 
 export async function prepareInviteAuthentication(admin: SupabaseClient, input: {
   email: string;
@@ -38,14 +37,14 @@ export async function prepareInviteAuthentication(admin: SupabaseClient, input: 
     return { ok: false, message: "The invitation no longer matches this account. Please reload and try again." };
   }
   const initializePassword = !existingUserId || initializePendingSetup;
-  const requiresPassword = initializePassword || userNeedsPassword(data.user);
+  const requiresPassword = false;
   // Every managed invite must obey the database agreement gate, including an
   // established login joining another store in its already-validated account.
   if (initializePassword || input.managedOnboarding) {
     const { error: metadataError } = await admin.auth.admin.updateUserById(userId, {
       app_metadata: {
         ...data.user.app_metadata,
-        ...(initializePassword ? { needs_password: true } : {}),
+        ...(initializePassword ? { needs_password: false } : {}),
         ...(input.managedOnboarding ? { managed_onboarding: true } : {}),
       },
     });

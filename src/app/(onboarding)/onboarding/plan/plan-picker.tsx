@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useState, type FormEvent } from "react";
+import {AuthFormAlert} from "@/components/auth/auth-form-alert";
+import { useActionState, useState, type FormEvent } from "react";
 import { ArrowRight } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
@@ -45,6 +46,9 @@ type Props = {
   initialError?: string | null;
   /** Dev preview — Continue navigates here instead of starting checkout. */
   previewCheckoutPath?: string;
+  checkoutAction?: (previous: { ok: false; message: string }, formData: FormData) => Promise<{ ok: false; message: string }>;
+  configureAfterCheckout?: boolean;
+  requiresDpaAcceptance?: boolean;
 };
 
 const INITIAL = { ok: false as const, message: "" };
@@ -77,6 +81,9 @@ export function PlanPicker({
   defaultInterval,
   initialError,
   previewCheckoutPath,
+  checkoutAction = startPlanCheckout,
+  configureAfterCheckout = false,
+  requiresDpaAcceptance = !configureAfterCheckout,
 }: Props) {
   const selfServePlans = plans.filter((p) => p.selfServe);
   const customPlan = plans.find((p) => !p.selfServe);
@@ -88,7 +95,7 @@ export function PlanPicker({
     "pro";
 
   const [plan, setPlan] = useState<PlanTier>(defaultSelfServe);
-  const [interval, setInterval] = useState<BillingInterval>(defaultInterval);
+  const [interval, setInterval] = useState<BillingInterval>(configureAfterCheckout ? "month" : defaultInterval);
   const [submittingTier, setSubmittingTier] = useState<PlanTier | null>(null);
   const [legalHighlight, setLegalHighlight] = useState<LegalHighlight>(
     LEGAL_HIGHLIGHT_INITIAL,
@@ -96,8 +103,11 @@ export function PlanPicker({
   const reduceMotion = useReducedMotion();
 
   const [state, formAction, pending] = useActionState(
-    async (_prev: { ok: false; message: string }, formData: FormData) =>
-      startPlanCheckout(_prev, formData),
+    async (_prev: { ok: false; message: string }, formData: FormData) => {
+      const result = await checkoutAction(_prev, formData);
+      setLegalHighlight(legalHighlightFromMessage(result.message));
+      return result;
+    },
     INITIAL,
   );
 
@@ -114,16 +124,6 @@ export function PlanPicker({
     !legalErrorFromMessage?.acceptDpa &&
     !legalErrorFromMessage?.acceptCallerPrivacy;
 
-  useEffect(() => {
-    if (!errorMessage) return;
-    const fromServer = legalHighlightFromMessage(errorMessage);
-    if (fromServer.acceptDpa || fromServer.acceptCallerPrivacy) {
-      setLegalHighlight((prev) => ({
-        acceptDpa: prev.acceptDpa || fromServer.acceptDpa,
-        acceptCallerPrivacy: prev.acceptCallerPrivacy || fromServer.acceptCallerPrivacy,
-      }));
-    }
-  }, [errorMessage]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     const form = event.currentTarget;
@@ -135,8 +135,8 @@ export function PlanPicker({
     )?.checked;
 
     const next: LegalHighlight = {
-      acceptDpa: !dpaChecked,
-      acceptCallerPrivacy: !privacyChecked,
+      acceptDpa: requiresDpaAcceptance && !dpaChecked,
+      acceptCallerPrivacy: !configureAfterCheckout && !privacyChecked,
     };
 
     if (next.acceptDpa || next.acceptCallerPrivacy) {
@@ -153,10 +153,11 @@ export function PlanPicker({
       action={formAction}
       onSubmit={handleSubmit}
       noValidate
-      className="flex w-full flex-col items-center gap-4 text-center sm:gap-5"
+      className={cn("flex w-full flex-col items-center text-center", configureAfterCheckout ? "gap-3" : "gap-4 sm:gap-5")}
     >
       <input type="hidden" name="interval" value={interval} />
 
+      {configureAfterCheckout ? null : <>
       <div className="inline-flex rounded-full border border-slate-200/75 bg-white p-1 text-xs font-medium shadow-[0_4px_20px_rgba(15,23,42,0.06)]">
         <button
           type="button"
@@ -186,6 +187,7 @@ export function PlanPicker({
           </span>
         </button>
       </div>
+      </>}
 
       <div className="grid w-full gap-4 md:grid-cols-3 md:items-stretch">
         {selfServePlans.map((p) => {
@@ -198,6 +200,7 @@ export function PlanPicker({
               key={p.tier}
               className={cn(
                 "flex min-h-[22rem] flex-col p-5 transition-[border-color,box-shadow,transform,min-height] duration-300 ease-out sm:min-h-[23.5rem] sm:p-6",
+                configureAfterCheckout && "min-h-0 sm:min-h-0 sm:p-5",
                 ONBOARDING_SELECTION_CARD,
                 popular &&
                   "border-[#0b1220]/20 shadow-[0_10px_32px_rgba(11,18,32,0.1)]",
@@ -219,7 +222,7 @@ export function PlanPicker({
                   </span>
                   {popular ? (
                     <span className="shrink-0 rounded-full bg-[#0b1220] px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white">
-                      Popular
+                      Recommended
                     </span>
                   ) : null}
                 </div>
@@ -270,19 +273,20 @@ export function PlanPicker({
                   className="mt-4 space-y-2 border-t border-slate-100 pt-4"
                 >
                   <p className="text-[12px] font-medium text-slate-600">
-                    {p.includedMinutes.toLocaleString()} min ·{" "}
-                    {p.includedSms.toLocaleString()} SMS / mo
+                    {p.includedMinutes.toLocaleString()} minutes / month
+                    {!configureAfterCheckout ? <> · {p.includedSms.toLocaleString()} SMS</> : null}
                   </p>
-                  <p className="text-[11px] font-light text-slate-400">
-                    {formatEuro(p.overageRateCents)}/min ·{" "}
-                    {formatEuro(p.smsOverageRateCents)}/SMS overage
+                  {configureAfterCheckout ? <p className="text-xs leading-5 text-slate-600">≈{Math.floor(p.includedMinutes / 2).toLocaleString()} calls/month · ≈{Math.round(p.includedMinutes / 60)} calls/day</p> : null}
+                  <p className="text-[11px] text-slate-500">
+                    {formatEuro(p.overageRateCents)}/min after your allowance
+                    {!configureAfterCheckout ? <> · {formatEuro(p.smsOverageRateCents)}/SMS overage</> : null}
                   </p>
                 </motion.div>
 
                 <motion.ul
                   layout={!reduceMotion}
                   transition={{ duration: 0.32, ease: ONBOARDING_EASE }}
-                  className="mt-4 space-y-2 border-t border-slate-100 pt-4 text-[12px] font-light leading-snug text-slate-600"
+                  className="mt-4 w-full space-y-2 border-t border-slate-100 pl-0 pt-4 text-left text-[12px] font-light leading-snug text-slate-600"
                 >
                   {p.features.map((feature) => (
                     <li key={feature} className="flex items-start gap-2">
@@ -302,7 +306,7 @@ export function PlanPicker({
                 tier={p.tier}
                 disabled={pending}
                 isSubmitting={isSubmitting}
-                previewHref={previewCheckoutPath}
+                previewHref={previewCheckoutPath ? `${previewCheckoutPath}?plan=${p.tier}` : undefined}
                 onContinue={() => {
                   setPlan(p.tier);
                   setSubmittingTier(p.tier);
@@ -334,7 +338,8 @@ export function PlanPicker({
         </div>
       ) : null}
 
-      <div className="grid w-full gap-2.5 md:grid-cols-2 md:items-stretch">
+      <div className={cn("grid w-full gap-2.5", !configureAfterCheckout && "md:grid-cols-2 md:items-stretch", configureAfterCheckout && !requiresDpaAcceptance && "hidden")}>
+        {!configureAfterCheckout ? <>
         <LegalAcceptanceCheckbox
           id="acceptCallerPrivacy"
           name="acceptCallerPrivacy"
@@ -357,6 +362,8 @@ export function PlanPicker({
           .
         </LegalAcceptanceCheckbox>
 
+        </> : null}
+        {requiresDpaAcceptance ? <>
         <LegalAcceptanceCheckbox
           id="acceptDpa"
           name="acceptDpa"
@@ -370,20 +377,17 @@ export function PlanPicker({
             legalHighlight.acceptDpa && LEGAL_FIELD_ERROR_RING,
           )}
         >
-          I accept the{" "}
+          I’m authorised to accept the{" "}
           <LegalDocLink href="/legal/dpa">Data Processing Agreement</LegalDocLink>{" "}
           so {PRODUCT_NAME} may process my callers&apos; data when I go live.
         </LegalAcceptanceCheckbox>
+        </> : null}
       </div>
 
-      {isPaymentError && errorMessage ? (
-        <p
-          role="alert"
-          className="w-full rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left text-[13px] font-medium leading-snug text-red-800 shadow-sm"
-        >
-          {errorMessage}
-        </p>
-      ) : null}
+      {configureAfterCheckout ? <p className="text-[11px] leading-5 text-slate-500">Call estimates assume 2-minute calls across 30 days; actual call length varies.</p> : null}
+
+      <AuthFormAlert title="Plan could not be continued" message={isPaymentError?errorMessage:null}/>
+
     </form>
   );
 }

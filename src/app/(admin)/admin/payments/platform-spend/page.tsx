@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireAdminPermission } from "@/lib/admin-session";
 import { CreditCard } from "lucide-react";
 
@@ -63,11 +64,12 @@ export default async function PlatformSpendPage() {
   return (
     <AdminPageShell
       icon={CreditCard}
-      title="Platform spend"
-      description="Track what Cliste pays for internal tools and infrastructure — subscriptions, usage, and upcoming charges."
+      title="Platform costs"
+      description="Subscriptions, usage costs and upcoming vendor charges."
       actions={<PlatformSpendToolbar lastSyncedLabel={lastSyncedLabel} />}
       maxWidth="6xl"
     >
+      <nav aria-label="Billing sections" className="flex gap-5 border-b border-slate-200 pb-3 text-sm"><Link href="/admin/payments/platform-income" className="text-slate-500 hover:underline">Customer billing</Link><span className="font-semibold">Platform costs</span></nav>
       {loadError ? (
         <p className="text-sm text-red-700" role="alert">
           Could not load platform spend: {loadError}
@@ -95,8 +97,9 @@ export default async function PlatformSpendPage() {
 
       <AdminSectionCard
         title="Vendors"
-        description="Edit manual amounts and billing days. Click Refresh API data for OpenRouter."
-        padded
+        description="Amounts, billing dates and provider sync status."
+        className="flex min-h-0 flex-1 flex-col"
+        contentClassName="flex min-h-0 flex-1 flex-col p-4"
       >
         <PlatformSpendVendorTable rows={rows} />
       </AdminSectionCard>

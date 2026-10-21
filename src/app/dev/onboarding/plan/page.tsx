@@ -26,11 +26,12 @@ export default function DevOnboardingPlanPreviewPage() {
     <OnboardingStepShell
       variant="plan"
       compact
-      title="Last step — go live"
-      description={`Pick a plan to put Cara on your number. ${PLATFORM_TRIAL_DAYS}-day free trial, cancel anytime.`}
+      title="Choose your plan"
+      description={`${PLATFORM_TRIAL_DAYS} days free, then monthly billing. Card required. Cancel anytime.`}
     >
-      <PlanPicker
-        plans={plans}
+        <PlanPicker
+        plans={plans.filter(p=>p.selfServe)}
+        configureAfterCheckout
         defaultPlan="pro"
         defaultInterval="month"
         previewCheckoutPath="/dev/onboarding/plan/checkout"

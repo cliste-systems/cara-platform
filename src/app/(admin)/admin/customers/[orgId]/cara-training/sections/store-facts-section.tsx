@@ -144,7 +144,7 @@ export function StoreFactsSection({ data, onChange, onSaved }: Props) {
         {data.hoursOverrides.map((override, index) => (
           <div
             key={override.id || `override-${index}`}
-            className="rounded-lg border border-violet-200/60 bg-violet-50/30 p-3"
+            className="rounded-lg border border-gray-200/60 bg-gray-50/30 p-3"
           >
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">

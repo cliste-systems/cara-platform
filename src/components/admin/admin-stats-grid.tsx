@@ -6,14 +6,16 @@ import { cn } from "@/lib/utils";
 export function AdminStatsGrid({
   children,
   className,
+  columns,
 }: {
   children: ReactNode;
   className?: string;
+  columns?: number;
 }) {
   return (
     <section
-      className={cn("grid gap-3", className)}
-      style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))" }}
+      className={cn("grid shrink-0 gap-3", className)}
+      style={{ gridTemplateColumns: columns ? `repeat(${columns}, minmax(0, 1fr))` : "repeat(auto-fit, minmax(min(100%, 130px), 1fr))" }}
     >
       {children}
     </section>

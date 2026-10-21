@@ -1,3 +1,4 @@
+import {parseOutsideHoursPolicy, type OutsideHoursPolicy} from "./outside-hours-policy";
 export type DayKey =
   | "monday"
   | "tuesday"
@@ -19,12 +20,14 @@ export type WeekScheduleMeta = {
   open24_7?: boolean;
   hoursNote?: string;
   bankHolidays?: BankHolidayConfig;
+  outsideHours?: OutsideHoursPolicy;
 };
 
 /** Bank & public holiday handling — optional add-on to the weekly schedule. */
 export type BankHolidayConfig = {
   /** Owner opted in to bank-holiday rules. */
   configured: boolean;
+  usualHours?: boolean;
   /** When configured: open on bank/public holidays vs closed. */
   open: boolean;
   start: string;
@@ -124,7 +127,7 @@ function readBankHolidayConfig(raw: Record<string, unknown>): BankHolidayConfig 
     raw[META_BANK_HOLIDAYS_END].trim()
       ? raw[META_BANK_HOLIDAYS_END].trim()
       : defaults.end;
-  return { configured: true, open, start, end };
+  return { configured: true, open, start, end, ...(raw._bankHolidaysUsualHours === true ? {usualHours:true} : {}) };
 }
 
 function readWeekScheduleMeta(raw: Record<string, unknown>): WeekScheduleMeta {
@@ -135,6 +138,7 @@ function readWeekScheduleMeta(raw: Record<string, unknown>): WeekScheduleMeta {
         ? raw[META_HOURS_NOTE].trim().slice(0, 120)
         : "",
     bankHolidays: readBankHolidayConfig(raw),
+    outsideHours: raw._outsideHours ? parseOutsideHoursPolicy(raw._outsideHours) : undefined,
   };
 }
 
@@ -163,6 +167,7 @@ export function serializeBusinessHours(
   meta: WeekScheduleMeta = {},
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = { ...schedule };
+  if (meta.outsideHours) payload._outsideHours = meta.outsideHours;
   if (meta.open24_7) payload[META_OPEN_24_7] = true;
   if (meta.hoursNote?.trim()) {
     payload[META_HOURS_NOTE] = meta.hoursNote.trim().slice(0, 120);
@@ -170,6 +175,7 @@ export function serializeBusinessHours(
   if (meta.bankHolidays?.configured) {
     payload[META_BANK_HOLIDAYS_CONFIGURED] = true;
     payload[META_BANK_HOLIDAYS_OPEN] = meta.bankHolidays.open;
+    if (meta.bankHolidays.usualHours) payload._bankHolidaysUsualHours = true;
     if (meta.bankHolidays.open) {
       payload[META_BANK_HOLIDAYS_START] = meta.bankHolidays.start;
       payload[META_BANK_HOLIDAYS_END] = meta.bankHolidays.end;

@@ -1,12 +1,6 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { publicLegalUrl } from "@/lib/public-legal-url";
 
-import { TermsDocument } from "@/content/legal/terms-document";
-
-export const metadata: Metadata = {
-  title: "Terms of service — Cliste",
-  description: "Terms for using the Cliste AI voice receptionist platform.",
-};
-
-export default function TermsPage() {
-  return <TermsDocument />;
+export default function PublicLegalRedirect() {
+  redirect(publicLegalUrl("/legal/terms"));
 }

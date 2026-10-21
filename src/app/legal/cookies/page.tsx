@@ -1,12 +1,6 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { publicLegalUrl } from "@/lib/public-legal-url";
 
-import { CookiesDocument } from "@/content/legal/cookies-document";
-
-export const metadata: Metadata = {
-  title: "Cookies — Cliste",
-  description: "How Cliste uses cookies and similar technologies.",
-};
-
-export default function CookiesPage() {
-  return <CookiesDocument />;
+export default function PublicLegalRedirect() {
+  redirect(publicLegalUrl("/legal/cookies"));
 }

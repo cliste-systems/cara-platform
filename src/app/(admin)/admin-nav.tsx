@@ -2,158 +2,44 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-import {
-  Building2,
-  ClipboardCheck,
-  Headphones,
-  LayoutGrid,
-  LifeBuoy,
-  Mail,
-  MessageSquareText,
-  Phone,
-  Users,
-  ShieldCheck,
-  UserCog,
-} from "lucide-react";
-
-import {
-  adminCallAnalysisPath,
-  adminCustomersPath,
-  adminDemoCallsPath,
-  adminInboxPath,
-  adminOverviewPath,
-  adminPhonePoolPath,
-  adminSupportPath,
-  adminTextRehearsalPath,
-} from "@/lib/admin-route-paths";
-import { adminNavLinkBaseClass } from "@/components/admin/admin-interactive";
-import { cn } from "@/lib/utils";
+import { ArrowDownLeft, ClipboardCheck, LayoutGrid, LifeBuoy, Mail, Users, ShieldCheck } from "lucide-react";
 import { hasAdminPermission, type AdminStaffAccess } from "@/lib/admin-permissions";
-
 import { AdminSignOutButton } from "./admin-sign-out-button";
-import { AdminPaymentsNavGroup } from "./admin-payments-nav";
 
-const baseNav = [
-  { href: adminOverviewPath(), label: "Overview", icon: LayoutGrid, exact: true, permission: "team" },
-  {
-    href: adminCustomersPath(),
-    label: "Customers",
-    permission: "customers",
-    icon: Users,
-    exact: false,
-  },
-  { href: "/admin/organisations", label: "Organisations", permission: "customers", icon: Building2, exact: false },
-  {
-    href: adminPhonePoolPath(),
-    label: "Phone pool",
-    permission: "customers",
-    icon: Phone,
-    exact: false,
-  },
-  {
-    href: adminDemoCallsPath(),
-    label: "Demo calls",
-    permission: "calls",
-    icon: Headphones,
-    exact: true,
-  },
-  {
-    href: adminCallAnalysisPath(),
-    label: "Call analysis",
-    permission: "calls",
-    icon: ClipboardCheck,
-    exact: false,
-  },
-  {
-    href: adminTextRehearsalPath(),
-    label: "Text rehearsal",
-    permission: "calls",
-    icon: MessageSquareText,
-    exact: true,
-  },
-  {
-    href: adminInboxPath(),
-    label: "Inbox",
-    permission: "inbox",
-    icon: Mail,
-    exact: false,
-  },
-  {
-    href: adminSupportPath(),
-    label: "Support tickets",
-    permission: "support",
-    icon: LifeBuoy,
-    exact: false,
-  },
-  { href: "/admin/team", label: "Team", icon: UserCog, exact: false, permission: "team" },
-  { href: "/admin/security", label: "Security & sessions", icon: ShieldCheck, exact: false, permission: null },
+const groups = [
+  { label: "Workspace", items: [
+    { href: "/admin", label: "Overview", icon: LayoutGrid, permission: "team", exact: true },
+    { href: "/admin/customers", label: "Customers", icon: Users, permission: "customers", exact: false },
+    { href: "/admin/call-analysis", label: "Calls", icon: ClipboardCheck, permission: "calls", exact: false },
+    { href: "/admin/support", label: "Support", icon: LifeBuoy, permission: "support", exact: false },
+    { href: "/admin/inbox", label: "Email inbox", icon: Mail, permission: "inbox", exact: false },
+    { href: "/admin/payments/platform-income", label: "Billing", icon: ArrowDownLeft, permission: "billing", exact: false },
+  ] },
+  { label: "Administration", items: [
+    { href: "/admin/settings", label: "Settings & tools", icon: ShieldCheck, permission: null, exact: false },
+  ] },
 ] as const;
 
-function isActive(pathname: string, href: string, exact: boolean): boolean {
-  if (exact) {
-    return pathname === href || pathname === `${href}/`;
-  }
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-export function AdminNav({ loggedInAs, access }: { loggedInAs: string; access: AdminStaffAccess }) {
+export function AdminNav({ loggedInAs, displayName, access }: { loggedInAs: string; displayName?: string; access: AdminStaffAccess }) {
   const pathname = usePathname() ?? "";
-  const initial = loggedInAs.trim().charAt(0).toUpperCase() || "A";
-
-  return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <nav
-        className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 py-5"
-        aria-label="Admin"
-      >
-        <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#929aa1]">Workspace</p>
-        {baseNav.filter((item) => item.permission === null || hasAdminPermission(access, item.permission)).map(({ href, label, icon: Icon, exact }) => {
-          const active = isActive(pathname, href, exact);
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                adminNavLinkBaseClass,
-                "group relative flex min-h-10 items-center gap-3 rounded-lg px-3 py-2.5 text-[13px]",
-                active
-                  ? "bg-[#353d42] font-semibold text-white"
-                  : "font-medium text-[#667078] hover:bg-[#f1f3f5] hover:text-[#11181d]",
-              )}
-              aria-current={active ? "page" : undefined}
-            >
-              <Icon
-                className={cn(
-                  "size-4 shrink-0 transition-colors",
-                  active
-                    ? "text-white"
-                    : "text-[#929aa1] group-hover:text-[#353d42]",
-                )}
-                strokeWidth={1.5}
-                aria-hidden
-              />
-              {label}
-            </Link>
-          );
-        })}
-        {hasAdminPermission(access, "billing") ? <AdminPaymentsNavGroup /> : null}
-      </nav>
-
-      <div className="shrink-0 border-t border-[#e0e3e6] bg-[#fafafa] p-4">
-        <div className="mb-3 flex items-center gap-2.5 px-1">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-[#e0e3e6] bg-white text-xs font-semibold text-[#353d42]">
-            {initial}
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-[#11181d]">
-              {loggedInAs}
-            </p>
-            <p className="text-[11px] text-[#929aa1]">{access.role === "owner" ? "Workspace owner" : "Team member"}</p>
-          </div>
-        </div>
-        <AdminSignOutButton />
-      </div>
+  const name = displayName || loggedInAs;
+  return <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+    <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-2" aria-label="Admin">
+      {groups.map(group => {
+        const items = group.items.filter(item => (item.permission === null || hasAdminPermission(access, item.permission)) && !(item.href === "/admin/inbox" && hasAdminPermission(access, "support")));
+        if (!items.length) return null;
+        return <div key={group.label} className="border-t border-[#354553] py-2 first:border-t-0 first:pt-1">
+          <p className="px-3 pb-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-[#91a8be]">{group.label}</p>
+          <div className="space-y-0.5">{items.map(({ href, label, icon: Icon, exact }) => {
+            const active = href === "/admin/settings" ? ["/admin/settings", "/admin/team", "/admin/security", "/admin/phone-pool", "/admin/demo-calls"].some(path => pathname === path || pathname.startsWith(`${path}/`)) : href === "/admin/customers" ? pathname.startsWith("/admin/customers") || pathname.startsWith("/admin/organisations") : href === "/admin/payments/platform-income" ? pathname.startsWith("/admin/payments") : href === "/admin/support" ? pathname.startsWith("/admin/support") || pathname.startsWith("/admin/inbox") : exact ? pathname === href || pathname === `${href}/` : pathname === href || pathname.startsWith(`${href}/`);
+            return <Link key={href} href={href} aria-current={active ? "page" : undefined} className={`flex min-h-8 items-center gap-3 rounded-md px-3 py-1.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#9db3c8] ${active ? "bg-white/10 font-semibold text-white" : "font-medium text-[#d5e0eb] hover:bg-white/[0.07] hover:text-white"}`}><Icon size={17} strokeWidth={1.6} aria-hidden />{label}</Link>;
+          })}</div>
+        </div>;
+      })}
+    </nav>
+    <div className="shrink-0 border-t border-[#354553] px-4 py-3">
+      <div className="flex items-center gap-3"><span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-semibold">{name.trim()[0]?.toUpperCase() || "A"}</span><div className="min-w-0"><p className="truncate text-[13px] font-medium text-[#f0f4f8]" title={loggedInAs}>{name}</p><p className="mt-1 text-[11px] text-[#9eb2c6]">{access.role === "owner" ? "Workspace owner" : "Team member"}</p></div></div>
+      <div className="mt-2"><AdminSignOutButton /></div>
     </div>
-  );
+  </div>;
 }

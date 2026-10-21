@@ -64,6 +64,8 @@ type CallLogListRow = {
   id: string;
   caller_number: string;
   caller_name?: string | null;
+  is_urgent?: boolean;
+  owner_sms_status?: string | null;
   duration_seconds: number;
   outcome: string;
   ai_summary: string | null;
@@ -103,7 +105,7 @@ type CallLinkRow = {
 };
 
 const CALL_LIST_COLUMNS =
-  "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, call_resolution, created_at, post_call_status, audio_storage_path, caller_data_erased_at, caller_data_erased_by_label, caller_data_erased_reason, engineer_test_call, room_name";
+  "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, call_resolution, created_at, post_call_status, audio_storage_path, caller_data_erased_at, caller_data_erased_by_label, caller_data_erased_reason, engineer_test_call, room_name, is_urgent, owner_sms_status";
 
 function parsePageParam(raw: string | undefined): number {
   const n = Number.parseInt(String(raw ?? "1"), 10);
@@ -123,7 +125,7 @@ function toListItem(
   });
   const followUp = followUpByCallId.get(row.id) ?? null;
   const outcome = normalizeCallOutcome(row.outcome);
-  const attentionLevel = resolveCallAttentionLevel({
+  const attentionLevel = row.is_urgent ? "urgent" : resolveCallAttentionLevel({
     hasOpenAction: Boolean(followUp),
     postCallStatus: (row.post_call_status as PostCallStatus) ?? "complete",
     aiSummary: mapped.aiSummary,
@@ -147,7 +149,7 @@ function toListItem(
     durationLabel: mapped.durationLabel || "—",
     outcome,
     outcomeLabel: OUTCOME_LABELS[outcome],
-    intentLabel: mapped.intentLabel || inferCallIntent(mapped.aiSummary, outcome),
+    intentLabel: [row.is_urgent?"Urgent enquiry":mapped.intentLabel || inferCallIntent(mapped.aiSummary, outcome),["failed","unknown"].includes(row.owner_sms_status??"")?"SMS needs attention":row.owner_sms_status==="sent"?"SMS sent":""].filter(Boolean).join(" · "),
     summaryPreview: null,
     transcriptVerbatim: "",
     transcriptReview: null,

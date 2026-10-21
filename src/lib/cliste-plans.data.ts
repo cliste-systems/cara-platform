@@ -37,6 +37,13 @@ export type PlanDefinition = {
 export const LOCATION_ADDON_MONTHLY_CENTS = 7900;
 export const LOCATION_ADDON_STRIPE_KEY = "cliste_location_addon_monthly";
 
+export const STANDARD_PLAN_FEATURES = [
+  "Cara, your AI receptionist, available 24/7",
+  "Call transcripts, summaries and callback capture",
+  "Knowledge Base and HelloCara dashboard",
+  "Forward your existing business number",
+];
+
 export const PLANS: Record<PlanTier, PlanDefinition> = {
   starter: {
     tier: "starter",
@@ -45,50 +52,42 @@ export const PLANS: Record<PlanTier, PlanDefinition> = {
       "For smaller businesses that want calls answered and requests captured.",
     monthlyCents: 9900,
     annualCents: 9900 * 10,
-    includedMinutes: 140,
+    includedMinutes: 150,
     includedSms: 40,
-    overageRateCents: 59,
+    overageRateCents: 49,
     smsOverageRateCents: 15,
     applicationFeeBps: 150,
     includedLocations: 1,
     locationAddonMonthlyCents: null,
     selfServe: true,
-    features: [
-      "Cara answers calls 24/7",
-      "Call summaries and Action Inbox",
-      "Call flow routing (links, files, inbox)",
-    ],
+    features: [...STANDARD_PLAN_FEATURES],
   },
   pro: {
     tier: "pro",
-    name: "Professional",
+    name: "Growth",
     tagline:
       "For busy local businesses handling more calls each month.",
-    monthlyCents: 24900,
-    annualCents: 24900 * 10,
-    includedMinutes: 500,
+    monthlyCents: 19900,
+    annualCents: 19900 * 10,
+    includedMinutes: 400,
     includedSms: 150,
-    overageRateCents: 55,
+    overageRateCents: 49,
     smsOverageRateCents: 15,
     applicationFeeBps: 100,
     includedLocations: 1,
     locationAddonMonthlyCents: null,
     recommended: true,
     selfServe: true,
-    features: [
-      "Everything in Starter",
-      "Lower per-minute rate as you grow",
-      "Priority onboarding support",
-    ],
+    features: [...STANDARD_PLAN_FEATURES],
   },
   business: {
     tier: "business",
     name: "Business",
     tagline:
       "For high-volume or multi-location businesses that need more included usage.",
-    monthlyCents: 44900,
-    annualCents: 44900 * 10,
-    includedMinutes: 1000,
+    monthlyCents: 34900,
+    annualCents: 34900 * 10,
+    includedMinutes: 800,
     includedSms: 300,
     overageRateCents: 49,
     smsOverageRateCents: 15,
@@ -96,12 +95,7 @@ export const PLANS: Record<PlanTier, PlanDefinition> = {
     includedLocations: 1,
     locationAddonMonthlyCents: LOCATION_ADDON_MONTHLY_CENTS,
     selfServe: true,
-    features: [
-      "Everything in Professional",
-      "Lowest standard per-minute rate",
-      "Priority phone support",
-      "Add extra locations from €79/site",
-    ],
+    features: [...STANDARD_PLAN_FEATURES],
   },
   enterprise: {
     tier: "enterprise",
@@ -139,32 +133,32 @@ export type LaunchDefinition = {
 export const LAUNCHES: Record<LaunchTier, LaunchDefinition> = {
   diy: {
     tier: "diy",
-    name: "DIY Setup",
+    name: "Set up myself",
     description:
-      "Self-serve wizard, per-carrier forwarding guides, no human contact. Live in under an hour.",
+      "Set up Cara in your dashboard.",
     priceCents: 0,
   },
   remote: {
     tier: "remote",
-    name: "Remote Launch",
+    name: "Remote setup",
     description:
-      "60-minute Zoom with a Cliste specialist. We co-write your AI prompt, walk through forwarding, run test calls together.",
-    priceCents: 14900,
+      "Help setting up Cara remotely.",
+    priceCents: 19900,
   },
   onsite_dublin: {
     tier: "onsite_dublin",
-    name: "On-Site Launch (Dublin + commuter belt)",
+    name: "On-site setup",
     description:
-      "Specialist visits your premises: sets up forwarding, trains staff, runs test calls, updates Google Business Profile.",
-    priceCents: 34900,
+      "Help setting up Cara at your premises.",
+    priceCents: 39900,
     targetRegion: "Dublin, Kildare, Meath, Wicklow, Louth",
   },
   onsite_rest_ie: {
     tier: "onsite_rest_ie",
-    name: "On-Site Launch (rest of Ireland)",
+    name: "On-site setup",
     description:
-      "Same scope as Dublin on-site; includes travel for the rest of the country.",
-    priceCents: 44900,
+      "Help setting up Cara at your premises.",
+    priceCents: 39900,
     targetRegion: "Cork, Galway, Limerick, Waterford, and nationwide",
   },
 };

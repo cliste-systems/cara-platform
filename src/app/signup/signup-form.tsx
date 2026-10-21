@@ -1,468 +1,120 @@
 "use client";
 
-import {
-  startTransition,
-  useActionState,
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-} from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
 import type { TurnstileInstance } from "@marsidev/react-turnstile";
-
 import { AuthTurnstileField } from "@/components/auth/auth-turnstile-field";
-import {
-  OnboardingFieldBox,
-  OnboardingFieldRow,
-  OnboardingFieldSurfaceProvider,
-} from "@/components/onboarding/onboarding-form-card";
-import { OnboardingEnter } from "@/components/onboarding/onboarding-enter";
-import { ONBOARDING_EASE } from "@/components/onboarding/onboarding-motion";
-import { OnboardingPrimaryButton } from "@/components/onboarding/onboarding-primary-button";
-import {
-  ONBOARDING_FIELD_INPUT,
-  ONBOARDING_GLASS_PREVIEW,
-} from "@/components/onboarding/onboarding-ui";
-import {
-  LegalAcceptanceCheckbox,
-  LegalDocLink,
-} from "@/components/legal/legal-acceptance-checkbox";
 import { AuthFormAlert } from "@/components/auth/auth-form-alert";
-import { cn } from "@/lib/utils";
+import { OnboardingFieldBox, OnboardingFieldSurfaceProvider } from "@/components/onboarding/onboarding-form-card";
+import { OnboardingPrimaryButton } from "@/components/onboarding/onboarding-primary-button";
+import { ONBOARDING_FIELD_INPUT } from "@/components/onboarding/onboarding-ui";
+import { LegalAcceptanceCheckbox, LegalDocLink } from "@/components/legal/legal-acceptance-checkbox";
 import type { BillingInterval, PlanTier } from "@/lib/cliste-plans.data";
+import { cn } from "@/lib/utils";
+import { startSignup } from "./actions";
+import { useSetupValidation } from "@/components/dashboard/use-setup-validation";
 
-import { startSignup, type SignupResult } from "./actions";
-
-const INITIAL: SignupResult = { ok: false, message: "" };
-
-const SIGNUP_SUCCESS_HOLD_MS = 360;
-const SIGNUP_EXIT_MS = 520;
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const SIGNUP_FIELD_BOX = "px-3.5 py-2.5";
-
-type SignupFieldErrors = Partial<
-  Record<
-    | "firstName"
-    | "lastName"
-    | "salonName"
-    | "email"
-    | "phone"
-    | "password"
-    | "acceptLegal",
-    string
-  >
->;
-
-const PHONE_COMPACT_RE = /^\+?\d{7,15}$/;
-
-function compactPhone(raw: string): string {
-  return raw.replace(/[\s\-().]/g, "");
-}
-
-function validateSignupFields(formData: FormData): SignupFieldErrors {
-  const errors: SignupFieldErrors = {};
-  const firstName = String(formData.get("firstName") ?? "").trim();
-  const lastName = String(formData.get("lastName") ?? "").trim();
-  const salonName = String(formData.get("salonName") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const password = String(formData.get("password") ?? "");
-
-  if (!firstName) errors.firstName = "Enter your first name.";
-  if (!lastName) errors.lastName = "Enter your last name.";
-  if (!salonName || salonName.length < 2) {
-    errors.salonName = "Enter your business name.";
-  }
-  if (!email || !EMAIL_RE.test(email)) {
-    errors.email = "Enter a valid email address.";
-  }
-  const phone = compactPhone(String(formData.get("phone") ?? "").trim());
-  if (!phone || !PHONE_COMPACT_RE.test(phone)) {
-    errors.phone = "Enter a valid phone number.";
-  }
-  if (password.length < 8) {
-    errors.password = "Password must be at least 8 characters.";
-  }
-  if (formData.get("acceptLegal") !== "on") {
-    errors.acceptLegal =
-      "You must agree to the terms of service and privacy notice.";
-  }
-
-  return errors;
-}
+const subscribeToClientReady=()=>()=>{};
 
 type Props = {
-  planTier: PlanTier | null;
-  billingInterval: BillingInterval;
-  selectedPlanName: string | null;
-  selectedPlanPriceCents: number | null;
+  planTier: PlanTier | null; billingInterval: BillingInterval;
+  selectedPlanName: string | null; selectedPlanPriceCents: number | null;
   billingIntervalLabel: "monthly" | "annual";
-  /** Dev QA — skip Cloudflare Turnstile when CLISTE_SIGNUP_ONBOARDING_DEV=true */
-  skipTurnstile?: boolean;
-  /** Fades the signup shell before client navigation. */
-  onTransitionStart?: () => void;
+  skipTurnstile?: boolean; onTransitionStart?: () => void;
 };
 
-export function SignupForm({
-  planTier,
-  billingInterval,
-  selectedPlanName,
-  selectedPlanPriceCents,
-  billingIntervalLabel,
-  skipTurnstile = false,
-  onTransitionStart,
-}: Props) {
+export function SignupForm({ planTier, billingInterval, skipTurnstile = false }: Props) {
   const router = useRouter();
-  const reduceMotion = useReducedMotion() ?? false;
-  const [state, formAction, pending] = useActionState(
-    async (_prev: SignupResult, formData: FormData) => {
-      return startSignup(_prev, formData);
-    },
-    INITIAL,
-  );
-
-  const [showPw, setShowPw] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<SignupFieldErrors>({});
-  const [turnstileVerified, setTurnstileVerified] = useState(false);
-  const [submittingSecurity, setSubmittingSecurity] = useState(false);
-  const [accountCreated, setAccountCreated] = useState(false);
-  const redirectToRef = useRef<string | null>(null);
-  const transitionStartedRef = useRef(false);
-  const turnstileRef = useRef<TurnstileInstance | null>(null);
-  const turnstileSiteKey = skipTurnstile
-    ? ""
-    : (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "");
-  const errorMessage = !state.ok && state.message ? state.message : null;
-
+  const clientReady=useSyncExternalStore(subscribeToClientReady,()=>true,()=>false);
+  const validation = useSetupValidation();
+  const [pending, setPending] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const [openingNextStep, setOpeningNextStep] = useState(false);
+  const [slow, setSlow] = useState(false);
   useEffect(() => {
-    if (state.ok) return;
-    const message = "message" in state ? state.message : "";
-    // Any server rejection means the token we submitted was already consumed by
-    // Cloudflare (tokens are single-use). Reset the widget so the next attempt
-    // gets a fresh token instead of replaying a burned one.
-    if (!message) return;
-    setAccountCreated(false);
-    setTurnstileVerified(false);
-    turnstileRef.current?.reset();
-  }, [state]);
+    if (!pending) return;
+    const timer = window.setTimeout(() => setSlow(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, [pending]);
+  const [error, setError] = useState<string | null>(null);
+  const turnstile = useRef<TurnstileInstance | null>(null);
+  const siteKey = skipTurnstile ? "" : process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
 
-  useEffect(() => {
-    if (!state.ok || !state.redirectTo || transitionStartedRef.current) return;
-    transitionStartedRef.current = true;
-    redirectToRef.current = state.redirectTo;
-    setAccountCreated(true);
-
-    const holdMs = reduceMotion ? 0 : SIGNUP_SUCCESS_HOLD_MS;
-    const exitMs = reduceMotion ? 0 : SIGNUP_EXIT_MS;
-
-    const exitTimer = window.setTimeout(() => {
-      onTransitionStart?.();
-    }, holdMs);
-
-    const navTimer = window.setTimeout(() => {
-      const path = redirectToRef.current;
-      if (path) router.push(path);
-    }, holdMs + exitMs + 40);
-
-    return () => {
-      window.clearTimeout(exitTimer);
-      window.clearTimeout(navTimer);
-    };
-  }, [state, reduceMotion, router, onTransitionStart]);
-
-  function clearFieldError(field: keyof SignupFieldErrors) {
-    setFieldErrors((current) => {
-      if (!current[field]) return current;
-      const next = { ...current };
-      delete next[field];
-      return next;
-    });
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const errors = validateSignupFields(formData);
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
+    if (pending || !validation.validate(event.currentTarget)) return;
+    const data = new FormData(event.currentTarget);
+    setError(null);
+    setSlow(false);
+    setOpeningNextStep(false);
+    const token = turnstile.current?.getResponse();
+    if (siteKey && (!token || turnstile.current?.isExpired())) {
+      setError("Please complete the security check.");
+      turnstile.current?.reset();
       return;
     }
-
-    if (turnstileSiteKey) {
-      if (!turnstileVerified) {
-        setFieldErrors({
-          email: "Complete the security check below the terms checkbox.",
-        });
+    if (token) data.set("turnstileToken", token);
+    setPending(true);
+    try {
+      const result = await startSignup(null, data);
+      if (!result.ok) {
+        setError(result.message);
+        turnstile.current?.reset();
+        setPending(false);
         return;
       }
-
-      setSubmittingSecurity(true);
-      try {
-        let token = turnstileRef.current?.getResponse();
-        if (!token || turnstileRef.current?.isExpired()) {
-          setTurnstileVerified(false);
-          turnstileRef.current?.reset();
-          token = await turnstileRef.current?.getResponsePromise(30_000);
-        }
-        if (!token) {
-          throw new Error("missing turnstile token");
-        }
-        formData.set("turnstileToken", token);
-      } catch {
-        setFieldErrors({
-          email: "Security check expired. Tick the box again, then retry.",
-        });
-        setTurnstileVerified(false);
-        turnstileRef.current?.reset();
-        setSubmittingSecurity(false);
-        return;
-      }
-      setSubmittingSecurity(false);
+      setOpeningNextStep(true);
+      router.push(result.redirectTo);
+    } catch {
+      setError("We couldn’t create your account. Please try again.");
+      turnstile.current?.reset();
+      setPending(false);
     }
-
-    setFieldErrors({});
-    // Manual dispatch of a useActionState action MUST be wrapped in
-    // startTransition — otherwise Next.js drops the server action's
-    // redirect() and the user silently stays on this page.
-    startTransition(() => {
-      formAction(formData);
-    });
   }
 
-  return (
-    <OnboardingFieldSurfaceProvider surface="profile">
-      <motion.form
-        action={formAction}
-        onSubmit={handleSubmit}
-        noValidate
-        className="w-full space-y-2"
-        animate={
-          reduceMotion
-            ? undefined
-            : {
-                opacity: pending && !accountCreated ? 0.9 : 1,
-                y: pending && !accountCreated ? 2 : 0,
-              }
-        }
-        transition={{ duration: 0.32, ease: ONBOARDING_EASE }}
-      >
-        {planTier ? (
-          <input type="hidden" name="planTier" value={planTier} />
-        ) : null}
-        <input type="hidden" name="billingInterval" value={billingInterval} />
-
-        {selectedPlanName && selectedPlanPriceCents != null ? (
-          <OnboardingEnter tone="profile">
-            <div className={cn(ONBOARDING_GLASS_PREVIEW, "rounded-2xl px-4 py-3.5")}>
-              <p className="text-[14px] font-medium text-[#0b1220]">
-                {selectedPlanName} · {formatEuro(selectedPlanPriceCents)}{" "}
-                {billingIntervalLabel === "annual" ? "billed annually" : "/ month"}
-              </p>
-              <p className="mt-1 text-[12px] leading-snug text-slate-500">
-                Payment is confirmed in the next step after your account is created.
-              </p>
-            </div>
-          </OnboardingEnter>
-        ) : null}
-
-        <OnboardingFieldRow className="grid gap-2 sm:grid-cols-2">
-          <OnboardingFieldBox
-            label="First name"
-            htmlFor="firstName"
-            error={fieldErrors.firstName}
-            className={SIGNUP_FIELD_BOX}
-          >
-            <input
-              id="firstName"
-              name="firstName"
-              type="text"
-              autoComplete="given-name"
-              placeholder="Jane"
-              aria-invalid={Boolean(fieldErrors.firstName)}
-              onChange={() => clearFieldError("firstName")}
-              className={ONBOARDING_FIELD_INPUT}
-            />
-          </OnboardingFieldBox>
-          <OnboardingFieldBox
-            label="Last name"
-            htmlFor="lastName"
-            error={fieldErrors.lastName}
-            className={SIGNUP_FIELD_BOX}
-          >
-            <input
-              id="lastName"
-              name="lastName"
-              type="text"
-              autoComplete="family-name"
-              placeholder="Smith"
-              aria-invalid={Boolean(fieldErrors.lastName)}
-              onChange={() => clearFieldError("lastName")}
-              className={ONBOARDING_FIELD_INPUT}
-            />
-          </OnboardingFieldBox>
-        </OnboardingFieldRow>
-
-        <OnboardingFieldBox
-          label="Business name"
-          htmlFor="salonName"
-          error={fieldErrors.salonName}
-          className={SIGNUP_FIELD_BOX}
-        >
-          <input
-            id="salonName"
-            name="salonName"
-            type="text"
-            autoComplete="organization"
-            placeholder="e.g. Riverside Studio"
-            aria-invalid={Boolean(fieldErrors.salonName)}
-            onChange={() => clearFieldError("salonName")}
-            className={ONBOARDING_FIELD_INPUT}
-          />
-        </OnboardingFieldBox>
-
-        <OnboardingFieldBox
-          label="Email address"
-          htmlFor="email"
-          error={fieldErrors.email}
-          className={SIGNUP_FIELD_BOX}
-        >
-          <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            placeholder="you@business.ie"
-            aria-invalid={Boolean(fieldErrors.email)}
-            onChange={() => clearFieldError("email")}
-            className={ONBOARDING_FIELD_INPUT}
-          />
-        </OnboardingFieldBox>
-
-        <OnboardingFieldBox
-          label="Phone number"
-          htmlFor="phone"
-          error={fieldErrors.phone}
-          className={SIGNUP_FIELD_BOX}
-        >
-          <input
-            id="phone"
-            name="phone"
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            placeholder="+353 87 123 4567"
-            aria-invalid={Boolean(fieldErrors.phone)}
-            onChange={() => clearFieldError("phone")}
-            className={ONBOARDING_FIELD_INPUT}
-          />
-        </OnboardingFieldBox>
-
-        <OnboardingFieldBox
-          label="Password"
-          htmlFor="password"
-          error={fieldErrors.password}
-          className={SIGNUP_FIELD_BOX}
-        >
+  return <OnboardingFieldSurfaceProvider surface="default">
+    <form data-signup-form method="post" noValidate onChange={event => { if (event.target instanceof HTMLInputElement) validation.clear(event.target.name); }} onSubmit={submit} className="space-y-3">
+      <input type="hidden" name="planTier" value={planTier ?? ""} />
+      <input type="hidden" name="billingInterval" value={billingInterval} />
+      <fieldset disabled={pending||!clientReady} className="min-w-0 space-y-3">
+        <div data-signup-identity className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <OnboardingFieldBox label="Your name" htmlFor="signup-name" static className="signup-account-field rounded-xl border-slate-200 bg-white px-3.5 py-2.5 shadow-none focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-100 [&>label]:text-slate-500">
+          <input id="signup-name" name="fullName" {...validation.props("fullName")} autoComplete="name" placeholder="Full name" required minLength={2} maxLength={120} className={ONBOARDING_FIELD_INPUT} />
+        {validation.error("fullName")}</OnboardingFieldBox>
+        <OnboardingFieldBox label="Business name" htmlFor="signup-business" static className="signup-account-field rounded-xl border-slate-200 bg-white px-3.5 py-2.5 shadow-none focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-100 [&>label]:text-slate-500">
+          <input id="signup-business" name="businessName" {...validation.props("businessName")} autoComplete="organization" placeholder="Your business name" required minLength={2} maxLength={120} className={ONBOARDING_FIELD_INPUT} />
+        {validation.error("businessName")}</OnboardingFieldBox>
+        </div>
+        <OnboardingFieldBox label="Legal company name" htmlFor="signup-company" static className="signup-account-field rounded-xl border-slate-200 bg-white px-3.5 py-2.5 shadow-none focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-100 [&>label]:text-slate-500">
+          <input id="signup-company" name="legalCompanyName" {...validation.props("legalCompanyName")} autoComplete="off" placeholder="e.g. Murphy Services Limited" required minLength={2} maxLength={200} className={ONBOARDING_FIELD_INPUT} />
+          <p className="mt-1 text-[11px] leading-4 text-slate-500">Your registered company name, or legal trading name if not incorporated.</p>
+        {validation.error("legalCompanyName")}</OnboardingFieldBox>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <OnboardingFieldBox label="Work email" htmlFor="signup-email" static className="signup-account-field rounded-xl border-slate-200 bg-white px-3.5 py-2.5 shadow-none focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-100 [&>label]:text-slate-500">
+          <input id="signup-email" name="email" {...validation.props("email")} type="email" autoComplete="email" placeholder="you@business.ie" required className={ONBOARDING_FIELD_INPUT} />
+        {validation.error("email")}</OnboardingFieldBox>
+        <OnboardingFieldBox label="Password" htmlFor="signup-password" static className="signup-account-field rounded-xl border-slate-200 bg-white px-3.5 py-2.5 shadow-none focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-100 [&>label]:text-slate-500">
           <div className="relative">
-            <input
-              id="password"
-              name="password"
-              type={showPw ? "text" : "password"}
-              maxLength={128}
-              autoComplete="new-password"
-              placeholder="At least 8 characters"
-              aria-invalid={Boolean(fieldErrors.password)}
-              onChange={() => clearFieldError("password")}
-              className={cn(ONBOARDING_FIELD_INPUT, "pr-10")}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPw((v) => !v)}
-              className="absolute top-1/2 right-0 -translate-y-1/2 p-1 text-slate-400 transition-colors hover:text-[#0b1220]"
-              aria-label={showPw ? "Hide password" : "Show password"}
-            >
-              {showPw ? (
-                <EyeOff className="h-4 w-4" aria-hidden />
-              ) : (
-                <Eye className="h-4 w-4" aria-hidden />
-              )}
+            <input id="signup-password" name="password" {...validation.props("password")} type={visible ? "text" : "password"} autoComplete="new-password" placeholder="At least 8 characters" required minLength={8} maxLength={128} className={cn(ONBOARDING_FIELD_INPUT, "pr-12")} />
+            <button type="button" onClick={() => setVisible(!visible)} aria-label={visible ? "Hide password" : "Show password"} className="absolute right-0 top-1/2 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-slate-500 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-slate-500">
+              {visible ? <EyeOff size={16} aria-hidden /> : <Eye size={16} aria-hidden />}
             </button>
           </div>
-        </OnboardingFieldBox>
-
-        <OnboardingEnter tone="profile">
-          <div className="space-y-1">
-            <LegalAcceptanceCheckbox
-              id="acceptLegal"
-              name="acceptLegal"
-              required={false}
-              compact
-              onCheckedChange={() => clearFieldError("acceptLegal")}
-              className={cn(
-                fieldErrors.acceptLegal &&
-                  "border-red-300/90 bg-red-50/60 ring-1 ring-red-200",
-              )}
-            >
-              I agree to the{" "}
-              <LegalDocLink href="/legal/terms">terms of service</LegalDocLink>{" "}
-              and{" "}
-              <LegalDocLink href="/legal/privacy">privacy notice</LegalDocLink>.
-            </LegalAcceptanceCheckbox>
-            {fieldErrors.acceptLegal ? (
-              <p className="px-1 text-[11px] font-medium leading-snug text-red-600">
-                {fieldErrors.acceptLegal}
-              </p>
-            ) : null}
-          </div>
-        </OnboardingEnter>
-
-        {turnstileSiteKey ? (
-          <div className={turnstileVerified ? "sr-only" : undefined}>
-            <AuthTurnstileField
-              ref={turnstileRef}
-              siteKey={turnstileSiteKey}
-              onSuccess={() => setTurnstileVerified(true)}
-              onExpire={() => setTurnstileVerified(false)}
-            />
-          </div>
-        ) : null}
-        {turnstileSiteKey && turnstileVerified ? (
-          <p className="text-center text-[11px] text-slate-500">
-            Security check passed
-          </p>
-        ) : null}
-
-        <AuthFormAlert message={errorMessage || null} />
-
-        <OnboardingEnter tone="profile" className="flex justify-center pt-0.5">
-          <OnboardingPrimaryButton
-            type="submit"
-            pending={pending || submittingSecurity}
-            disabled={accountCreated}
-            className="w-full max-w-none sm:min-w-[14rem]"
-          >
-            {accountCreated
-              ? "Account created"
-              : submittingSecurity
-                ? "Verifying…"
-                : pending
-                  ? "Creating your account…"
-                  : "Create account"}
-            <ArrowRight className="h-4 w-4" aria-hidden />
-          </OnboardingPrimaryButton>
-        </OnboardingEnter>
-      </motion.form>
-    </OnboardingFieldSurfaceProvider>
-  );
-}
-
-function formatEuro(cents: number): string {
-  const value = cents / 100;
-  if (Number.isInteger(value)) return `€${value}`;
-  return `€${value.toFixed(2)}`;
+        {validation.error("password")}</OnboardingFieldBox>
+        </div>
+        <LegalAcceptanceCheckbox id="signup-legal" name="acceptLegal" inputProps={validation.props("acceptLegal")} required compact>
+          I’m authorised to accept the <LegalDocLink href="/legal/terms">terms of service</LegalDocLink> and <LegalDocLink href="/legal/dpa">Data Processing Agreement</LegalDocLink> for this business, allowing HelloCara to process callers’ data when we go live. I acknowledge the <LegalDocLink href="/legal/privacy">privacy notice</LegalDocLink>.
+        </LegalAcceptanceCheckbox>
+        {validation.error("acceptLegal")}
+      </fieldset>
+      {validation.summary}
+      {siteKey ? <AuthTurnstileField ref={turnstile} siteKey={siteKey} onSuccess={() => setError(null)} onExpire={() => turnstile.current?.reset()} /> : null}
+      <AuthFormAlert message={error} />
+      <OnboardingPrimaryButton type="submit" pending={pending} disabled={pending||!clientReady} className="w-full max-w-none shadow-none">
+        {pending ? openingNextStep ? "Opening the next step…" : "Creating your account…" : "Create account"}<ArrowRight size={16} aria-hidden />
+      </OnboardingPrimaryButton>
+      {pending && slow ? <p role="status" className="text-center text-xs leading-5 text-slate-500">{openingNextStep ? "Your account is created. The next page is taking a little longer to load." : "This is taking longer than usual. We’re still waiting for the signup service."}</p> : null}
+    </form>
+  </OnboardingFieldSurfaceProvider>;
 }

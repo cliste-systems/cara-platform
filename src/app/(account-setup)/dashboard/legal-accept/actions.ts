@@ -4,7 +4,6 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getMissingLegalAcceptances, recordLegalAcceptances } from "@/lib/legal-acceptances";
 import { requireDashboardSession } from "@/lib/dashboard-session";
-import { userNeedsPassword } from "@/lib/invite-onboarding";
 import { validateLegalAgreementInput } from "@/lib/legal-agreement-input";
 import { buildSecurityEventContext, logSecurityEvent } from "@/lib/security-events";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -13,7 +12,6 @@ export type AcceptLegalDocumentsResult = { ok: true } | { ok: false; message: st
 
 export async function acceptLegalDocuments(_: unknown, formData: FormData): Promise<AcceptLegalDocumentsResult> {
   const session = await requireDashboardSession({ allowOnboarding: true });
-  if (userNeedsPassword(session.user)) redirect("/dashboard/set-password");
   if (session.isLocalPreview) return { ok: false, message: "Sign in with your invitation to accept agreements." };
   const admin = createAdminClient();
   const { data: account, error } = await admin.from("accounts").select("id, name")

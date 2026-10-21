@@ -8,6 +8,7 @@ import {
 } from "@/lib/platform-billing-checkout";
 import {
   activateElementsOnboardingIfReady,
+  persistPlatformElementsSubscription,
   isDevPreviewBillingMetadata,
 } from "@/lib/platform-billing-elements";
 import {
@@ -362,13 +363,14 @@ async function handlePlatformCheckoutCompleted(
   );
 
   try {
-    await activatePlatformSubscriptionGoLive(orgId);
+    await activatePlatformSubscriptionGoLive(orgId, { dashboardOnly: session.metadata?.cliste_signup_flow === "simple_v1" });
   } catch (err) {
     await captureObservedError(err, {
       route: "stripe/webhook",
       sideEffect: "platform_go_live",
       orgId,
     });
+    if (session.metadata?.cliste_signup_flow === "simple_v1") throw err;
   }
 }
 
@@ -419,10 +421,12 @@ async function handlePlatformSubscriptionChange(
 
   const { data: account } = await admin
     .from("accounts")
-    .select("status")
+    .select("status, platform_subscription_id")
     .eq("id", accountId)
     .maybeSingle();
   const currentStatus = (account?.status as string | undefined) ?? "active";
+  // A late event from an abandoned signup must not replace the subscribed plan.
+  if (sub.metadata?.cliste_signup_flow === "simple_v1" && account?.platform_subscription_id && account.platform_subscription_id !== sub.id && currentStatus !== "onboarding") return;
 
   const patch: Record<string, unknown> = {
     platform_subscription_id: sub.id,
@@ -493,6 +497,11 @@ async function handlePlatformSubscriptionDeleted(
     organizationId: orgId,
   });
   if (!accountId) return;
+  if (sub.metadata?.cliste_signup_flow === "simple_v1") {
+    const {data:account,error}=await admin.from("accounts").select("platform_subscription_id").eq("id",accountId).maybeSingle();
+    if(error) throw error;
+    if(account?.platform_subscription_id !== sub.id) return;
+  }
   await patchAccountAndLocations(accountId, {
     status: "churned",
     suspended_reason: "platform_subscription_cancelled",
@@ -529,6 +538,15 @@ async function handleSetupIntentSucceeded(
     organizationId: orgId,
   });
   if (!accountId) return;
+
+  if (setupIntent.metadata?.cliste_signup_flow === "simple_v1") {
+    const {data:account,error}=await createAdminClient().from("accounts").select("status,platform_subscription_id").eq("id",accountId).maybeSingle();
+    if(error) throw error;
+    if(account?.status === "active" && account.platform_subscription_id && account.platform_subscription_id !== subscriptionId) return;
+    await persistPlatformElementsSubscription({organizationId:orgId,subscriptionId,accountId,setupIntentId:setupIntent.id});
+    await activatePlatformSubscriptionGoLive(orgId,{dashboardOnly:true});
+    return;
+  }
 
   try {
     await activateElementsOnboardingIfReady({

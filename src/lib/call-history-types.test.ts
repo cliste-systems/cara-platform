@@ -23,3 +23,10 @@ describe("normalizeCallOutcome transferred", () => {
     assert.notEqual(normalizeCallOutcome("transfer"), "answered");
   });
 });
+
+it("explicit speech and connection failures remain failures", () => {
+  for (const outcome of ["stt_failure", "tts_failure", "speech_failure", "connection_failed", "dispatch_failed", " STT_FAILURE "]) {
+    assert.equal(normalizeCallOutcome(outcome), "failed", outcome);
+  }
+  assert.equal(normalizeCallOutcome("answered"), "answered");
+});

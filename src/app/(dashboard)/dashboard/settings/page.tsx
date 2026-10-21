@@ -1,3 +1,6 @@
+import {smsPlanPricing} from "@/lib/sms-plan-pricing";
+import {parseBusinessHoursBundle} from "@/lib/business-hours";
+import {DEFAULT_OUTSIDE_HOURS} from "@/lib/outside-hours-policy";
 import { parseCallRoutingMode } from "@/lib/call-routing";
 import { loadAccountBilling } from "@/lib/account-session";
 import { buildDashboardAccountSummary } from "@/lib/dashboard-account-summary";
@@ -18,7 +21,7 @@ export default async function SettingsPage() {
     supabase
       .from("organizations")
       .select(
-        "is_active, status, name, phone_number, niche, agent_business_type, notification_email, notification_phone, call_routing_mode, fallback_number, slug, block_anonymous_callers",
+        "business_hours, is_active, status, name, phone_number, niche, agent_business_type, notification_email, notification_phone, call_routing_mode, fallback_number, slug, block_anonymous_callers",
       )
       .eq("id", organizationId)
       .maybeSingle(),
@@ -59,6 +62,8 @@ export default async function SettingsPage() {
   return (
     <SettingsView
       className="min-h-0 flex-1"
+      smsPricing={smsPlanPricing(accountBilling?.planTier)}
+      callHandling={parseBusinessHoursBundle(org.business_hours).meta.outsideHours??DEFAULT_OUTSIDE_HOURS}
       signInEmail={user.email ?? ""}
       canManageAccount={canManageDashboardConfig(profile.role)}
       isLocalPreview={isLocalPreview}

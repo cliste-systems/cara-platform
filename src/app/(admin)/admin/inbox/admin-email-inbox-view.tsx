@@ -197,8 +197,8 @@ function DeliveryStatusBadge({
         failure
           ? "border-red-200 bg-red-50 text-red-700"
           : normalized === "opened" || normalized === "clicked"
-            ? "border-slate-300 bg-slate-100 text-slate-800"
-            : "border-slate-200 bg-white text-slate-600",
+            ? "border-gray-300 bg-gray-100 text-gray-800"
+            : "border-gray-200 bg-white text-gray-600",
       )}
       title={
         normalized === "opened"
@@ -241,9 +241,9 @@ function deliveryFailed(status: DeliveryStatus | null): boolean {
 }
 
 const toolbarButtonClass =
-  "inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg px-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg px-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 disabled:cursor-not-allowed disabled:opacity-40";
 const fieldClass =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[15px] text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100";
+  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-[15px] text-gray-900 outline-none placeholder:text-gray-400 focus:border-gray-400 focus:ring-2 focus:ring-gray-100";
 
 async function apiJson<T>(
   input: RequestInfo | URL,
@@ -804,32 +804,32 @@ export function AdminEmailInboxView({
     FOLDERS.find((item) => item.value === folder)?.label ?? "Inbox";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [&_button]:focus-visible:outline-none [&_button]:focus-visible:ring-2 [&_button]:focus-visible:ring-inset [&_button]:focus-visible:ring-blue-500">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm [&_button]:focus-visible:outline-none [&_button]:focus-visible:ring-2 [&_button]:focus-visible:ring-inset [&_button]:focus-visible:ring-gray-500">
       <div
         className={cn(
-          "flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-3 py-3 sm:px-5",
+          "flex shrink-0 items-center justify-between gap-3 border-b border-gray-200 px-3 py-3 sm:px-5",
           composing && "hidden",
         )}
       >
         <DropdownMenu>
           <DropdownMenuTrigger
-            className="flex min-w-0 cursor-pointer items-center gap-3 rounded-lg py-1 pr-3 text-left outline-none hover:bg-slate-50"
+            className="flex min-w-0 cursor-pointer items-center gap-3 rounded-lg py-1 pr-3 text-left outline-none hover:bg-gray-50"
             aria-label={`Choose mailbox, ${activeIdentity.label}`}
             disabled={navigationBusy}
           >
-            <span className="hidden size-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 sm:flex">
+            <span className="hidden size-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600 sm:flex">
               <Mail className="size-5" aria-hidden />
             </span>
             <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold text-slate-950">
+              <span className="block truncate text-sm font-semibold text-gray-950">
                 {activeIdentity.label}
               </span>
-              <span className="mt-0.5 block truncate text-xs text-slate-500">
+              <span className="mt-0.5 block truncate text-xs text-gray-500">
                 {activeIdentity.email}
               </span>
             </span>
             <ChevronDown
-              className="size-4 shrink-0 text-slate-400"
+              className="size-4 shrink-0 text-gray-400"
               aria-hidden
             />
           </DropdownMenuTrigger>
@@ -852,12 +852,12 @@ export function AdminEmailInboxView({
                     <span className="block text-sm font-medium">
                       {identity.label}
                     </span>
-                    <span className="mt-0.5 block text-xs text-slate-500">
+                    <span className="mt-0.5 block text-xs text-gray-500">
                       {identity.email}
                     </span>
                   </span>
                   {identity.key === identityKey ? (
-                    <Check className="size-4 text-blue-600" aria-hidden />
+                    <Check className="size-4 text-gray-700" aria-hidden />
                   ) : null}
                 </DropdownMenuItem>
               ))}
@@ -914,14 +914,14 @@ export function AdminEmailInboxView({
         <aside
           aria-label="Email list"
           className={cn(
-            "min-h-0 w-full shrink-0 flex-col border-r border-slate-200 bg-white lg:w-[300px] xl:w-[340px] 2xl:w-[380px]",
+            "min-h-0 w-full shrink-0 flex-col border-r border-gray-200 bg-white lg:w-[300px] xl:w-[340px] 2xl:w-[380px]",
             readerOpen || composing ? "hidden lg:flex" : "flex",
             (expandedReader || composing) && "lg:hidden",
           )}
         >
-          <div className="shrink-0 border-b border-slate-200 px-3 pt-3">
+          <div className="shrink-0 border-b border-gray-200 px-3 pt-3">
             <div
-              className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1"
+              className="grid grid-cols-3 gap-1 rounded-lg bg-gray-100 p-1"
               aria-label="Email folders"
             >
               {FOLDERS.map(({ value, label, icon: Icon }) => (
@@ -942,8 +942,8 @@ export function AdminEmailInboxView({
                   className={cn(
                     "flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium transition-colors",
                     folder === value
-                      ? "bg-white text-slate-950 shadow-sm"
-                      : "text-slate-500 hover:text-slate-900",
+                      ? "bg-white text-gray-950 shadow-sm"
+                      : "text-gray-500 hover:text-gray-900",
                   )}
                 >
                   <Icon className="size-3.5" aria-hidden />
@@ -953,7 +953,7 @@ export function AdminEmailInboxView({
             </div>
             <div className="relative mt-3">
               <Search
-                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400"
+                className="pointer-events-none absolute top-1/2 left-3 size-4 -trangray-y-1/2 text-gray-400"
                 aria-hidden
               />
               <input
@@ -962,17 +962,17 @@ export function AdminEmailInboxView({
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={`Search ${folderLabel.toLowerCase()}…`}
-                className={cn(fieldClass, "bg-slate-50 py-2 pr-3 pl-9 text-sm")}
+                className={cn(fieldClass, "bg-gray-50 py-2 pr-3 pl-9 text-sm")}
               />
             </div>
-            <div className="flex min-h-11 items-center justify-between gap-2 px-1 text-xs text-slate-500">
+            <div className="flex min-h-11 items-center justify-between gap-2 px-1 text-xs text-gray-500">
               <span aria-live="polite">
                 {query.trim()
                   ? `${filtered.length} of ${messages.length}`
                   : messages.length}{" "}
                 {messages.length === 1 ? "email" : "emails"}
                 {folder === "inbox" && unreadCount > 0 ? (
-                  <span className="ml-2 font-medium text-blue-600">
+                  <span className="ml-2 font-medium text-gray-700">
                     {unreadCount} unread
                   </span>
                 ) : null}
@@ -997,14 +997,14 @@ export function AdminEmailInboxView({
             data-inbox-list
           >
             {loadingList && messages.length === 0 ? (
-              <div className="flex items-center justify-center gap-2 p-8 text-sm text-slate-500">
+              <div className="flex items-center justify-center gap-2 p-8 text-sm text-gray-500">
                 <Loader2 className="size-4 animate-spin" aria-hidden /> Loading
                 emails…
               </div>
             ) : filtered.length === 0 ? (
               <div className="px-6 py-12 text-center">
-                <Inbox className="mx-auto size-8 text-slate-300" aria-hidden />
-                <p className="mt-3 text-sm font-medium text-slate-700">
+                <Inbox className="mx-auto size-8 text-gray-300" aria-hidden />
+                <p className="mt-3 text-sm font-medium text-gray-700">
                   {query.trim()
                     ? "No matching emails"
                     : folder === "archived"
@@ -1013,7 +1013,7 @@ export function AdminEmailInboxView({
                         ? "No sent emails yet"
                         : "Your inbox is empty"}
                 </p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
+                <p className="mt-1 text-xs leading-5 text-gray-500">
                   {query.trim()
                     ? "Try another sender, subject or phrase."
                     : folder === "archived"
@@ -1025,7 +1025,7 @@ export function AdminEmailInboxView({
                 {query.trim() ? (
                   <button
                     type="button"
-                    className="mt-3 cursor-pointer text-sm font-medium text-blue-600 hover:underline"
+                    className="mt-3 cursor-pointer text-sm font-medium text-gray-700 hover:underline"
                     onClick={() => setQuery("")}
                   >
                     Clear search
@@ -1045,16 +1045,16 @@ export function AdminEmailInboxView({
                     aria-current={active ? "true" : undefined}
                     onClick={() => selectMessage(message.id)}
                     className={cn(
-                      "relative block w-full cursor-pointer border-b border-slate-100 px-4 py-4 text-left transition-colors hover:bg-slate-50",
+                      "relative block w-full cursor-pointer border-b border-gray-100 px-4 py-4 text-left transition-colors hover:bg-gray-50",
                       active &&
-                        "bg-blue-50/80 shadow-[inset_3px_0_0_#2563eb] hover:bg-blue-50",
+                        "bg-gray-100 shadow-[inset_3px_0_0_#353d42] hover:bg-gray-100",
                     )}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <span
                         className={cn(
-                          "min-w-0 truncate text-[13px] text-slate-700",
-                          unread && "font-semibold text-slate-950",
+                          "min-w-0 truncate text-[13px] text-gray-700",
+                          unread && "font-semibold text-gray-950",
                         )}
                         title={
                           folder === "sent"
@@ -1066,20 +1066,20 @@ export function AdminEmailInboxView({
                           ? message.toAddresses[0] || "Recipient"
                           : displaySender(message)}
                       </span>
-                      <span className="shrink-0 text-[11px] tabular-nums text-slate-500">
+                      <span className="shrink-0 text-[11px] tabular-nums text-gray-500">
                         {whenLabel(message.occurredAt)}
                       </span>
                     </div>
                     <div className="mt-1.5 flex items-start gap-2">
                       {unread ? (
                         <span
-                          className="mt-1.5 size-1.5 shrink-0 rounded-full bg-blue-600"
+                          className="mt-1.5 size-1.5 shrink-0 rounded-full bg-gray-700"
                           aria-label="Unread"
                         />
                       ) : null}
                       <p
                         className={cn(
-                          "line-clamp-2 min-w-0 text-sm leading-5 text-slate-800",
+                          "line-clamp-2 min-w-0 text-sm leading-5 text-gray-800",
                           unread ? "font-semibold" : "font-medium",
                         )}
                       >
@@ -1087,7 +1087,7 @@ export function AdminEmailInboxView({
                       </p>
                     </div>
                     {message.preview ? (
-                      <p className="mt-1.5 line-clamp-2 break-words text-[13px] leading-5 text-slate-500">
+                      <p className="mt-1.5 line-clamp-2 break-words text-[13px] leading-5 text-gray-500">
                         {message.preview}
                       </p>
                     ) : null}
@@ -1104,7 +1104,7 @@ export function AdminEmailInboxView({
               })
             )}
             {filtered.length > 0 ? (
-              <p className="px-4 py-4 text-center text-[11px] text-slate-400">
+              <p className="px-4 py-4 text-center text-[11px] text-gray-400">
                 {query.trim()
                   ? "End of search results"
                   : `All ${messages.length} emails shown`}
@@ -1116,7 +1116,7 @@ export function AdminEmailInboxView({
         <section
           aria-label={composing ? "Compose email" : "Email reader"}
           className={cn(
-            "min-h-0 min-w-0 flex-1 flex-col bg-slate-50/70",
+            "min-h-0 min-w-0 flex-1 flex-col bg-gray-50/70",
             readerOpen || composing ? "flex" : "hidden lg:flex",
           )}
         >
@@ -1162,7 +1162,7 @@ export function AdminEmailInboxView({
             />
           ) : (
             <>
-              <div className="flex min-h-14 shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 sm:px-4">
+              <div className="flex min-h-14 shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 sm:px-4">
                 <div className="flex min-w-0 items-center gap-1">
                   <button
                     type="button"
@@ -1245,14 +1245,14 @@ export function AdminEmailInboxView({
                       </DropdownMenu>
                     </>
                   ) : (
-                    <span className="px-2 text-xs text-slate-500">
+                    <span className="px-2 text-xs text-gray-500">
                       {selected ? "Sent email" : "Select an email"}
                     </span>
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-0.5">
                   {selectedIndex >= 0 ? (
-                    <span className="mr-2 text-xs tabular-nums text-slate-500">
+                    <span className="mr-2 text-xs tabular-nums text-gray-500">
                       {selectedIndex + 1} of {filtered.length}
                     </span>
                   ) : null}
@@ -1306,7 +1306,7 @@ export function AdminEmailInboxView({
               </div>
 
               {loadingMessage ? (
-                <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-slate-500">
+                <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-gray-500">
                   <Loader2 className="size-5 animate-spin" aria-hidden />
                   Opening email…
                 </div>
@@ -1319,12 +1319,12 @@ export function AdminEmailInboxView({
                   >
                     <article className="mx-auto w-full max-w-[1000px] px-4 py-5 sm:px-6 sm:py-6">
                       <header className="mb-6">
-                        <h2 className="break-words text-xl font-semibold leading-snug tracking-tight text-slate-950 sm:text-2xl">
+                        <h2 className="break-words text-xl font-semibold leading-snug tracking-tight text-gray-950 sm:text-2xl">
                           {selected.subject || "(no subject)"}
                         </h2>
                         <div className="mt-5 flex items-start gap-3">
                           <span
-                            className="flex size-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-sm font-semibold text-slate-600"
+                            className="flex size-10 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-sm font-semibold text-gray-600"
                             aria-hidden
                           >
                             {(selected.fromName || selected.fromAddress || "?")
@@ -1333,25 +1333,25 @@ export function AdminEmailInboxView({
                           </span>
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                              <p className="break-all text-sm font-semibold text-slate-900">
+                              <p className="break-all text-sm font-semibold text-gray-900">
                                 {selected.fromName || selected.fromAddress}
                               </p>
                               <time
                                 dateTime={selected.occurredAt}
-                                className="text-xs text-slate-500"
+                                className="text-xs text-gray-500"
                               >
                                 {fullWhenLabel(selected.occurredAt)}
                               </time>
                             </div>
-                            <details className="mt-1 text-xs text-slate-500">
+                            <details className="mt-1 text-xs text-gray-500">
                               <summary className="cursor-pointer break-words leading-5 [overflow-wrap:anywhere]">
                                 To{" "}
                                 {selected.toAddresses.join(", ") ||
                                   activeIdentity.email}
                               </summary>
-                              <dl className="mt-2 space-y-1 rounded-lg border border-slate-200 bg-white p-3 text-xs leading-5 [overflow-wrap:anywhere]">
+                              <dl className="mt-2 space-y-1 rounded-lg border border-gray-200 bg-white p-3 text-xs leading-5 [overflow-wrap:anywhere]">
                                 <div>
-                                  <dt className="inline font-medium text-slate-700">
+                                  <dt className="inline font-medium text-gray-700">
                                     From:{" "}
                                   </dt>
                                   <dd className="inline">
@@ -1361,7 +1361,7 @@ export function AdminEmailInboxView({
                                   </dd>
                                 </div>
                                 <div>
-                                  <dt className="inline font-medium text-slate-700">
+                                  <dt className="inline font-medium text-gray-700">
                                     To:{" "}
                                   </dt>
                                   <dd className="inline">
@@ -1370,7 +1370,7 @@ export function AdminEmailInboxView({
                                 </div>
                                 {selected.ccAddresses.length > 0 ? (
                                   <div>
-                                    <dt className="inline font-medium text-slate-700">
+                                    <dt className="inline font-medium text-gray-700">
                                       Cc:{" "}
                                     </dt>
                                     <dd className="inline">
@@ -1380,7 +1380,7 @@ export function AdminEmailInboxView({
                                 ) : null}
                                 {selected.replyToAddresses.length > 0 ? (
                                   <div>
-                                    <dt className="inline font-medium text-slate-700">
+                                    <dt className="inline font-medium text-gray-700">
                                       Reply to:{" "}
                                     </dt>
                                     <dd className="inline">
@@ -1400,7 +1400,7 @@ export function AdminEmailInboxView({
                         ) : null}
                       </header>
                       {selected.direction === "outbound" ? (
-                        <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4">
+                        <div className="mb-5 rounded-lg border border-gray-200 bg-white p-4">
                           <div className="flex flex-wrap items-center gap-4">
                             {deliveryStages(selected).map((stage) => (
                               <span
@@ -1408,8 +1408,8 @@ export function AdminEmailInboxView({
                                 className={cn(
                                   "flex items-center gap-1.5 text-xs",
                                   stage.complete
-                                    ? "font-medium text-slate-700"
-                                    : "text-slate-400",
+                                    ? "font-medium text-gray-700"
+                                    : "text-gray-400",
                                 )}
                               >
                                 <CheckCircle2
@@ -1442,8 +1442,8 @@ export function AdminEmailInboxView({
                         }
                       />
                       {selected.attachments.length > 0 ? (
-                        <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
-                          <p className="flex items-center gap-2 text-sm font-medium text-slate-800">
+                        <div className="mt-5 rounded-lg border border-gray-200 bg-white p-4">
+                          <p className="flex items-center gap-2 text-sm font-medium text-gray-800">
                             <Paperclip className="size-4" aria-hidden />
                             {selected.attachments.length} attachment
                             {selected.attachments.length === 1 ? "" : "s"}
@@ -1452,7 +1452,7 @@ export function AdminEmailInboxView({
                             {selected.attachments.map((attachment, index) => (
                               <span
                                 key={String(attachment.id ?? index)}
-                                className="max-w-full break-all rounded-md bg-slate-100 px-3 py-2 text-xs text-slate-600"
+                                className="max-w-full break-all rounded-md bg-gray-100 px-3 py-2 text-xs text-gray-600"
                               >
                                 {String(
                                   attachment.filename ??
@@ -1462,7 +1462,7 @@ export function AdminEmailInboxView({
                               </span>
                             ))}
                           </div>
-                          <p className="mt-3 text-xs leading-5 text-slate-500">
+                          <p className="mt-3 text-xs leading-5 text-gray-500">
                             Attachments are quarantined until their file type
                             and malware scan are cleared.
                           </p>
@@ -1470,12 +1470,12 @@ export function AdminEmailInboxView({
                       ) : null}
                       {selected.replies.length > 0 ? (
                         <section
-                          className="mt-7 border-t border-slate-200 pt-5"
+                          className="mt-7 border-t border-gray-200 pt-5"
                           aria-label="Sent replies"
                         >
-                          <h3 className="text-sm font-semibold text-slate-800">
+                          <h3 className="text-sm font-semibold text-gray-800">
                             Sent replies{" "}
-                            <span className="ml-1 font-normal text-slate-400">
+                            <span className="ml-1 font-normal text-gray-400">
                               {selected.replies.length}
                             </span>
                           </h3>
@@ -1486,19 +1486,19 @@ export function AdminEmailInboxView({
                                 key={sent.id}
                                 disabled={navigationBusy}
                                 onClick={() => selectMessage(sent.id)}
-                                className="block w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300"
+                                className="block w-full cursor-pointer rounded-lg border border-gray-200 bg-white p-4 text-left hover:border-gray-300"
                               >
-                                <span className="flex flex-wrap justify-between gap-2 text-xs text-slate-500">
-                                  <span className="font-medium text-slate-700">
+                                <span className="flex flex-wrap justify-between gap-2 text-xs text-gray-500">
+                                  <span className="font-medium text-gray-700">
                                     {sent.fromName || activeIdentity.name} →{" "}
                                     {sent.toAddresses[0] || "recipient"}
                                   </span>
                                   <span>{fullWhenLabel(sent.occurredAt)}</span>
                                 </span>
-                                <span className="mt-2 block line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-slate-600">
+                                <span className="mt-2 block line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-gray-600">
                                   {sent.preview}
                                 </span>
-                                <span className="mt-2 block text-xs font-medium text-blue-600">
+                                <span className="mt-2 block text-xs font-medium text-gray-700">
                                   Read full reply →
                                 </span>
                               </button>
@@ -1509,13 +1509,13 @@ export function AdminEmailInboxView({
                     </article>
                   </div>
                   {selected.direction === "inbound" && !selected.archivedAt ? (
-                    <div className="max-h-[50%] shrink-0 overflow-y-auto border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
+                    <div className="max-h-[50%] shrink-0 overflow-y-auto border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
                       {replyOpen ? (
                         <div className="mx-auto max-w-[950px]">
                           <div className="mb-2 flex items-center justify-between gap-3">
                             <label
                               htmlFor="inbox-reply"
-                              className="min-w-0 truncate text-xs font-medium text-slate-600"
+                              className="min-w-0 truncate text-xs font-medium text-gray-600"
                             >
                               Reply to{" "}
                               {selected.replyToAddresses[0] ||
@@ -1600,7 +1600,7 @@ export function AdminEmailInboxView({
                             <Reply className="size-4" aria-hidden />
                             {reply.trim() ? "Continue reply" : "Reply"}
                           </button>
-                          <p className="min-w-0 truncate text-xs text-slate-500">
+                          <p className="min-w-0 truncate text-xs text-gray-500">
                             Reply as {activeIdentity.email}
                           </p>
                         </div>
@@ -1611,13 +1611,13 @@ export function AdminEmailInboxView({
               ) : (
                 <div className="flex min-h-0 flex-1 items-center justify-center p-8 text-center">
                   <div>
-                    <span className="mx-auto flex size-16 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400">
+                    <span className="mx-auto flex size-16 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400">
                       <MailOpen className="size-7" aria-hidden />
                     </span>
-                    <p className="mt-5 text-base font-semibold text-slate-700">
+                    <p className="mt-5 text-base font-semibold text-gray-700">
                       Select an email to read
                     </p>
-                    <p className="mt-2 max-w-xs text-sm leading-6 text-slate-500">
+                    <p className="mt-2 max-w-xs text-sm leading-6 text-gray-500">
                       Choose an email from the list, or start a new
                       conversation.
                     </p>

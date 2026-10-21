@@ -24,6 +24,8 @@ export type AdminClientRow = {
   planTier: string | null;
   platformSubscriptionId: string | null;
   ownerEmail: string | null;
+  isActive: boolean;
+  setupOption: string | null;
   provisioningStage: TenantProvisioningStage | null;
   phoneNumber: string | null;
 };
@@ -35,6 +37,8 @@ type AccountJoin = {
   plan_tier: string | null;
   platform_subscription_id: string | null;
   signup_ip?: string | null;
+  billing_email?: string | null;
+  launch_tier?: string | null;
 };
 
 type OrgRow = {
@@ -48,6 +52,7 @@ type OrgRow = {
   onboarding_step: number | null;
   phone_number: string | null;
   is_primary_location: boolean | null;
+  is_active: boolean | null;
   accounts: AccountJoin | AccountJoin[] | null;
 };
 
@@ -70,15 +75,15 @@ function inferProvisionSource(
 }
 
 const ACCOUNT_SELECT_WITH_SOURCE =
-  "name, provision_source, status, plan_tier, platform_subscription_id, signup_ip";
+  "name, provision_source, status, plan_tier, platform_subscription_id, signup_ip, billing_email, launch_tier";
 const ACCOUNT_SELECT_LEGACY =
-  "name, status, plan_tier, platform_subscription_id, signup_ip";
+  "name, status, plan_tier, platform_subscription_id, signup_ip, billing_email, launch_tier";
 
 async function loadClientOrganizations(admin: ReturnType<typeof createAdminClient>) {
   const withSource = await admin
     .from("organizations")
     .select(
-      `id, account_id, name, slug, niche, created_at, status, onboarding_step, phone_number, is_primary_location,
+      `id, account_id, name, slug, niche, created_at, status, onboarding_step, phone_number, is_primary_location, is_active,
        accounts ( ${ACCOUNT_SELECT_WITH_SOURCE} )`,
     )
     .order("created_at", { ascending: false })
@@ -98,7 +103,7 @@ async function loadClientOrganizations(admin: ReturnType<typeof createAdminClien
   const legacy = await admin
     .from("organizations")
     .select(
-      `id, account_id, name, slug, niche, created_at, status, onboarding_step, phone_number, is_primary_location,
+      `id, account_id, name, slug, niche, created_at, status, onboarding_step, phone_number, is_primary_location, is_active,
        accounts ( ${ACCOUNT_SELECT_LEGACY} )`,
     )
     .order("created_at", { ascending: false })
@@ -194,12 +199,14 @@ export async function loadAdminClients(
       niche: org.niche,
       createdAt: org.created_at,
       provisionSource,
-      accountStatus: account?.status ?? "active",
+      accountStatus: account?.status ?? "unknown",
       onboardingStep: org.onboarding_step,
       orgStatus: org.status,
       planTier: account?.plan_tier ?? null,
       platformSubscriptionId: account?.platform_subscription_id ?? null,
-      ownerEmail: inviteEmailByOrg.get(org.id) ?? null,
+      ownerEmail: inviteEmailByOrg.get(org.id) ?? account?.billing_email ?? null,
+      isActive: org.is_active === true,
+      setupOption: account?.launch_tier ?? null,
       provisioningStage: stageByOrg.get(org.id) ?? null,
       phoneNumber: org.phone_number,
     };
@@ -247,12 +254,13 @@ export async function loadAdminClientDetail(
     niche: orgRow.niche,
     createdAt: orgRow.created_at,
     provisionSource,
-    accountStatus: account?.status ?? "active",
+    accountStatus: account?.status ?? "unknown",
     onboardingStep: orgRow.onboarding_step,
     orgStatus: orgRow.status,
     planTier: account?.plan_tier ?? null,
     platformSubscriptionId: account?.platform_subscription_id ?? null,
-    ownerEmail: invite?.email ? String(invite.email) : null,
+    ownerEmail: invite?.email ? String(invite.email) : account?.billing_email ?? null,
+    setupOption: account?.launch_tier ?? null,
     provisioningStage: stageByOrg.get(orgId) ?? null,
     phoneNumber: orgRow.phone_number,
     storeCode: orgRow.store_code,

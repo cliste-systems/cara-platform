@@ -1,6 +1,9 @@
 "use server";
 
+import { signupDetails, PUBLIC_SIGNUP_FLOW } from "@/lib/public-signup-flow";
+import { isPublicSignupEnabled } from "@/lib/public-signup";
 import { cookies, headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 
 import {
   getRateLimitStatus,
@@ -51,14 +54,15 @@ async function uniqueSlug(
   admin: ReturnType<typeof createAdminClient>,
   base: string,
 ): Promise<string> {
-  const seed = base || "salon";
+  const seed = base || "business";
   let candidate = seed;
   for (let i = 0; i < 25; i++) {
-    const { data } = await admin
+    const { data, error } = await admin
       .from("organizations")
       .select("id")
       .eq("slug", candidate)
       .maybeSingle();
+    if (error) throw new Error("Signup service unavailable");
     if (!data) return candidate;
     const suffix = Math.random().toString(36).slice(2, 6);
     candidate = `${seed.slice(0, 44)}-${suffix}`;
@@ -77,10 +81,9 @@ const IS_PRODUCTION = process.env.NODE_ENV === "production";
  * reuses the same throttle surface as login.
  */
 export async function startSignup(_: unknown, formData: FormData): Promise<SignupResult> {
-  const salonName = String(formData.get("salonName") ?? "").trim();
-  const firstName = String(formData.get("firstName") ?? "").trim();
-  const lastName = String(formData.get("lastName") ?? "").trim();
-  const ownerName = [firstName, lastName].filter(Boolean).join(" ");
+  if (!isPublicSignupEnabled()) return { ok: false, message: "Signup is temporarily unavailable." };
+  const { businessName: salonName, firstName, lastName, ownerName } = signupDetails(formData);
+  const legalCompanyName = String(formData.get("legalCompanyName") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const phone = compactPhone(String(formData.get("phone") ?? "").trim());
   const password = String(formData.get("password") ?? "");
@@ -90,10 +93,11 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
   const billingInterval = rawInterval === "year" ? "year" : "month";
 
   if (!salonName || salonName.length < MIN_SALON_NAME || salonName.length > MAX_SALON_NAME) {
-    return { ok: false, message: "Enter your salon or business name." };
+    return { ok: false, message: "Enter your business name." };
   }
-  if (firstName.length < 1 || lastName.length < 1) {
-    return { ok: false, message: "Enter your first and last name." };
+  if (legalCompanyName.length < 2 || legalCompanyName.length > 200) return { ok: false, message: "Enter your legal company name, or your legal trading name if not incorporated." };
+  if (ownerName.length < 2) {
+    return { ok: false, message: "Enter your name." };
   }
   if (ownerName.length > MAX_SALON_NAME) {
     return { ok: false, message: "Name is too long." };
@@ -101,7 +105,7 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
   if (!email || !EMAIL_RE.test(email)) {
     return { ok: false, message: "Enter a valid email address." };
   }
-  if (!phone || !PHONE_COMPACT_RE.test(phone)) {
+  if (phone && !PHONE_COMPACT_RE.test(phone)) {
     return { ok: false, message: "Enter a valid phone number." };
   }
   if (password.length < MIN_PASSWORD || password.length > MAX_PASSWORD) {
@@ -113,7 +117,7 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
   if (formData.get("acceptLegal") !== "on") {
     return {
       ok: false,
-      message: "You must agree to the terms of service and privacy notice.",
+      message: "Please accept the terms of service and Data Processing Agreement, and acknowledge the privacy notice.",
     };
   }
 
@@ -174,10 +178,21 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
     };
   }
 
+  const companyCheck = await admin.rpc("company_name_exists", {p_name:legalCompanyName});
+  if (companyCheck.error) return {ok:false,message:"The signup service could not check your company details. Please try again shortly."};
+  if (companyCheck.data) {
+    await recordRateLimitFailure("authenticate", ipFp);
+    return {ok:false,message:"An organisation with this legal company name already exists. Sign in to your existing account or contact support for access."};
+  }
   const baseSlug = slugifySalonName(salonName);
-  const slug = await uniqueSlug(admin, baseSlug);
+  let slug: string;
+  try {
+    slug = await uniqueSlug(admin, baseSlug);
+  } catch {
+    return { ok: false, message: "The signup service is taking too long to respond. Please try again shortly." };
+  }
 
-  const { data: authData, error: authError } = await admin.auth.admin.createUser({
+  const authResponse = await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: !IS_PRODUCTION,
@@ -190,10 +205,17 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
     },
     app_metadata: {
       cliste_signup_source: "self_serve",
+      cliste_signup_flow: PUBLIC_SIGNUP_FLOW,
     },
-  });
+  }).catch(() => null);
+  // A timed-out creation may have reached Auth; do not automatically submit it again.
+  if (!authResponse) return { ok: false, message: "We couldn’t confirm your account was created. Please try signing in before signing up again." };
+  const { data: authData, error: authError } = authResponse;
 
   if (authError || !authData.user?.id) {
+    if (authError?.status === 0 || authError?.name === "AuthRetryableFetchError") {
+      return { ok: false, message: "We couldn’t confirm your account was created. Please try signing in before signing up again." };
+    }
     const raw = authError?.message?.toLowerCase() ?? "";
     if (raw.includes("already") || raw.includes("duplicate") || raw.includes("exists")) {
       await recordRateLimitFailure("authenticate", ipFp);
@@ -213,8 +235,11 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
   const userId = authData.user.id;
 
   const accountPayload = {
-    name: salonName,
+    name: legalCompanyName,
     slug,
+    billing_method: "card",
+    billing_email: email,
+    billing_contact_name: ownerName,
     status: "onboarding" as const,
     launch_status: "not_started" as const,
     billing_period_start: new Date().toISOString().slice(0, 10),
@@ -234,7 +259,7 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
     await recordRateLimitFailure("authenticate", ipFp);
     return {
       ok: false,
-      message: accountErr?.message ?? "Could not create account.",
+      message: accountErr?.code === "23505" && accountErr.message.includes("company") ? "An organisation with this legal company name already exists. Sign in or contact support for access." : "Could not create your organisation. Please try again.",
     };
   }
   const accountId = accountRow.id;
@@ -290,11 +315,17 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
     };
   }
 
-  await admin.from("account_memberships").insert({
+  const { error: membershipError } = await admin.from("account_memberships").insert({
     user_id: userId,
     account_id: accountId,
     role: "admin",
   });
+  if (membershipError) {
+    await admin.auth.admin.deleteUser(userId).catch(() => undefined);
+    await admin.from("organizations").delete().eq("id", orgId);
+    await admin.from("accounts").delete().eq("id", accountId);
+    return { ok: false, message: "Could not create your business access. Please try again." };
+  }
 
   const willReview = devRelaxed ? false : shouldRouteToReview(fraud.score);
   await admin
@@ -311,12 +342,14 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
     await recordLegalAcceptances(admin, {
       userId,
       organizationId: orgId,
-      documents: ["terms", "privacy"],
+      documents: ["terms", "privacy", "dpa"],
       context: securityCtx,
+      agreement: { accountId, organisationName: legalCompanyName, signatoryName: ownerName, signatoryRole: "Account owner", authorityConfirmed: true },
     });
   } catch (err) {
     await admin.auth.admin.deleteUser(userId).catch(() => undefined);
     await admin.from("organizations").delete().eq("id", orgId).then(() => undefined);
+    await admin.from("accounts").delete().eq("id", accountId).then(() => undefined);
     return {
       ok: false,
       message:
@@ -326,13 +359,16 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
     };
   }
 
+  revalidatePath("/admin/organisations");
+  revalidatePath("/admin/customers", "layout");
+
   await logSecurityEvent(securityCtx, {
     eventType: "legal_acceptance",
     outcome: "success",
     actorUserId: userId,
     actorEmail: email,
     metadata: {
-      documents: ["terms", "privacy"],
+      documents: ["terms", "privacy", "dpa"],
       organizationId: orgId,
       source: "signup",
     },
@@ -357,16 +393,15 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
   }
 
   // Dev: auto sign-in so the wizard sees the session immediately.
-  const userClient = await createClient();
-  const { error: signInErr } = await userClient.auth.signInWithPassword({
-    email,
-    password,
-  });
-  if (signInErr) {
-    console.warn("[signup] post-signup auto sign-in failed", signInErr.message);
+  try {
+    const userClient = await createClient();
+    const { error: signInErr } = await userClient.auth.signInWithPassword({ email, password });
+    if (signInErr) throw new Error("Automatic sign-in failed");
+  } catch {
+    return { ok: false, message: "Your account was created, but we couldn’t sign you in. Use the Sign in link below to continue." };
   }
 
   void cookies;
 
-  return { ok: true, redirectTo: "/onboarding" };
+  return { ok: true, redirectTo: "/signup/voice" };
 }

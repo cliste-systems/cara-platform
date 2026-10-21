@@ -1,8 +1,11 @@
 import Link from "next/link";
+import type { InputHTMLAttributes } from "react";
+import { publicLegalUrl } from "@/lib/public-legal-url";
 
 import { cn } from "@/lib/utils";
 
 type Props = {
+  inputProps?: Pick<InputHTMLAttributes<HTMLInputElement>, "aria-invalid" | "aria-describedby">;
   id: string;
   name: string;
   required?: boolean;
@@ -15,6 +18,7 @@ type Props = {
 };
 
 export function LegalAcceptanceCheckbox({
+  inputProps,
   id,
   name,
   required = true,
@@ -36,6 +40,7 @@ export function LegalAcceptanceCheckbox({
       )}
     >
       <input
+        {...inputProps}
         id={id}
         name={name}
         type="checkbox"
@@ -64,7 +69,7 @@ export function LegalDocLink({
 }) {
   return (
     <Link
-      href={href}
+      href={href.startsWith("/legal/") ? publicLegalUrl(href) : href}
       target="_blank"
       rel="noopener noreferrer"
       className="font-medium text-[#0b1220] underline underline-offset-2"

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
+import { adminCreateButtonClass } from "@/components/admin/admin-interactive";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -10,7 +11,7 @@ export function OrganisationDialog({ organisation }: { organisation?: Organisati
   const [open, setOpen] = useState(false), [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   return <Dialog open={open} onOpenChange={(value) => { if (!pending) { setOpen(value); setMessage(null); } }}>
-    <DialogTrigger render={<Button variant="outline" />}>{organisation ? "Edit billing details" : "New organisation"}</DialogTrigger>
+    <DialogTrigger render={<Button type="button" variant="outline" className={!organisation ? adminCreateButtonClass : undefined} />}>{organisation ? "Edit billing details" : "New organisation"}</DialogTrigger>
     <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg"><DialogHeader><DialogTitle>{organisation ? "Organisation details" : "Create an organisation"}</DialogTitle><DialogDescription>The legal company or group that owns the businesses and receives their invoices.</DialogDescription></DialogHeader>
       <form onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); startTransition(async () => { try { const result = await saveBillingOrganisation(data); setMessage(result.message); if (result.ok) setOpen(false); } catch { setMessage("The organisation could not be saved. Please try again."); } }); }} className="space-y-4">
         {organisation && <input type="hidden" name="id" value={organisation.id} />}

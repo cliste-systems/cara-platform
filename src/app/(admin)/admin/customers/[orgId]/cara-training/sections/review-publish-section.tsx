@@ -82,7 +82,7 @@ export function ReviewPublishSection({ data, onChange, onSaved }: Props) {
         feed="prompt"
         hint="Read-only output saved to Supabase — rebuilt when you save any section above."
       >
-        <pre className="max-h-72 overflow-auto rounded-md border border-violet-100 bg-slate-950 p-3 text-xs text-slate-100">
+        <pre className="max-h-72 overflow-auto rounded-md border border-gray-100 bg-slate-950 p-3 text-xs text-slate-100">
           {data.customPrompt || "— not compiled yet —"}
         </pre>
       </CaraTrainingField>

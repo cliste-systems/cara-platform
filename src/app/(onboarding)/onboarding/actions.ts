@@ -1,5 +1,7 @@
 "use server";
 
+import { usesSimpleSignup } from "@/lib/public-signup-flow";
+
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -452,7 +454,7 @@ export type ValidateVoicePreviewResult =
 export async function validateVoiceGreetingPreviewStep(
   payload: SaveVoicePayload,
 ): Promise<ValidateVoicePreviewResult> {
-  const session = await requireOnboardingAdminSession();
+  const session = await requireOnboardingAdminSession({ allowSimpleVoice: true });
 
   const admin = createAdminClient();
   const { data: org } = await admin
@@ -488,7 +490,7 @@ export async function validateVoiceGreetingPreviewStep(
 export async function reviewVoiceGreetingStep(
   payload: SaveVoicePayload,
 ): Promise<ReviewVoiceGreetingResult> {
-  const session = await requireOnboardingAdminSession();
+  const session = await requireOnboardingAdminSession({ allowSimpleVoice: true });
 
   const admin = createAdminClient();
   const { data: org } = await admin
@@ -545,7 +547,7 @@ export async function saveVoiceStep(
   _: unknown,
   payload: SaveVoicePayload,
 ): Promise<SaveVoiceResult> {
-  const session = await requireOnboardingAdminSession();
+  const session = await requireOnboardingAdminSession({ allowSimpleVoice: true });
 
   const admin = createAdminClient();
   const { data: org } = await admin
@@ -592,7 +594,7 @@ export async function saveVoiceStep(
   if (error) return { ok: false, message: error.message };
 
   revalidatePath("/onboarding", "layout");
-  redirect("/onboarding/knowledge");
+  redirect(usesSimpleSignup(session.user) ? "/signup/plan" : "/onboarding/knowledge");
 }
 
 /**

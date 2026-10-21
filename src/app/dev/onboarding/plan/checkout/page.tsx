@@ -1,4 +1,6 @@
-import { PlanCheckoutFlow } from "@/components/billing/plan-checkout-flow";
+import { SignupCheckoutWelcome } from "@/components/billing/signup-checkout-welcome";
+import { SignupBillingCheckout } from "@/components/billing/signup-billing-checkout";
+import { updateDevCheckoutSetup } from "./actions";
 import { OnboardingStepShell } from "@/components/onboarding/onboarding-step-shell";
 import { prepareDevElementsCheckoutPreview } from "@/lib/dev-stripe-checkout-preview";
 import { PLATFORM_TRIAL_DAYS } from "@/lib/cliste-plans";
@@ -6,7 +8,10 @@ import { stripePublishableConfigured } from "@/lib/stripe-publishable";
 
 export const dynamic = "force-dynamic";
 
-export default async function DevOnboardingPlanCheckoutPreviewPage() {
+export default async function DevOnboardingPlanCheckoutPreviewPage({searchParams}: {searchParams:Promise<{plan?:string;setup?:string;step?:string;complete?:string}>}) {
+  const selection = await searchParams;
+  if (selection.complete === "1") return <SignupCheckoutWelcome continueHref="/dashboard?welcome=1" />;
+
   if (!stripePublishableConfigured()) {
     return (
       <OnboardingStepShell
@@ -19,7 +24,7 @@ export default async function DevOnboardingPlanCheckoutPreviewPage() {
     );
   }
 
-  const result = await prepareDevElementsCheckoutPreview();
+  const result = await prepareDevElementsCheckoutPreview(selection);
 
   if (!result.ok) {
     return (
@@ -34,14 +39,7 @@ export default async function DevOnboardingPlanCheckoutPreviewPage() {
   }
 
   return (
-    <PlanCheckoutFlow
-      clientSecret={result.clientSecret}
-      subscriptionId={result.subscriptionId}
-      summary={result.summary}
-      returnUrl={result.returnUrl}
-      continueHref="/dashboard?welcome=1"
-      continueLabel="Continue to dashboard"
-    />
+    <SignupBillingCheckout key={selection.step ?? "setup"} initialPaymentStep={selection.step === "payment"} initialCheckout={result} onSetupChange={updateDevCheckoutSetup.bind(null, selection.plan ?? "pro")} preview />
   );
 }
 

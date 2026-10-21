@@ -10,7 +10,7 @@ export type TwilioSmsSendOptions = {
 
 export type TwilioSmsSendResult =
   | { ok: true; fromE164: string }
-  | { ok: false; message: string };
+  | { ok: false; message: string; retryable?: boolean; uncertain?: boolean };
 
 function platformSmsFromE164(): string | null {
   return (
@@ -35,10 +35,10 @@ export async function sendTwilioBookingSms(
   to: string,
   body: string,
   options?: TwilioSmsSendOptions,
-): Promise<{ ok: true } | { ok: false; message: string }> {
+): Promise<{ ok: true } | { ok: false; message: string; retryable?: boolean; uncertain?: boolean }> {
   const result = await sendTwilioBookingSmsDetailed(to, body, options);
   if (result.ok) return { ok: true };
-  return { ok: false, message: result.message };
+  return { ok: false, message: result.message, retryable: result.retryable, uncertain: result.uncertain };
 }
 
 async function sendTwilioBookingSmsDetailed(
@@ -70,7 +70,8 @@ async function sendTwilioBookingSmsDetailed(
     return { ok: true, fromE164: from };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, message: msg };
+    const status = typeof e === "object" && e && "status" in e ? Number(e.status) : 0;
+    return { ok: false, message: msg, retryable: status === 429, uncertain: !status || status >= 500 };
   }
 }
 

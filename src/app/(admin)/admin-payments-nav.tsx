@@ -59,10 +59,10 @@ export function AdminPaymentsNavGroup() {
         }}
         className={cn(
           adminNavLinkBaseClass,
-          "group flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px]",
+          "group flex min-h-8 w-full items-center gap-3 rounded-lg px-3 py-1.5 text-[13px]",
           sectionActive
-            ? "bg-[#353d42] font-semibold text-white"
-            : "font-medium text-[#667078] hover:bg-[#f1f3f5] hover:text-[#11181d]",
+            ? "bg-white/10 font-semibold text-white"
+            : "font-medium text-[#d5e0eb] hover:bg-white/[0.07] hover:text-white",
         )}
         aria-expanded={expanded}
       >
@@ -71,7 +71,7 @@ export function AdminPaymentsNavGroup() {
             "size-4 shrink-0 transition-colors",
             sectionActive
               ? "text-white"
-              : "text-[#929aa1] group-hover:text-[#353d42]",
+              : "text-[#b5c6d7] group-hover:text-white",
           )}
           strokeWidth={1.5}
           aria-hidden
@@ -79,7 +79,7 @@ export function AdminPaymentsNavGroup() {
         <span className="min-w-0 flex-1 truncate text-left">Payments</span>
         <ChevronDown
           className={cn(
-            "size-4 shrink-0 text-[#929aa1] transition-transform duration-200 ease-out",
+            "size-4 shrink-0 text-[#b5c6d7] transition-transform duration-200 ease-out",
             expanded ? "rotate-0" : "-rotate-90",
           )}
           aria-hidden
@@ -95,10 +95,10 @@ export function AdminPaymentsNavGroup() {
               href={item.href}
               className={cn(
                 adminNavLinkBaseClass,
-                "ml-6 flex min-h-9 items-center rounded-lg px-3 py-2 text-[13px]",
+                "ml-6 flex min-h-7 items-center rounded-lg px-3 py-1 text-[12px]",
                 active
-                  ? "bg-[#e9ebed] font-semibold text-[#11181d]"
-                  : "font-medium text-[#667078] hover:bg-[#f1f3f5] hover:text-[#11181d]",
+                  ? "bg-white/10 font-semibold text-white"
+                  : "font-medium text-[#d5e0eb] hover:bg-white/[0.07] hover:text-white",
               )}
               aria-current={active ? "page" : undefined}
             >

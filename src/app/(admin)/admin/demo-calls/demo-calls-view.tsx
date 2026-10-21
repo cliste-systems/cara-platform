@@ -646,7 +646,7 @@ export function DemoCallsView({ lines }: DemoCallsViewProps) {
   const showLinePicker = phase === "idle" || phase === "error";
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       {phase === "connecting" ? (
         <>
           <AdminSectionCard
@@ -655,7 +655,7 @@ export function DemoCallsView({ lines }: DemoCallsViewProps) {
           >
             <div className="flex items-center gap-2 p-5 text-sm text-gray-600">
               <Loader2 className="size-4 animate-spin" aria-hidden />
-              Creating LiveKit room — your mic publishes first, then Cara joins…
+              Connecting your microphone and starting Cara…
             </div>
           </AdminSectionCard>
           <DemoCallEngineeringLogPanel

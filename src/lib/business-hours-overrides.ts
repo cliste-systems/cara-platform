@@ -89,6 +89,7 @@ export function mergeHoursOverrideIntoBundle(
   if (!override) return businessHours;
   const { meta } = parseBusinessHoursBundle(businessHours);
   return serializeBusinessHours(override.schedule, {
+    ...meta,
     open24_7: meta.open24_7 === true,
     bankHolidays: meta.bankHolidays,
     hoursNote: override.label.trim() || meta.hoursNote,

@@ -27,12 +27,15 @@ export async function patchAccountAndLocations(
   options?: { primaryOrganizationId?: string | null },
 ): Promise<void> {
   const admin = createAdminClient();
-  await admin.from("accounts").update(patch).eq("id", accountId);
-  await admin.from("organizations").update(patch).eq("account_id", accountId);
+  const { error: accountError } = await admin.from("accounts").update(patch).eq("id", accountId);
+  if (accountError) throw new Error(`Could not update account billing: ${accountError.message}`);
+  const { error: locationsError } = await admin.from("organizations").update(patch).eq("account_id", accountId);
+  if (locationsError) throw new Error(`Could not update location billing: ${locationsError.message}`);
 
   const primaryOrgId = (options?.primaryOrganizationId ?? "").trim();
   if (primaryOrgId) {
-    await admin.from("organizations").update(patch).eq("id", primaryOrgId);
+    const { error } = await admin.from("organizations").update(patch).eq("id", primaryOrgId);
+    if (error) throw new Error(`Could not update primary location billing: ${error.message}`);
   }
 }
 

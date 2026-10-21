@@ -145,7 +145,7 @@ type CaraSetupFormContextValue = {
   discardChanges: () => void;
   promptExtras: Pick<
     CaraSetupPromptInput,
-    "routes" | "fallbackNote" | "transferNumber"
+    "routes" | "fallbackNote" | "transferNumber" | "businessScope"
   >;
 };
 
@@ -170,7 +170,7 @@ export function CaraSetupFormProvider({
   businessFiles: BusinessFileListItem[];
   promptExtras: Pick<
     CaraSetupPromptInput,
-    "routes" | "fallbackNote" | "transferNumber"
+    "routes" | "fallbackNote" | "transferNumber" | "businessScope"
   >;
   children: ReactNode;
 }) {

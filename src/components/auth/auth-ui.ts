@@ -6,4 +6,4 @@ export const AUTH_CARD =
 
 /** Inline auth form errors — glass-card friendly, not plain red text. */
 export const AUTH_FORM_ALERT =
-  "flex items-start gap-3 rounded-2xl border border-red-200/80 bg-red-50/75 px-4 py-3 text-left text-[13px] leading-relaxed text-red-800 shadow-[0_4px_20px_rgba(220,38,38,0.06)]";
+  "flex items-start gap-3 rounded-xl border border-l-[3px] border-[#edc5bd] border-l-[#b74b3f] bg-[#fff3ef] px-4 py-3 text-left text-[#792f27] outline-none focus-visible:ring-2 focus-visible:ring-[#b74b3f]/30";

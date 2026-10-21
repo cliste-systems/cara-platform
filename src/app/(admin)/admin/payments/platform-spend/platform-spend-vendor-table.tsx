@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AdminBadge } from "@/components/admin/admin-badge";
 import {
   adminDestructiveButtonClass,
@@ -235,8 +236,8 @@ export function PlatformSpendVendorTable({
   );
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-gray-600">
           {rows.length} vendor{rows.length === 1 ? "" : "s"} tracked
         </p>
@@ -253,25 +254,14 @@ export function PlatformSpendVendorTable({
         </button>
       </div>
 
-      {adding ? (
-        <VendorEditor
-          row={null}
-          onClose={() => {
-            setAdding(false);
-          }}
-        />
-      ) : null}
+      <Dialog open={adding || Boolean(editing)} onOpenChange={open => { if (!open) { setAdding(false); setEditing(null); } }}>
+        <DialogContent className="max-h-[85dvh] overflow-y-auto bg-white p-6 sm:max-w-2xl">
+          <DialogHeader><DialogTitle>{adding ? "Add vendor" : "Edit vendor"}</DialogTitle><DialogDescription>Update the vendor’s cost and billing details.</DialogDescription></DialogHeader>
+          <VendorEditor key={editing?.id || "new"} row={editing} onClose={() => { setAdding(false); setEditing(null); }} />
+        </DialogContent>
+      </Dialog>
 
-      {editing ? (
-        <VendorEditor
-          row={editing}
-          onClose={() => {
-            setEditing(null);
-          }}
-        />
-      ) : null}
-
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+      <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-gray-200 bg-white">
         <table className={adminTableClass}>
           <thead className={adminTableHeadClass}>
             <tr>

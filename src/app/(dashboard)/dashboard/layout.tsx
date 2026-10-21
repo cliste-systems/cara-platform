@@ -1,5 +1,8 @@
-import { cookies } from "next/headers";
-import Link from "next/link";
+import { usesSimpleSignup } from "@/lib/public-signup-flow";
+import { cookies, headers } from "next/headers";
+import {FirstCallWelcome} from "@/components/dashboard/first-call-welcome";
+import {loadFirstCallSetup} from "@/lib/load-first-call-setup";
+import {needsFirstCallSetup} from "@/lib/first-call-setup";
 import { redirect } from "next/navigation";
 
 import { HideStripeTestingAssistant } from "@/components/billing/hide-stripe-testing-assistant";
@@ -20,7 +23,6 @@ import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-
 import { navItemsForVertical } from "@/lib/dashboard-nav-items";
 import { resolveOrganizationDisplayName } from "@/lib/organization-display-name";
 import { verticalPackForNiche } from "@/lib/verticals";
-import { userNeedsPassword } from "@/lib/invite-onboarding";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import {
   fetchDashboardNavBadges,
@@ -142,10 +144,21 @@ export default async function DashboardLayout({
     (lifecycleStatus === "pending_verification" ||
       lifecycleStatus === "onboarding")
   ) {
-    redirect("/onboarding");
+    redirect(usesSimpleSignup(user) ? "/signup/voice" : "/onboarding");
   }
   if (lifecycleStatus === "suspended") {
     redirect("/dashboard/usage?suspended=1");
+  }
+
+  // New self-service owners complete setup before entering the workspace.
+  // Billing, support and legal remain accessible while verification is pending.
+  if (usesSimpleSignup(user)) {
+    const pathname=(await headers()).get("x-pathname")??"/dashboard";
+    const accountHelp=["/dashboard/usage","/dashboard/support","/dashboard/legal"].some(path=>pathname===path||pathname.startsWith(`${path}/`));
+    if(!accountHelp){
+      const setup=await loadFirstCallSetup(session);
+      if(setup.canManage&&needsFirstCallSetup(setup))return <FirstCallWelcome state={setup} initialOpen requiredSetup billingSetupComplete={Boolean(accountBilling?.platformSubscriptionId&&lifecycleStatus==="active")}/>;
+    }
   }
 
   const navBadges: DashboardNavBadgeMap = await fetchDashboardNavBadges(
@@ -154,7 +167,6 @@ export default async function DashboardLayout({
     navSeenAt,
   );
 
-  const needsPassword = userNeedsPassword(user);
 
   const vertical = verticalPackForNiche(orgRow?.niche);
   const resolvedNavItems = navItemsForVertical(navItems, vertical);
@@ -209,7 +221,6 @@ export default async function DashboardLayout({
             <DashboardSidebar
               coreNav={coreNav}
               accountNav={accountNav}
-              needsPassword={needsPassword}
               account={accountSummary}
               locations={locations}
               activeOrganizationId={organizationId}
@@ -231,17 +242,6 @@ export default async function DashboardLayout({
                     accountNav={accountNav}
                   />
                 </div>
-              </div>
-            ) : null}
-            {!DASHBOARD_REBUILD_SHELL && needsPassword ? (
-              <div className="shrink-0 border-b border-amber-200/60 bg-amber-50/90 px-4 py-3 text-xs leading-snug text-amber-950 lg:hidden">
-                Finish setup: choose a password for this account.{" "}
-                <Link
-                  href="/dashboard/set-password"
-                  className="font-semibold underline-offset-2 hover:underline"
-                >
-                  Set password
-                </Link>
               </div>
             ) : null}
             <main className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden overscroll-y-none bg-[#f3f6f4]">

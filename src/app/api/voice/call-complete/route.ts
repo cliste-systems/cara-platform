@@ -965,6 +965,25 @@ async function queueCallAnalysis(input: {
     roomName: input.body.room_name,
   }) && !isAdminDemoCallRow({ caller_number: input.body.caller_number, room_name: input.body.room_name })) return;
 
+  if (input.body.post_call_status !== "pending") {
+    try {
+      const {queueOwnerCallAlert}=await import("@/lib/owner-call-sms-alerts");
+      // Persist the queue before acknowledging the final webhook. Delivery can
+      // finish after the response or be recovered by the scheduled worker.
+      await queueOwnerCallAlert(input.admin,input.callLogId);
+      after(async()=>{
+        try {
+          const {processOwnerCallAlerts}=await import("@/lib/owner-call-sms-alerts");
+          await processOwnerCallAlerts({admin:input.admin,callId:input.callLogId});
+        } catch(error) {
+          await captureObservedError(error,{route:"voice/call-complete",sideEffect:"owner_call_alert_delivery",orgId:input.orgId});
+        }
+      });
+    } catch(error) {
+      await captureObservedError(error,{route:"voice/call-complete",sideEffect:"owner_call_alert_queue",orgId:input.orgId});
+    }
+  }
+
   const diagnostics = {
     ...(input.body.diagnostics ?? {}),
     ...(typeof input.body.disclosure_confirmed === "boolean"

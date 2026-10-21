@@ -25,8 +25,8 @@ export function SignupFlow({ planTier, billingInterval, skipTurnstile }: Props) 
   return (
     <AuthMarketingShell
       title="Create your account"
-      subtitle="Your AI phone agent for Irish businesses."
-      pageBackground={PUBLIC_ASSETS.onboarding.authSignup}
+      subtitle="A few details to get started."
+      pageBackground={PUBLIC_ASSETS.signupScenes.signup}
       compact
       contentExiting={panelExiting}
     >

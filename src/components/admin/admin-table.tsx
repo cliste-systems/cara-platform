@@ -3,13 +3,13 @@
 import { cn } from "@/lib/utils";
 
 /** Natural column sizing — content stays readable; card scrolls on very narrow viewports. */
-export const adminTableClass = "w-full min-w-[900px] table-auto border-collapse text-left text-sm text-[#35443f]";
+export const adminTableClass = "w-full min-w-[900px] table-auto border-collapse text-left text-sm text-[#353d42]";
 
 export const adminTableHeadClass =
-  "sticky top-0 z-10 border-b border-[#d9e2dd] bg-[#f6faf7]";
+  "sticky top-0 z-10 border-b border-[#e0e3e6] bg-[#f7f8f9]";
 
 export const adminTableThClass =
-  "whitespace-nowrap px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[#6b7c75]";
+  "whitespace-nowrap px-4 py-2.5 text-left text-xs font-medium text-[#697078]";
 
 export const adminTableThDateClass = cn(
   adminTableThClass,
@@ -22,9 +22,9 @@ export const adminTableThActionsClass = cn(
 );
 
 export const adminTableBodyClass =
-  "[&_tr]:border-b [&_tr]:border-[#e9efeb] [&_tr:last-child]:border-0";
+  "[&_tr]:border-b [&_tr]:border-[#e5e7eb] [&_tr:last-child]:border-0";
 
-export const adminTableTdClass = "px-5 py-3.5 align-middle";
+export const adminTableTdClass = "px-4 py-3 align-middle";
 
 /** Optional helper for long free-text cells (e.g. message previews). */
 export const adminTableTdTruncateClass = cn(
@@ -38,7 +38,7 @@ export const adminTableTdDateClass = cn(
 );
 
 export const adminTableRowClass =
-  "transition-colors hover:bg-[#f3f6f4]";
+  "transition-colors hover:bg-[#f5f6f7]";
 
 export const adminTableEmptyClass =
   "px-4 py-16 text-center text-sm text-gray-500";

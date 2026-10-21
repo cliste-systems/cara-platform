@@ -8,7 +8,9 @@ import {
 
 describe("planFromPriceCents", () => {
   it("maps business price without colliding enterprise", () => {
-    assert.equal(planFromPriceCents(44900), "business");
+    assert.equal(planFromPriceCents(9900), "starter");
+    assert.equal(planFromPriceCents(19900), "pro");
+    assert.equal(planFromPriceCents(34900), "business");
     assert.equal(planFromPriceCents(0), null);
   });
 });

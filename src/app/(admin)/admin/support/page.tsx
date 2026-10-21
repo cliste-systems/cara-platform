@@ -1,4 +1,6 @@
-import { requireAdminPermission } from "@/lib/admin-session";
+import { hasAdminPermission } from "@/lib/admin-permissions";
+import { AdminPagination } from "@/components/admin/admin-pagination";
+import { requireAdminPermission, requireAdminStaffContext } from "@/lib/admin-session";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LifeBuoy } from "lucide-react";
@@ -7,15 +9,14 @@ import { AdminBadge } from "@/components/admin/admin-badge";
 import { AdminListCard } from "@/components/admin/admin-list-card";
 import {
   adminSecondaryButtonClass,
-  adminTextLinkClass,
 } from "@/components/admin/admin-interactive";
 import {
   AdminErrorCard,
   AdminPageShell,
 } from "@/components/admin/admin-page-shell";
 import { adminSupportTicketPath } from "@/lib/admin-route-paths";
+import { getAdminGlobalMetricRange } from "@/lib/admin-metric-range";
 import { PRODUCT_NAME } from "@/lib/company-details";
-import { cn } from "@/lib/utils";
 import {
   adminTableBodyClass,
   adminTableClass,
@@ -79,20 +80,40 @@ function messagePreview(body: string, maxLen = 120): string {
   return `${t.slice(0, maxLen).trim()}…`;
 }
 
-export default async function AdminSupportPage() {
+export default async function AdminSupportPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; date?: string; page?: string }> }) {
+  const params = await searchParams;
+  const query = (params.q || "").trim().slice(0, 200);
+  const status = ["open", "closed"].includes(params.status || "") ? params.status! : "all";
+  const date = params.date === "today" ? "today" : "all";
+  const range = getAdminGlobalMetricRange("day");
+  const requestedPage = Number(params.page || 0);
+  let page = Number.isFinite(requestedPage) ? Math.max(0, Math.min(1000000, Math.floor(requestedPage))) : 0;
+  const size = 8;
+  let total = 0;
   await requireAdminPermission("support");
+  const staff = await requireAdminStaffContext();
   let tickets: SupportTicketAdminRow[] = [];
   let loadError: string | null = null;
 
   try {
     const admin = createAdminClient();
-    const { data, error } = await admin
+    const request = () => { let builder = admin
       .from("support_tickets")
       .select(
         "id, subject, body, status, created_at, organization_id, organizations ( name, slug )",
+        { count: "exact" },
       )
-      .order("created_at", { ascending: false })
-      .limit(200);
+      .order("created_at", { ascending: false }).order("id")
+      .range(page * size, (page + 1) * size - 1);
+    if (status !== "all") builder = builder.eq("status", status);
+    if (date === "today") builder = builder.gte("created_at", range.startIso).lt("created_at", range.endExclusiveIso);
+    if (query) builder = builder.ilike("subject", `%${query.replace(/[%_]/g, "\\$&")}%`);
+    return builder; };
+    let result = await request();
+    total = result.count || 0;
+    const last = Math.max(0, Math.ceil(total / size) - 1);
+    if (page > last) { page = last; result = await request(); }
+    const { data, error } = result;
 
     if (error) throw new Error(error.message);
     tickets = (data ?? []) as SupportTicketAdminRow[];
@@ -101,45 +122,23 @@ export default async function AdminSupportPage() {
       e instanceof Error ? e.message : "Failed to load support tickets.";
   }
 
-  const openCount = tickets.filter((t) => t.status === "open").length;
-  const countLabel = `${tickets.length} ticket${tickets.length === 1 ? "" : "s"}${
-    openCount > 0 ? ` · ${openCount} open` : ""
-  }`;
+  const countLabel = `${total} ${status === "all" ? "" : `${status} `}tickets`;
 
   return (
     <AdminPageShell
       icon={LifeBuoy}
-      title="Support tickets"
-      description={
-        <>
-          Requests submitted from each client&apos;s{" "}
-          <Link
-            href="/dashboard/support"
-            className={cn(adminTextLinkClass, "text-gray-700")}
-          >
-            Support
-          </Link>{" "}
-          page. Mark closed when you&apos;re done — clients still see their
-          history.
-        </>
-      }
+      title="Support"
+      description="Customer requests, conversations and resolutions."
+      actions={hasAdminPermission(staff, "inbox") ? <Link href="/admin/inbox" className={adminSecondaryButtonClass}>Email inbox</Link> : undefined}
     >
       {loadError ? (
         <AdminErrorCard
           message={loadError}
-          hint={
-            loadError.includes("support_tickets") ||
-            loadError.includes("schema cache") ? (
-              <p>
-                Apply migration{" "}
-                <code className="font-mono text-xs">007_support_tickets.sql</code>{" "}
-                if this table is new.
-              </p>
-            ) : null
-          }
+
         />
       ) : (
-        <AdminListCard countLabel={countLabel}>
+        <AdminListCard countLabel={countLabel} toolbar={<form action="/admin/support" method="get" className="flex flex-wrap items-center gap-2"><input name="q" defaultValue={query} placeholder="Search subject" aria-label="Search ticket subjects" className="h-9 w-60 rounded-md border border-[#e0e3e6] px-3 text-sm" /><select name="status" defaultValue={status} aria-label="Ticket status" className="h-9 rounded-md border border-[#e0e3e6] px-3 text-sm"><option value="all">All statuses</option><option value="open">Open</option><option value="closed">Closed</option></select><select name="date" defaultValue={date} aria-label="Ticket date" className="h-9 rounded-md border border-[#e0e3e6] px-3 text-sm"><option value="all">All dates</option><option value="today">Today · Dublin</option></select><button type="submit" className={adminSecondaryButtonClass}>Apply</button></form>}>
+          <div className="flex h-full min-h-0 flex-col"><div className="min-h-0 flex-1 overflow-auto">
           <table className={adminTableClass}>
             <thead className={adminTableHeadClass}>
               <tr>
@@ -207,7 +206,7 @@ export default async function AdminSupportPage() {
                 ))
               )}
             </tbody>
-          </table>
+          </table></div><AdminPagination path="/admin/support" filters={{q:query,status,date}} page={page} size={size} total={total} /></div>
         </AdminListCard>
       )}
     </AdminPageShell>

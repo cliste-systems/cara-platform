@@ -22,7 +22,7 @@ export function AdminSegmentedTabs({
 }: AdminSegmentedTabsProps) {
   return (
     <div
-      className="inline-flex max-w-full flex-wrap rounded-lg border border-[#d9e2dd] bg-[#f3f6f4] p-1"
+      className="inline-flex max-w-full flex-wrap rounded-lg border border-[#e0e3e6] bg-[#f5f6f7] p-1"
       role="tablist"
       aria-label={ariaLabel}
     >
@@ -39,7 +39,7 @@ export function AdminSegmentedTabs({
               "rounded-md px-3.5 py-2 text-sm font-semibold",
               active
                 ? "bg-white text-[#11181d] shadow-sm"
-                : "text-[#6b7c75] hover:text-[#11181d]",
+                : "text-[#697078] hover:text-[#11181d]",
             )}
           >
             {label}

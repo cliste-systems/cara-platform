@@ -1,0 +1,40 @@
+/* Compress whitespace, not the secure fields, at laptop heights. Long/error
+   states retain accessible scrolling instead of clipping the submit action. */
+.frame [data-payment-only] [data-payment-fields] { transition:box-shadow .2s ease; }
+@media (min-width:1024px) and (max-height:850px) {
+ .frame[data-signup-stage="billing"] [data-signup-frame] { padding-block:4px; }
+ .frame[data-signup-stage="billing"] [data-signup-panel] { padding-block:2px; }
+ .frame[data-signup-stage="billing"] [data-signup-heading] { gap:4px; margin-bottom:8px; }
+ .frame[data-signup-stage="billing"] [data-signup-heading] h1 { font-size:30px; }
+ .frame[data-signup-stage="billing"] [data-signup-heading] p { line-height:20px; }
+ .frame [data-checkout-payment-summary] > div { padding-block:8px; }
+ .frame [data-payment-fields] { padding-block:8px; }
+ .frame [data-payment-only] { gap:8px; }
+}
+@media (max-width:639px) {
+ .frame[data-signup-stage="billing"] [data-signup-frame] { padding-block:12px; }
+ .frame[data-signup-stage="billing"] [data-signup-panel] { padding:24px 16px; }
+ .frame [data-checkout-payment-summary] > div { padding-block:10px; }
+}
+
+@media(max-width:899px) {
+ .frame :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),textarea) { font-size:16px; }
+}
+@media(prefers-reduced-motion:reduce) {
+ .frame [data-payment-fields] { transition:none; }
+}
+
+@media(min-width:1024px) and (max-height:850px) {
+ .frame[data-signup-stage="billing"] [data-signup-mark] img { height:36px; width:auto; }
+}
+
+/* Extra payment choices stay inside their own area on desktop, so opening
+   Stripe's list cannot push the trial action below the viewport. */
+@media(min-width:1024px) {
+ .frame [data-payment-only] :global(.cliste-stripe-payment-element) {
+  max-height:max(300px,calc(100dvh - 460px));
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+ }
+}

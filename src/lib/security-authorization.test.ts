@@ -9,6 +9,7 @@ import * as teamRoles from "./team-roles";
 import * as identifiers from "./rate-limit-identifiers";
 import * as ownerAccess from "./account-owner-access";
 import * as staffPermissions from "./admin-permissions";
+import * as adminReturnPaths from "./admin-return-path";
 
 // Exercise the real server entry points while preventing every external side effect.
 function isolated<T>(relativePath: string, imports: Record<string, unknown>): T {
@@ -39,6 +40,8 @@ function adminGuards(
   const user = { id: "audit-admin", email, app_metadata: { cliste_admin_console: true, admin_needs_password: options.needsPassword === true } };
   return isolated<typeof import("./admin-session")>("./admin-session.ts", {
     react: { cache: (fn: unknown) => fn },
+    "next/headers": { headers: async () => new Headers() },
+    "@/lib/admin-return-path": adminReturnPaths,
     "next/navigation": { redirect },
     "@/lib/supabase-env": { allowAdminDevWithoutSupabase: () => false },
     "@/lib/admin-permissions": staffPermissions,

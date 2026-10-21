@@ -26,9 +26,9 @@ export default async function SignupCheckEmailPage({
 
   return (
     <AuthMarketingShell
-      title="Enter your code"
+      title={email ? "Enter your code" : "Check your email"}
       subtitle="Confirm your inbox to continue setting up Cara."
-      pageBackground={PUBLIC_ASSETS.onboarding.authSignup}
+      pageBackground={PUBLIC_ASSETS.signupScenes.signup}
       compact
     >
       <div className="space-y-5 text-center">
@@ -41,7 +41,7 @@ export default async function SignupCheckEmailPage({
                 Enter it below, or use the link in the email.
               </>
             ) : (
-              <>Open the confirmation email and enter the code below.</>
+              <>Open your confirmation email and follow its link to verify your account.</>
             )}
           </p>
         </OnboardingEnter>

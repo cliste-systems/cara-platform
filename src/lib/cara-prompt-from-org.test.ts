@@ -17,3 +17,15 @@ describe("cara-prompt-from-org", () => {
     assert.doesNotMatch(input.openingHours ?? "", /9pm/i);
   });
 });
+
+it('loads saved outside-hours policy into compiled Cara instructions', async()=>{
+ const {compileCaraPromptWithMeta}=await import('./compile-cara-prompt');
+ const policy={version:2 as const,availability:'urgent_only' as const,sms:'urgent' as const,phone:'+353871234567'};
+ const input=buildCaraSetupPromptInputFromOrg({name:'Example',business_hours:serializeBusinessHours(defaultWeekSchedule(),{bankHolidays:{configured:true,open:false,start:'10:00',end:'14:00'},outsideHours:policy})});
+ assert.deepEqual(input.outsideHours,policy);
+ const result=compileCaraPromptWithMeta(input);
+ assert.match(JSON.stringify(result),/accepts urgent enquiries only/);
+ assert.match(JSON.stringify(result),/Closed on bank and public holidays/);
+ assert.match(JSON.stringify(result),/Never promise attendance/);
+ assert.doesNotMatch(JSON.stringify(result),/353871234567/);
+});

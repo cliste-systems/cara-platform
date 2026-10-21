@@ -1,22 +1,22 @@
 "use client";
 
 import {
-  Check,
+  ArrowRight,
   CheckCircle2,
   ChevronDown,
   Loader2,
   ScanLine,
-  ShieldCheck,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 
+
+import { cn } from "@/lib/utils";
+import { adminPrimaryButtonClass } from "@/components/admin/admin-interactive";
 import { createClient } from "@/utils/supabase/client";
 
 type Mode = "loading" | "enroll" | "verify" | "done";
 
-export function AdminMfaSetup() {
-  const router = useRouter();
+export function AdminMfaSetup({ returnTo = "/admin" }: { returnTo?: string }) {
   const codeInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<Mode>("loading");
   const [factorId, setFactorId] = useState<string | null>(null);
@@ -46,8 +46,7 @@ export function AdminMfaSetup() {
       if (aal.currentLevel === "aal2") {
         if (!cancelled) {
           setMode("done");
-          router.replace("/admin");
-          router.refresh();
+          window.location.replace(returnTo);
         }
         return;
       }
@@ -135,7 +134,7 @@ export function AdminMfaSetup() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [returnTo]);
 
   useEffect(() => {
     if (mode === "verify") {
@@ -144,6 +143,8 @@ export function AdminMfaSetup() {
   }, [mode]);
 
   async function verify(codeOverride?: string) {
+    if (submitting || mode === "done") return;
+
     const verificationCode = (codeOverride ?? code).trim();
 
     if (!factorId || !/^\d{6}$/.test(verificationCode)) {
@@ -151,8 +152,6 @@ export function AdminMfaSetup() {
       codeInputRef.current?.focus();
       return;
     }
-
-    if (submitting) return;
 
     setSubmitting(true);
     setError(null);
@@ -173,8 +172,7 @@ export function AdminMfaSetup() {
       }
 
       setMode("done");
-      router.replace("/admin");
-      router.refresh();
+      window.location.replace(returnTo);
     } finally {
       setSubmitting(false);
     }
@@ -182,165 +180,64 @@ export function AdminMfaSetup() {
 
   if (mode === "loading") {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5">
-        <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
-            <Loader2 className="size-4 animate-spin text-slate-600" aria-hidden />
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              Preparing secure verification
-            </p>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Checking your account security…
-            </p>
-          </div>
-        </div>
+      <div role="status" className="py-3">
+        <span className="mb-4 inline-flex items-center text-[#697078]">
+          <Loader2 className="size-6 animate-spin" aria-hidden />
+        </span>
+        <h1 className="text-lg font-semibold tracking-tight">Checking your security</h1>
+        <p className="mt-2 text-[13px] text-[#697078]">Preparing your authenticator…</p>
       </div>
     );
   }
 
-  if (mode === "done") {
-    return (
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5">
-        <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-xl bg-emerald-600 text-white">
-            <CheckCircle2 className="size-5" aria-hidden />
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-emerald-950">
-              Verification complete
-            </p>
-            <p className="mt-0.5 text-xs text-emerald-700">
-              Taking you to the admin console…
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  const complete = mode === "done";
   const digits = Array.from({ length: 6 }, (_, index) => code[index] ?? "");
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { label: "Authenticator", complete: mode === "verify" },
-          { label: "Code", complete: false },
-          { label: "Admin", complete: false },
-        ].map((item, index) => {
-          const active =
-            (mode === "enroll" && index === 0) ||
-            (mode === "verify" && index === 1);
+    <div>
+      <h1 className="text-[28px] leading-tight font-semibold tracking-[-0.7px]">
+        {complete ? "You’re verified" : mode === "enroll" ? "Set up your authenticator" : "Verify it’s you"}
+      </h1>
+      <p id="admin-mfa-instructions" className="mt-2.5 min-h-12 text-sm leading-6 text-[#697078]">
+        {complete ? "Taking you to the admin workspace." : mode === "enroll" ? "Scan this QR code with your authenticator app, then enter its 6-digit code below." : "Enter the 6-digit code from your authenticator app."}
+      </p>
 
-          return (
-            <div
-              key={item.label}
-              className={[
-                "rounded-xl border px-3 py-2 transition-colors",
-                active
-                  ? "border-slate-300 bg-slate-50"
-                  : "border-slate-200 bg-white",
-              ].join(" ")}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold tracking-[0.12em] text-slate-400">
-                  0{index + 1}
-                </span>
-                {item.complete ? (
-                  <Check className="size-3.5 text-slate-700" aria-hidden />
-                ) : null}
-              </div>
-              <p className="mt-1 text-[11px] font-medium text-slate-700">
-                {item.label}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-
-      {mode === "enroll" ? (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 sm:p-4">
-          <div className="flex items-start gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
-              <ScanLine className="size-4 text-slate-700" aria-hidden />
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-slate-950">
-                Scan with your authenticator app
-              </p>
-              <p className="mt-1 text-xs leading-4.5 text-slate-500">
-                Use 1Password, Microsoft Authenticator, Google Authenticator,
-                Authy or Apple Passwords.
-              </p>
-            </div>
-          </div>
-
+      {mode === "enroll" || (complete && qrCode) ? (
+        <div className="mt-6 rounded-lg border border-[#e0e3e6] bg-[#f7f8f9] p-4">
+          <p className="flex items-center justify-center gap-2 text-xs font-medium text-[#353d42]"><ScanLine className="size-4" aria-hidden />Scan to connect your authenticator</p>
           {qrCode ? (
-            <div className="mt-3 flex justify-center">
-              <div className="rounded-[20px] border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="mt-4 flex justify-center">
+              <div className="rounded-lg border border-[#e0e3e6] bg-white p-3">
                 {/* Supabase returns the QR code as a data URL. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={qrCode}
-                  alt="Authenticator setup QR code"
-                  className="size-36 sm:size-40"
-                />
+                <img src={qrCode} alt="Authenticator setup QR code" className="size-40" />
               </div>
             </div>
           ) : null}
-
           {secret ? (
-            <details className="group mt-3 rounded-xl border border-slate-200 bg-white">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-2.5 text-xs font-medium text-slate-700">
+            <details className="group mt-4 rounded-md border border-[#e0e3e6] bg-white">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 text-xs font-medium text-[#353d42]">
                 Can’t scan the QR code?
-                <ChevronDown className="size-3.5 text-slate-400 transition-transform group-open:rotate-180" />
+                <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" aria-hidden />
               </summary>
-              <div className="border-t border-slate-100 px-3.5 py-2.5">
-                <p className="text-[11px] leading-5 text-slate-500">
-                  Enter this setup key manually in your authenticator app.
-                </p>
-                <p className="mt-2 break-all rounded-lg bg-slate-50 p-2.5 font-mono text-[11px] text-slate-700">
-                  {secret}
-                </p>
+              <div className="border-t border-[#e6edf3] p-3">
+                <p className="text-xs leading-5 text-[#697078]">Enter this setup key manually in your authenticator app.</p>
+                <p className="mt-2 break-all rounded-lg bg-[#f0f2f4] p-3 font-mono text-xs text-[#353d42]">{secret}</p>
               </div>
             </details>
           ) : null}
         </div>
-      ) : (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5">
-          <div className="flex items-start gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
-              <ShieldCheck className="size-4 text-slate-700" aria-hidden />
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-slate-950">
-                Authenticator ready
-              </p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                Open your authenticator app and enter the current 6-digit code.
-              </p>
-            </div>
+      ) : null}
+
+      <div className="mt-7">
+        <label htmlFor="admin-mfa-code" className="mb-3 block text-[13px] font-medium text-[#353d42]">{complete ? "Authenticator" : "Authenticator code"}</label>
+        {complete ? (
+          <div role="status" className="flex h-14 items-center gap-3 rounded-md border border-[#dce7df] bg-[#f0f5f2] px-4 text-[13px] font-medium text-[#38654f]">
+            <CheckCircle2 className="size-5 shrink-0" aria-hidden />
+            Code accepted
           </div>
-        </div>
-      )}
-
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <label
-            htmlFor="admin-mfa-code"
-            className="text-xs font-semibold text-slate-700"
-          >
-            Verification code
-          </label>
-          <span className="text-[10px] text-slate-400">6 digits</span>
-        </div>
-
-        <div
-          className="relative cursor-text"
-          onClick={() => codeInputRef.current?.focus()}
-        >
+        ) : (
+        <div className="group relative cursor-text" onClick={() => codeInputRef.current?.focus()}>
           <input
             ref={codeInputRef}
             id="admin-mfa-code"
@@ -349,69 +246,45 @@ export function AdminMfaSetup() {
             pattern="[0-9]*"
             maxLength={6}
             value={code}
+            disabled={submitting}
             onChange={(event) => {
-              const nextCode = event.target.value
-                .replace(/\D/g, "")
-                .slice(0, 6);
-
+              const nextCode = event.target.value.replace(/\D/g, "").slice(0, 6);
               setError(null);
               setCode(nextCode);
-
-              if (nextCode.length === 6 && factorId && !submitting) {
-                void verify(nextCode);
-              }
+              if (nextCode.length === 6 && factorId && !submitting) void verify(nextCode);
             }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") void verify();
-            }}
-            className="absolute inset-0 z-10 h-full w-full cursor-text opacity-0"
+            onKeyDown={(event) => { if (event.key === "Enter") void verify(); }}
+            className="absolute inset-0 z-10 h-full w-full cursor-text opacity-0 disabled:cursor-wait"
             aria-label="6-digit authenticator code"
+            aria-describedby={`admin-mfa-instructions${error ? " admin-mfa-error" : ""}`}
+            aria-invalid={Boolean(error)}
           />
-
-          <div className="grid grid-cols-6 gap-1.5">
+          <div className="grid grid-cols-6 gap-2 sm:gap-2.5" aria-hidden>
             {digits.map((digit, index) => (
-              <div
-                key={index}
-                className={[
-                  "flex h-12 min-w-0 items-center justify-center rounded-xl border bg-white font-mono text-lg font-semibold shadow-sm transition",
-                  code.length === index
-                    ? "border-slate-400 ring-2 ring-slate-200"
-                    : "border-slate-200",
-                ].join(" ")}
-                aria-hidden
-              >
-                {digit || (
-                  <span className="size-1.5 rounded-full bg-slate-200" />
-                )}
+              <div key={index} className={[
+                "flex h-14 min-w-0 items-center justify-center rounded-md border bg-white font-mono text-2xl font-medium text-[#11181d] transition-colors",
+                error ? "border-[#e7b9b0]" : code.length === index ? "border-[#e0e3e6] group-focus-within:border-[#697078] group-focus-within:ring-2 group-focus-within:ring-[#e0e3e6]" : "border-[#e0e3e6]",
+              ].join(" ")}>
+                {digit || <span className="size-1 rounded-full bg-[#aeb5bb]" />}
               </div>
             ))}
           </div>
         </div>
+        )}
       </div>
 
-      {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-xs leading-5 text-red-700">
-          {error}
-        </div>
-      ) : null}
+      {error ? <div id="admin-mfa-error" role="alert" className="mt-4 rounded-md border border-red-200 bg-red-50 px-3.5 py-3 text-xs leading-5 text-red-700">{error}</div> : null}
 
       <button
         type="button"
-        disabled={submitting || code.length !== 6 || !factorId}
+        disabled={complete || submitting || code.length !== 6 || !factorId}
         onClick={() => void verify()}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+        className={cn(adminPrimaryButtonClass, "mt-6 min-h-12 w-full", complete && "disabled:opacity-100")}
       >
-        {submitting ? (
-          <Loader2 className="size-4 animate-spin" aria-hidden />
-        ) : (
-          <ShieldCheck className="size-4" aria-hidden />
-        )}
-        {submitting ? "Verifying…" : "Verify and continue"}
+        {submitting || complete ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+        {complete ? "Opening admin…" : submitting ? "Verifying…" : "Continue"}
+        {!submitting && !complete ? <ArrowRight className="size-4" aria-hidden /> : null}
       </button>
-
-      <p className="text-center text-[11px] leading-4 text-slate-400">
-        Admin verification
-      </p>
     </div>
   );
 }

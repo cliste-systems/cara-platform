@@ -1,72 +1,56 @@
-import type { Metadata } from "next";
 import Link from "next/link";
-import { ClipboardCheck, Search } from "lucide-react";
-
-import { AdminBadge } from "@/components/admin/admin-badge";
+import { requireAdminPermission } from "@/lib/admin-session";
+import { ClipboardCheck } from "lucide-react";
+import { AdminPageShell, AdminErrorCard } from "@/components/admin/admin-page-shell";
 import { AdminListCard } from "@/components/admin/admin-list-card";
-import { adminSecondaryButtonClass, adminTextLinkClass } from "@/components/admin/admin-interactive";
-import { AdminErrorCard, AdminPageShell } from "@/components/admin/admin-page-shell";
+import { AdminPagination } from "@/components/admin/admin-pagination";
 import { AdminStatsGrid } from "@/components/admin/admin-stats-grid";
 import { AdminStatCard } from "@/components/admin/admin-stat-card";
-import { adminTableBodyClass, adminTableClass, adminTableEmptyClass, adminTableHeadClass, adminTableRowClass, adminTableTdClass, adminTableTdDateClass, adminTableThClass } from "@/components/admin/admin-table";
-import { requireAdminPermission } from "@/lib/admin-session";
-import { adminCallAnalysisPath } from "@/lib/admin-route-paths";
-import { formatDurationLabel, formatE164ForDisplay } from "@/lib/call-history-types";
-import { PRODUCT_NAME } from "@/lib/company-details";
+import { adminSecondaryButtonClass } from "@/components/admin/admin-interactive";
+import { adminTableClass, adminTableHeadClass, adminTableThClass, adminTableTdClass, adminTableBodyClass, adminTableEmptyClass, adminTableRowClass } from "@/components/admin/admin-table";
+import { normalizeCallOutcome, formatDurationLabel, formatE164ForDisplay } from "@/lib/call-history-types";
+import { parseAdminCallDirectoryFilters } from "@/lib/admin-call-directory-filters";
+import { loadAdminCallDirectory } from "@/lib/load-admin-call-directory";
+import { DeleteCallButton } from "./delete-call-button";
 import { AnalysisRefresh } from "./analysis-controls";
-import { ANALYSIS_STATUS_LABELS, AnalysisStatusBadge, analysisDisplayStatus } from "./analysis-status";
-import { CALL_ANALYSIS_LIST_LIMIT, loadCallAnalysisList } from "./load-call-analysis";
-
+import { AnalysisStatusBadge, ANALYSIS_STATUS_LABELS } from "./analysis-status";
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
-export const metadata: Metadata = { title: `${PRODUCT_NAME} Admin — Call Analysis` };
-
-export default async function CallAnalysisPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; customer?: string }> }) {
-  await requireAdminPermission("calls");
-  const filters = await searchParams;
-  const query = typeof filters.q === "string" ? filters.q.trim().slice(0, 200) : "";
-  const status = typeof filters.status === "string" && filters.status in ANALYSIS_STATUS_LABELS ? filters.status : "all";
-  const customer = typeof filters.customer === "string" ? filters.customer : "";
-  let calls: Awaited<ReturnType<typeof loadCallAnalysisList>> = [];
-  let loadError: string | null = null;
-  try { calls = await loadCallAnalysisList(); } catch { loadError = "Call analyses could not be loaded. Please refresh to try again."; }
-  const customers = [...new Map(calls.map((call) => [call.organization_id, call.organization_name])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  const rows = calls.filter((call) => {
-    if (status !== "all" && analysisDisplayStatus(call.analysis) !== status) return false;
-    if (customer && call.organization_id !== customer) return false;
-    if (!query) return true;
-    return [call.organization_name, call.caller_name, call.caller_number, call.analysis?.result?.summary, call.id].join(" ").toLowerCase().includes(query.toLowerCase());
-  });
-  const counts = calls.reduce((acc, call) => { acc[analysisDisplayStatus(call.analysis)] += 1; return acc; }, { pass: 0, fail: 0, review: 0, outdated: 0, pending: 0, error: 0, queued: 0, unreviewed: 0 });
-  return <AdminPageShell icon={ClipboardCheck} title="Call analysis" description="Conversation outcomes and technical health, call by call." actions={<AnalysisRefresh active />}>
-    {loadError ? <AdminErrorCard message={loadError} /> : <>
-    <AdminStatsGrid><AdminStatCard label="Calls" value={calls.length} /><AdminStatCard label="Passed" value={counts.pass} tone="success" /><AdminStatCard label="Failed" value={counts.fail} tone="danger" /><AdminStatCard label="Needs review" value={counts.review} tone="warning" /><AdminStatCard label="Not yet analysed" value={counts.pending + counts.queued + counts.unreviewed + counts.outdated} /><AdminStatCard label="Analysis errors" value={counts.error} tone={counts.error ? "danger" : "neutral"} /></AdminStatsGrid>
-    <AdminListCard
-      countLabel={`${rows.length} of ${calls.length} recent calls`}
-      toolbar={<form action={adminCallAnalysisPath()} method="get" className="flex flex-wrap items-center gap-2">
-        <div className="relative"><label htmlFor="analysis-search" className="sr-only">Search calls</label><Search className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-gray-400" aria-hidden /><input id="analysis-search" name="q" defaultValue={query} placeholder="Search caller or summary" className="h-9 w-52 rounded-md border border-gray-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-gray-400" /></div>
-        <label htmlFor="analysis-customer" className="sr-only">Customer</label><select id="analysis-customer" name="customer" defaultValue={customer} className="h-9 max-w-48 rounded-md border border-gray-200 bg-white px-2 text-sm"><option value="">All customers</option>{customers.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select>
-        <label htmlFor="analysis-status" className="sr-only">Analysis result</label><select id="analysis-status" name="status" defaultValue={status} className="h-9 rounded-md border border-gray-200 bg-white px-2 text-sm"><option value="all">All results</option>{Object.entries(ANALYSIS_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-        <button className={adminSecondaryButtonClass} type="submit">Filter</button>
-        {query || status !== "all" || customer ? <Link href={adminCallAnalysisPath()} className={`${adminTextLinkClass} text-xs text-gray-500`}>Clear</Link> : null}
-      </form>}
-
-      banner={<p className="text-xs text-[#6b7c75]">Latest {CALL_ANALYSIS_LIST_LIMIT} eligible calls · 30-day review window</p>}
-    >
-      <table className={adminTableClass}><thead className={adminTableHeadClass}><tr><th className={adminTableThClass}>Call</th><th className={adminTableThClass}>Customer</th><th className={adminTableThClass}>Result</th><th className={adminTableThClass}>Issues</th><th className={adminTableThClass}>Call summary</th><th className={adminTableThClass}>Duration</th><th className={`${adminTableThClass} text-right`}>Review</th></tr></thead>
-        <tbody className={adminTableBodyClass}>{rows.length ? rows.map((call) => {
-          const result = call.analysis?.result;
-          return <tr key={call.id} className={adminTableRowClass}>
-            <td className={adminTableTdClass}><Link href={adminCallAnalysisPath(call.id)} className={`${adminTextLinkClass} text-gray-900`}>{call.caller_name || formatE164ForDisplay(call.caller_number) || "Unknown caller"}</Link><span className="mt-1 block whitespace-nowrap text-xs text-gray-500">{new Date(call.created_at).toLocaleString("en-IE", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Dublin" })}</span></td>
-            <td className={adminTableTdClass}><span className="text-gray-700">{call.organization_name}</span>{call.is_test_call ? <span className="mt-1 block"><AdminBadge>Test call</AdminBadge></span> : null}</td>
-            <td className={adminTableTdClass}><AnalysisStatusBadge analysis={call.analysis} /></td>
-            <td className={`${adminTableTdClass} whitespace-nowrap text-xs text-gray-500`}>{result && call.analysis?.status === "completed" ? <><span className={result.failedCount ? "font-medium text-red-700" : ""}>{result.failedCount} problems</span><span className="mt-1 block">{result.unverifiedCount} unable to verify</span></> : "—"}</td>
-            <td className={`${adminTableTdClass} max-w-md`}><p className="line-clamp-2 text-sm text-gray-600">{analysisDisplayStatus(call.analysis) === "outdated" ? "Older review. Open this call to update it to the new questions." : call.analysis?.status === "completed" ? result?.summary || "Open the call for details." : call.analysis?.status === "error" ? call.analysis.next_attempt_at ? "Analysis will retry automatically." : call.analysis.error_message || "Analysis could not finish. Open the call for details." : call.analysis?.status === "running" ? "Automatic post-call review is in progress." : call.analysis ? "Automatic review pending. Results appear here when ready." : "No automatic review was scheduled for this call."}</p></td>
-            <td className={adminTableTdDateClass}>{formatDurationLabel(call.duration_seconds)}</td>
-            <td className={`${adminTableTdClass} text-right`}><Link href={adminCallAnalysisPath(call.id)} className={adminSecondaryButtonClass}>View</Link></td>
-          </tr>;
-        }) : <tr><td colSpan={7} className={adminTableEmptyClass}>{calls.length ? "No calls match these filters." : "No saved calls to analyse yet."}</td></tr>}</tbody>
-      </table>
-    </AdminListCard></>}
-  </AdminPageShell>;
+export const metadata = { title: "Calls — HelloCara Admin" };
+export default async function CallAnalysisPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+ await requireAdminPermission("calls");
+ const filters = parseAdminCallDirectoryFilters(await searchParams);
+ let data: Awaited<ReturnType<typeof loadAdminCallDirectory>> | null = null;
+ let error: string | null = null;
+ try { data = await loadAdminCallDirectory(filters); } catch (cause) { error = cause instanceof Error ? cause.message : "Calls unavailable."; }
+ const counts = data?.counts;
+ const control = "h-10 w-full min-w-0 rounded-md border border-[#e0e3e6] bg-white px-2.5 text-[13px]";
+ const paginationFilters = {q: filters.query, status: filters.status, customer: filters.customer, date: filters.date, kind: filters.kind, outcome: filters.outcome, processing: filters.processing ? "issues" : "all"};
+ return <AdminPageShell icon={ClipboardCheck} title="Calls" description={`${filters.date === "today" ? "Today in Ireland" : "Retained calls from the last 30 days"} · Outcomes, reviews and processing status.`} actions={<AnalysisRefresh active />}>
+  {error ? <AdminErrorCard message={error} /> : data && <>
+   <details className="shrink-0 rounded-lg border border-slate-200 px-4 py-3"><summary className="cursor-pointer text-sm font-medium">Review breakdown · {data.total} matching calls</summary><AdminStatsGrid className="mt-4"><AdminStatCard label="Matching calls" value={data.total} /><AdminStatCard label="Passed reviews" value={counts?.pass} /><AdminStatCard label="Failed reviews" value={counts?.fail} tone={counts?.fail ? "danger" : "neutral"} /><AdminStatCard label="Needs review" value={counts?.review} /><AdminStatCard label="Pending / needs update" value={(counts?.pending || 0)+(counts?.queued || 0)+(counts?.unreviewed || 0)+(counts?.outdated || 0)} /><AdminStatCard label="Analysis errors" value={counts?.error} tone={counts?.error ? "danger" : "neutral"} /></AdminStatsGrid></details>
+   <details className="shrink-0 rounded-lg border border-slate-200 px-4 py-3" open={Boolean(filters.query || filters.status!=="all" || filters.customer || filters.date==="today" || filters.kind!=="all" || filters.outcome!=="all" || filters.processing)}><summary className="cursor-pointer text-sm font-medium">Filter calls</summary><form action="/admin/call-analysis" method="get" className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <input name="q" defaultValue={filters.query} placeholder="Search caller or customer" aria-label="Search calls" className={`${control}`} />
+    <select name="date" defaultValue={filters.date} aria-label="Call date" className={control}><option value="all">Last 30 days</option><option value="today">Today</option></select>
+    <select name="kind" defaultValue={filters.kind} aria-label="Call type" className={control}><option value="all">All call types</option><option value="customer">Customer</option><option value="demo">Demo</option><option value="engineer">Engineer test</option><option value="verification">Verification</option></select>
+    <select name="customer" defaultValue={filters.customer} aria-label="Customer" className={control}><option value="">All customers</option>{data.customers.map(customer => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select>
+    <select name="status" defaultValue={filters.status} aria-label="Review result" className={control}><option value="all">All reviews</option><option value="backlog">Queued / analysing</option>{Object.entries(ANALYSIS_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+    <select name="outcome" defaultValue={filters.outcome} aria-label="Call outcome" className={control}><option value="all">All outcomes</option><option value="failed">Failed calls</option></select>
+    <select name="processing" defaultValue={filters.processing ? "issues" : "all"} aria-label="Post-call processing" className={control}><option value="all">All processing</option><option value="issues">Processing issues</option></select>
+    <button type="submit" className={adminSecondaryButtonClass}>Apply</button><Link href="/admin/call-analysis" className="px-2 text-xs text-[#697078] hover:underline">Clear</Link>
+   </form></details>
+   <AdminListCard fillRemaining={false} countLabel={`${data.total} matching calls`}>
+    <div className="flex min-h-0 flex-col"><div className="divide-y divide-slate-200 md:hidden">{data.calls.map(call=><div key={call.id} className="p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><Link href={`/admin/call-analysis/${call.id}`} className="text-sm font-semibold hover:underline">{call.caller_name || formatE164ForDisplay(call.caller_number) || "Unknown caller"}</Link><p className="mt-1 text-xs text-slate-500">{call.organization_name}</p></div><AnalysisStatusBadge analysis={call.analysis} /></div><div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500"><span>{normalizeCallOutcome(call.outcome).replaceAll("_"," ")}</span><span>{formatDurationLabel(call.duration_seconds)}</span><span>{new Date(call.created_at).toLocaleString("en-IE",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Dublin"})}</span></div>{call.processing_issue && <p className="mt-2 text-xs text-amber-800">Post-call processing needs attention</p>}<Link href={`/admin/call-analysis/${call.id}`} className="mt-4 inline-flex text-sm font-medium underline underline-offset-4">Review call →</Link></div>)}{!data.calls.length && <p className="p-8 text-center text-sm text-slate-500">No calls match these filters.</p>}</div><div className="hidden overflow-x-auto md:block"><table className={adminTableClass}><thead className={adminTableHeadClass}><tr>{["Call / customer", "Type", "Call outcome", "Review", "Issues", "Duration", "Actions"].map(label => <th key={label} className={adminTableThClass}>{label}</th>)}</tr></thead><tbody className={adminTableBodyClass}>
+     {data.calls.length ? data.calls.map(call => <tr key={call.id} className={adminTableRowClass}>
+      <td className={adminTableTdClass}><Link href={`/admin/call-analysis/${call.id}`} className="font-medium hover:underline">{call.caller_name || formatE164ForDisplay(call.caller_number) || "Unknown caller"}</Link><p className="mt-1 text-[11px] leading-4 text-[#697078]">{call.organization_name} · <time>{new Date(call.created_at).toLocaleString("en-IE", {day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Dublin"})}</time></p></td>
+      <td className={`${adminTableTdClass} text-xs capitalize`}>{call.kind === "engineer" ? "Engineer test" : call.kind}</td>
+      <td className={`${adminTableTdClass} text-xs`}><span className={normalizeCallOutcome(call.outcome) === "failed" ? "font-medium text-red-700" : ""}>{normalizeCallOutcome(call.outcome).replaceAll("_", " ")}</span>{call.processing_issue && <p className="mt-1 text-amber-700">Processing {call.post_call_status === "pending" ? "overdue" : call.post_call_status}</p>}</td>
+      <td className={adminTableTdClass}><AnalysisStatusBadge analysis={call.analysis} /></td>
+      <td className={`${adminTableTdClass} text-xs text-[#697078]`}>{call.analysis?.result ? <>{call.analysis.result.failedCount} problems<p className="mt-1">{call.analysis.result.unverifiedCount} unverified</p></> : "—"}</td>
+      <td className={`${adminTableTdClass} whitespace-nowrap text-xs tabular-nums`}>{formatDurationLabel(call.duration_seconds)}</td>
+      <td className={adminTableTdClass}><div className="flex items-center gap-2"><Link href={`/admin/call-analysis/${call.id}`} className={adminSecondaryButtonClass}>View</Link><DeleteCallButton callId={call.id} label={`${call.caller_name || formatE164ForDisplay(call.caller_number) || "Unknown caller"} · ${call.organization_name} · ${new Date(call.created_at).toLocaleString("en-IE", {timeZone:"Europe/Dublin"})}`} /></div></td>
+     </tr>) : <tr><td colSpan={7} className={adminTableEmptyClass}>No calls match these filters.</td></tr>}
+    </tbody></table></div><AdminPagination path="/admin/call-analysis" filters={paginationFilters} page={data.page} size={data.size} total={data.total} /></div>
+   </AdminListCard>
+  </>}
+ </AdminPageShell>;
 }

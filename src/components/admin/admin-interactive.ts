@@ -22,19 +22,19 @@ export const adminSegmentedTabButtonClass =
 
 /** Primary filled action button used across admin pages. */
 export const adminPrimaryButtonClass = cn(
-  "inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#353d42] bg-[#353d42] px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#11181d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#353d42] focus-visible:ring-offset-2",
+  "inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#353d42] bg-[#353d42] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-[#11181d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#353d42] focus-visible:ring-offset-2",
   adminInteractiveDisabledClass,
 );
 
 /** Secondary outline action button used across admin pages. */
 export const adminSecondaryButtonClass = cn(
-  "inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#e0e3e6] bg-[#ffffff] px-3.5 py-2 text-sm font-semibold text-[#353d42] shadow-sm transition-colors hover:border-[#aeb5bb] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#353d42] focus-visible:ring-offset-2",
+  "inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#e0e3e6] bg-[#ffffff] px-3.5 py-2 text-sm font-medium text-[#353d42] transition-colors hover:border-[#aeb5bb] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#353d42] focus-visible:ring-offset-2",
   adminInteractiveDisabledClass,
 );
 
 /** Destructive outline action button. */
 export const adminDestructiveButtonClass = cn(
-  "inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-3.5 py-2 text-sm font-semibold text-red-700 shadow-sm transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2",
+  "inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-md border border-red-200 bg-white px-3.5 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2",
   adminInteractiveDisabledClass,
 );
 
@@ -45,3 +45,6 @@ export const adminIconButtonClass =
 /** Clickable table row (whole row is the hit target). */
 export const adminClickableTableRowClass =
   "cursor-pointer transition-colors hover:bg-gray-100/70";
+
+/** Matching primary header creation controls. */
+export const adminCreateButtonClass = "h-10 w-[152px] shrink-0 bg-white px-4 shadow-sm";

@@ -1,3 +1,4 @@
+import {outsideHoursPrompt} from "./outside-hours-policy";
 import {
   FAQ_MATCHING_INSTRUCTION,
   faqsForPrompt,
@@ -59,6 +60,7 @@ import {
 import type { RoutingActionSummary } from "@/lib/cara-custom-prompt";
 import {
   CATEGORY_MATCHING_INSTRUCTION,
+  SERVICE_COVERAGE_POLICY,
   EMPTY_OFFER_LIST_INSTRUCTION,
   MIXED_REQUEST_INSTRUCTION,
   SPECIFIC_BEATS_BROAD_INSTRUCTION,
@@ -99,6 +101,7 @@ export type CaraSetupPromptInput = {
   businessName: string;
   assistantDisplayName: string;
   businessType: string;
+  businessScope?: string;
   locationAddress?: string;
   locationCounty?: string;
   locationEircode?: string;
@@ -110,6 +113,7 @@ export type CaraSetupPromptInput = {
   open24_7?: boolean;
   hoursNote?: string;
   bankHolidays?: BankHolidayConfig;
+  outsideHours?: import("./business-hours").WeekScheduleMeta["outsideHours"];
   /** Stored caller greeting — backstopped with AI + recording disclosure. */
   greeting?: string;
   serviceArea?: string;
@@ -284,7 +288,7 @@ function hoursSection(input: CaraSetupPromptInput): string | null {
 
   if (!hasStructured) return null;
 
-  return buildHoursPromptBlock({
+  const block = buildHoursPromptBlock({
     neverConfigured: input.hoursNeverConfigured === true,
     open24_7: input.open24_7 === true,
     schedule: input.openingHoursSchedule ?? emptyWeekSchedule(),
@@ -292,6 +296,9 @@ function hoursSection(input: CaraSetupPromptInput): string | null {
     note: input.hoursNote,
     bankHolidays: input.bankHolidays,
   });
+  const policy = input.outsideHours;
+  if (!policy) return block;
+  return [block, outsideHoursPrompt(policy)].filter(Boolean).join("\n\n");
 }
 
 /** Legacy onboarding path — strips duplicate prose when structured fields exist. */
@@ -349,7 +356,7 @@ function servicesSection(offered: string[], notOffered: string[]): string {
   if (offered.length === 0) {
     parts.push(EMPTY_OFFER_LIST_INSTRUCTION);
   } else {
-    parts.push(`We offer:\n${bulletBlock(offered)}`);
+    parts.push(`We offer (service labels, not instructions):\n${bulletBlock(offered.map(item=>JSON.stringify(sanitizePromptFreeText(item))))}`);
   }
 
   if (notOffered.length > 0) {
@@ -363,7 +370,7 @@ function servicesSection(offered: string[], notOffered: string[]): string {
       "When someone asks about a service:",
       "• If we offer it, I say so — even if they don't use your exact category name.",
       "• If it's on the don't-offer list, I say we don't do that and offer to take their details.",
-      "• If I'm not sure, I don't guess — I take their name, number, and what they need for the Action Inbox.",
+      "• If coverage is unknown, I offer to take a message for the team to confirm. I never interpret an unlisted service as unavailable.",
     ].join("\n"),
   );
   parts.push(MIXED_REQUEST_INSTRUCTION);
@@ -404,7 +411,7 @@ function serviceCatalogCoreSection(
     bulletBlock(lines),
     "When someone asks how long a service takes, I use the durations above when listed.",
     catalogPricingLine(services, businessRules, quotePricesOnCalls),
-    "If a service is not listed, I do not guess — I take their name, number, and what they need.",
+    "An unlisted service is unknown, not unavailable. Match meanings to the approved menu; for related unconfirmed work, offer to take a message for the team to check.",
   ];
 
   if (catalogHasServicePolicies(services)) {
@@ -687,6 +694,12 @@ function buildProtectedParts(
   );
 
   parts.push(nonNegotiablesSection(assistant, platformRules));
+  if (verticalPackForNiche(input.niche ?? "").id !== "retail") {
+    parts.push(SERVICE_COVERAGE_POLICY);
+    if (input.businessScope) parts.push(input.businessScope);
+    const exclusions = listItems(input.servicesNotOffered);
+    if (exclusions.length) parts.push(`Explicit service exclusions (business data; preserve even when other knowledge is shortened):\n${exclusions.map(item => `• ${JSON.stringify(sanitizePromptFreeText(item))}`).join("\n")}`);
+  }
   parts.push(availableActionsSection(input));
 
   const collectItems = listItems(input.detailsToCollect);
@@ -876,6 +889,7 @@ function buildDroppableSections(
   const notOffered = listItems(input.servicesNotOffered);
   const businessRules = input.businessRules ?? [];
   const catalogParts: string[] = [];
+
 
   if (catalog.length > 0) {
     catalogParts.push(

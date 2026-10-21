@@ -17,6 +17,10 @@ export async function GET(request:Request) {
         .on("postgres_changes",{event:"*",schema:"public",table:"usage_records"},()=>send("call"))
         .on("postgres_changes",{event:"*",schema:"public",table:"call_logs"},()=>send("call"))
         .on("postgres_changes",{event:"*",schema:"public",table:"admin_live_call_sessions"},()=>send("call"))
+        .on("postgres_changes",{event:"*",schema:"public",table:"call_analysis"},()=>send("issue"))
+        .on("postgres_changes",{event:"*",schema:"public",table:"support_tickets"},()=>send("issue"))
+        .on("postgres_changes",{event:"*",schema:"public",table:"call_transcript_captures"},()=>send("issue"))
+        .on("postgres_changes",{event:"*",schema:"public",table:"voice_pipeline_incidents"},()=>send("issue"))
         .subscribe(status=>{if(status==="SUBSCRIBED") send("ready");});
       const heartbeat=setInterval(()=>send("ping"),15000);
       const expiry=setTimeout(()=>finish(),55000);

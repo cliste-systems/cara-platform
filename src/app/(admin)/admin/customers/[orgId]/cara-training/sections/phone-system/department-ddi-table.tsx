@@ -173,7 +173,7 @@ export function DdiRangeQuestion({
         {options.map((opt) => (
           <label
             key={opt.id}
-            className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 has-[:checked]:border-sky-300 has-[:checked]:bg-sky-50/50"
+            className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 has-[:checked]:border-gray-300 has-[:checked]:bg-gray-50/50"
           >
             <input
               type="radio"

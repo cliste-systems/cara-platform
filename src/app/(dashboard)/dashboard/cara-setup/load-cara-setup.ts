@@ -35,7 +35,7 @@ export type CaraSetupPageData = {
   /** Routing + transfer fields for prompt preview (from Call Flow). */
   promptExtras: Pick<
     CaraSetupPromptInput,
-    "routes" | "fallbackNote" | "transferNumber"
+    "routes" | "fallbackNote" | "transferNumber" | "businessScope"
   >;
 };
 
@@ -45,7 +45,7 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
   const { data: org } = await supabase
     .from("organizations")
     .select(
-      "name, address, storefront_eircode, niche, phone_number, quote_prices_on_calls, assistant_display_name, greeting, custom_prompt, agent_business_type, agent_faqs, agent_opening_hours, agent_service_area, agent_service_area_exclusions, agent_base_town, agent_services_departments, agent_services_not_offered, agent_service_catalog_supplement, agent_details_to_collect, agent_details_collect_mode, agent_capture_fields, agent_business_rules, agent_cara_rules, agent_cara_conduct, agent_location_address, agent_location_eircode, agent_location_county, business_hours, business_knowledge_summary, raw_business_description, cara_goal, routing_links, fallback_number, call_routing_mode, prompt_compile_warnings",
+      "name, address, storefront_eircode, niche, phone_number, quote_prices_on_calls, assistant_display_name, greeting, custom_prompt, business_classification, agent_business_type, agent_faqs, agent_opening_hours, agent_service_area, agent_service_area_exclusions, agent_base_town, agent_services_departments, agent_services_not_offered, agent_service_catalog_supplement, agent_details_to_collect, agent_details_collect_mode, agent_capture_fields, agent_business_rules, agent_cara_rules, agent_cara_conduct, agent_location_address, agent_location_eircode, agent_location_county, business_hours, business_knowledge_summary, raw_business_description, cara_goal, routing_links, fallback_number, call_routing_mode, prompt_compile_warnings",
     )
     .eq("id", organizationId)
     .maybeSingle();
@@ -100,6 +100,7 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
   return {
     businessFiles,
     promptExtras: {
+      businessScope: promptFromOrg.businessScope,
       routes: promptFromOrg.routes,
       fallbackNote: promptFromOrg.fallbackNote,
       transferNumber: promptFromOrg.transferNumber,

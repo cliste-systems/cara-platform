@@ -8,19 +8,19 @@ const managedUser = {
   app_metadata: { managed_onboarding: true, needs_password: true },
 };
 
-test("a managed invite cannot use the API before setting a password", async () => {
+test("legacy password flags do not block authenticated managed users with current agreements", async () => {
   const result = await managedClientSetupRequirement({
     user: managedUser, organizationId: "store-1",
-    hasCurrentLegalAcceptances: async () => { throw new Error("Must not consult agreements before password setup"); },
+    hasCurrentLegalAcceptances: async () => true,
   });
-  assert.equal(result, "password");
+  assert.equal(result, null);
 });
 
-test("user-editable metadata cannot remove the managed password gate", async () => {
+test("user-editable metadata cannot remove the managed agreement gate", async () => {
   const user = { ...managedUser, user_metadata: { managed_onboarding: false, needs_password: false } };
   assert.equal(await managedClientSetupRequirement({
-    user, organizationId: "store-1", hasCurrentLegalAcceptances: async () => true,
-  }), "password");
+    user, organizationId: "store-1", hasCurrentLegalAcceptances: async () => false,
+  }), "agreements");
 });
 
 test("password completion alone does not unlock the API", async () => {

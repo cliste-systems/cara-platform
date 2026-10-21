@@ -27,9 +27,9 @@ test("new invitations receive trusted setup state before a link can be sent", as
   const { admin, calls } = mockAdmin();
   const result = await prepareInviteAuthentication(admin, input);
   assert.equal(result.ok, true);
-  assert.deepEqual(calls[1], { method: "updateUserById", args: ["user-1", { app_metadata: { provider: "email", needs_password: true, managed_onboarding: true } }] });
+  assert.deepEqual(calls[1], { method: "updateUserById", args: ["user-1", { app_metadata: { provider: "email", needs_password: false, managed_onboarding: true } }] });
   if (result.ok) {
-    assert.equal(result.requiresPassword, true);
+    assert.equal(result.requiresPassword, false);
     const url = new URL(result.actionLink);
     assert.equal(url.searchParams.get("next"), "setup");
     assert.equal(url.searchParams.get("type"), "invite");
@@ -47,11 +47,11 @@ test("an established managed invite enables the agreement gate without resetting
   if (result.ok) assert.equal(result.requiresPassword, false);
 });
 
-test("an unfinished existing invitation keeps its trusted password gate", async () => {
+test("an unfinished invitation no longer requires the removed password page", async () => {
   const { admin } = mockAdmin({ existing: true, needsPassword: true });
   const result = await prepareInviteAuthentication(admin, { ...input, existingUserId: "user-1" });
   if (!result.ok) assert.fail(result.message);
-  assert.equal(result.requiresPassword, true);
+  assert.equal(result.requiresPassword, false);
 });
 
 test("failed setup metadata cannot yield a usable prepared invitation", async () => {
@@ -77,7 +77,7 @@ test("an orphan invitation can recover its trusted setup flags before first sign
   const result = await prepareInviteAuthentication(admin, { ...input, existingUserId: "user-1", initializePendingSetup: true });
   assert.equal(result.ok, true);
   assert.equal(calls.at(-1)?.method, "updateUserById");
-  if (result.ok) assert.equal(result.requiresPassword, true);
+  if (result.ok) assert.equal(result.requiresPassword, false);
 });
 
 test("orphan recovery refuses accounts with a sign-in history or no invitation", async () => {

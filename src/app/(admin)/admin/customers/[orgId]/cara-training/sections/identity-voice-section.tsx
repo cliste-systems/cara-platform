@@ -153,7 +153,7 @@ export function IdentityVoiceSection({ data, onChange, onSaved }: Props) {
         feed="prompt"
         hint="Includes the locked AI and recording disclosure."
       >
-        <p className="rounded-md border border-violet-100 bg-white/80 px-3 py-2 text-sm text-slate-700">
+        <p className="rounded-md border border-gray-100 bg-white/80 px-3 py-2 text-sm text-slate-700">
           {greetingPreview}
         </p>
       </CaraTrainingField>

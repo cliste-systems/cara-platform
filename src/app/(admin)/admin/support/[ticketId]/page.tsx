@@ -150,6 +150,8 @@ export default async function AdminSupportTicketPage({
       }
     >
       <AdminSectionCard
+        className="flex min-h-0 flex-1 flex-col"
+        contentClassName="min-h-0 flex-1 overflow-y-auto p-4"
         title="Conversation"
         description="Original request and all replies. The client sees this on Support."
         padded
@@ -162,7 +164,7 @@ export default async function AdminSupportTicketPage({
         />
       </AdminSectionCard>
 
-      <AdminSectionCard title="Add reply" padded>
+      <AdminSectionCard title="Add reply" className="shrink-0" padded>
         <TicketAdminReplyForm ticketId={ticket.id} />
       </AdminSectionCard>
     </AdminPageShell>

@@ -7,7 +7,6 @@ import { redirectIfEmailUnconfirmed } from "@/lib/require-email-confirmed";
 import { isLocalDashboardPreviewEnabled } from "@/lib/dashboard-dev";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
-import { userNeedsPassword } from "@/lib/invite-onboarding";
 import { dashboardUserNeedsLegalAcceptance } from "@/lib/legal-acceptance-gate";
 import { DASHBOARD_LEGAL_ACCEPT_PATH } from "@/lib/legal-documents";
 import { readSupportDashboardCookieValue, SUPPORT_DASHBOARD_COOKIE } from "@/lib/support-dashboard-cookie";
@@ -349,7 +348,8 @@ const resolveDashboardAuth = cache(async (): Promise<ResolveDashboardAuth> => {
 
   let organizationId =
     profile?.active_organization_id ?? profile?.organization_id ?? null;
-  if (profileError || !profile?.account_id || !organizationId) {
+  if (profileError) throw new Error("Your workspace is temporarily unavailable. Please try again shortly.");
+  if (!profile?.account_id || !organizationId) {
     return { tag: "user_no_org" };
   }
 
@@ -388,7 +388,6 @@ export const requireDashboardSession = cache(
     const r = await resolveDashboardAuth();
     if (r.tag === "ok") {
       if (!options?.allowOnboarding && !r.session.isLocalPreview) {
-        if (userNeedsPassword(r.session.user)) redirect("/dashboard/set-password");
         if (await dashboardUserNeedsLegalAcceptance(r.session)) redirect(DASHBOARD_LEGAL_ACCEPT_PATH);
       }
       return r.session;

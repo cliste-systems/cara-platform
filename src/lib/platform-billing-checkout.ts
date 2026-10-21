@@ -1,4 +1,5 @@
 import "server-only";
+import { reserveSignupPoolNumber } from "@/lib/reserve-signup-number";
 
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
@@ -53,7 +54,6 @@ export async function persistOrgBillingSelection(input: {
   launchTier: LaunchTier;
   interval: "month" | "year";
 }): Promise<void> {
-  const admin = createAdminClient();
   const accountId = await resolveAccountIdForOrganization(input.organizationId);
   if (!accountId) {
     throw new Error("Organisation is not linked to an account.");
@@ -66,8 +66,7 @@ export async function persistOrgBillingSelection(input: {
     updated_at: new Date().toISOString(),
   };
 
-  await admin.from("accounts").update(payload).eq("id", accountId);
-  await admin.from("organizations").update(payload).eq("account_id", accountId);
+  await patchAccountAndLocations(accountId, payload);
 }
 
 type PlatformCheckoutBaseInput = {
@@ -77,6 +76,8 @@ type PlatformCheckoutBaseInput = {
   launchTier: LaunchTier;
   interval: "month" | "year";
   idempotencyKey: string;
+  signupFlow?: string;
+  integrationIdentifier?: string;
 };
 
 type RedirectCheckoutInput = PlatformCheckoutBaseInput & {
@@ -122,11 +123,11 @@ export async function createPlatformSubscriptionCheckout(
     wantedKeys.push(`cliste_setup_${input.launchTier}_once`);
   }
 
-  const { data: priceRows } = await admin
-    .from("stripe_platform_prices")
-    .select("key, stripe_price_id")
-    .in("key", wantedKeys)
-    .eq("active", true);
+  // Resolve new signup prices in the active Stripe account. Sandbox price IDs
+  // must never overwrite the shared database's existing billing catalogue.
+  const { data: priceRows } = input.signupFlow
+    ? { data: (await getStripeClient().prices.list({ lookup_keys: wantedKeys, active: true, limit: 100 })).data.map(price => ({ key: price.lookup_key!, stripe_price_id: price.id })) }
+    : await admin.from("stripe_platform_prices").select("key, stripe_price_id").in("key", wantedKeys).eq("active", true);
 
   const priceMap = new Map<string, string>();
   for (const r of priceRows ?? []) {
@@ -163,6 +164,8 @@ export async function createPlatformSubscriptionCheckout(
 
   const sessionBase = {
     mode: "subscription" as const,
+    payment_method_collection: "always" as const,
+    ...(input.integrationIdentifier ? { integration_identifier: input.integrationIdentifier } : {}),
     line_items: lineItems,
     customer_email: input.userEmail,
     allow_promotion_codes: true,
@@ -173,6 +176,7 @@ export async function createPlatformSubscriptionCheckout(
         cliste_organization_id: input.organizationId,
         cliste_plan_tier: input.planTier,
         cliste_launch_tier: input.launchTier,
+        ...(input.signupFlow ? { cliste_signup_flow: input.signupFlow } : {}),
       },
       ...(addInvoiceItems.length > 0
         ? { add_invoice_items: addInvoiceItems }
@@ -183,6 +187,7 @@ export async function createPlatformSubscriptionCheckout(
       cliste_organization_id: input.organizationId,
       cliste_plan_tier: input.planTier,
       cliste_launch_tier: input.launchTier,
+      ...(input.signupFlow ? { cliste_signup_flow: input.signupFlow } : {}),
     },
   };
 
@@ -276,6 +281,7 @@ export async function persistPlatformCheckoutSession(
  */
 export async function activatePlatformSubscriptionGoLive(
   organizationId: string,
+  options?: { dashboardOnly?: boolean },
 ): Promise<void> {
   const accountId = await resolveAccountIdForOrganization(organizationId);
   if (!accountId) {
@@ -297,6 +303,17 @@ export async function activatePlatformSubscriptionGoLive(
   }
 
   const nowIso = new Date().toISOString();
+  if (options?.dashboardOnly) {
+    await patchAccountAndLocations(accountId, {
+      platform_subscription_id: subscriptionId,
+      platform_customer_id: account?.platform_customer_id ?? null,
+      status: "active", updated_at: nowIso,
+    }, { primaryOrganizationId: organizationId });
+    // Confirmed payment setup reserves existing inventory, without activating calls.
+    // An empty pool must not fail checkout or trigger a paid purchase.
+    try { await reserveSignupPoolNumber(organizationId); } catch { console.warn("[signup] Pool reservation unavailable; workspace remains accessible."); }
+    return;
+  }
   const activationPatch = {
     platform_subscription_id: subscriptionId,
     platform_customer_id:

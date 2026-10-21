@@ -1,76 +1,25 @@
 "use client";
-
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
-
 import { ClisteLogoMark } from "@/components/cliste-logo-mark";
-
 import { AdminNav } from "./admin-nav";
 import type { AdminStaffAccess } from "@/lib/admin-permissions";
-type NavProps = { loggedInAs: string; access: AdminStaffAccess };
-
-export function AdminMobileNav({ loggedInAs, access }: NavProps) {
-  const pathname = usePathname();
-  return <AdminMobileNavContent key={pathname} loggedInAs={loggedInAs} access={access} />;
+type NavProps = { loggedInAs:string;displayName?:string;access:AdminStaffAccess };
+export function AdminMobileNav(props:NavProps) {
+ const pathname=usePathname();
+ return <AdminMobileNavContent key={pathname} {...props}/>;
 }
-
-function AdminMobileNavContent({ loggedInAs, access }: NavProps) {
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open]);
-
-  return (
-    <>
-      <div className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-[#e0e3e6] bg-[#ffffff] px-4 md:hidden">
-        <Link href="/admin" className="flex items-center gap-2.5 text-sm font-semibold text-[#11181d]">
-          <ClisteLogoMark size={30} />
-          HelloCara Admin
-        </Link>
-        <button
-          type="button"
-          aria-label="Open admin navigation"
-          aria-controls="admin-mobile-navigation"
-          aria-expanded={open}
-          onClick={() => setOpen(true)}
-          className="flex size-10 items-center justify-center rounded-lg border border-[#e0e3e6] text-[#353d42] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#353d42]"
-        >
-          <Menu className="size-5" aria-hidden />
-        </button>
-      </div>
-
-      {open ? (
-        <div className="fixed inset-0 z-50 flex md:hidden" role="presentation">
-          <button
-            type="button"
-            className="absolute inset-0 bg-[#11181d]/55"
-            aria-label="Close admin navigation"
-            onClick={() => setOpen(false)}
-          />
-          <aside id="admin-mobile-navigation" aria-label="Admin navigation" className="relative flex h-full w-[min(86vw,320px)] flex-col bg-[#ffffff] shadow-2xl">
-            <div className="flex h-16 shrink-0 items-center justify-between border-b border-[#e0e3e6] px-5">
-              <span className="text-sm font-semibold text-[#11181d]">HelloCara Admin</span>
-              <button
-                type="button"
-                aria-label="Close admin navigation"
-                onClick={() => setOpen(false)}
-                className="flex size-9 items-center justify-center rounded-lg text-[#667078] hover:bg-[#f1f3f5] hover:text-[#11181d]"
-              >
-                <X className="size-5" aria-hidden />
-              </button>
-            </div>
-            <AdminNav loggedInAs={loggedInAs} access={access} />
-          </aside>
-        </div>
-      ) : null}
-    </>
-  );
+function AdminMobileNavContent(props:NavProps) {
+ const [open,setOpen]=useState(false);
+ const dialog=useRef<HTMLDialogElement>(null);
+ useEffect(()=>{const element=dialog.current;if(!element)return;if(open && !element.open)element.showModal();else if(!open && element.open)element.close();},[open]);
+ return <>
+  <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 md:hidden"><Link href="/admin" className="flex items-center gap-2.5 text-sm font-semibold"><ClisteLogoMark size={30}/>HelloCara Admin</Link><button type="button" aria-label="Open admin navigation" aria-controls="admin-mobile-navigation" aria-expanded={open} onClick={()=>setOpen(true)} className="flex size-10 items-center justify-center rounded-lg border border-slate-200"><Menu size={20} aria-hidden/></button></div>
+  <dialog ref={dialog} id="admin-mobile-navigation" aria-label="Admin navigation" onCancel={()=>setOpen(false)} onClose={()=>setOpen(false)} className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none border-0 bg-transparent p-0 text-white backdrop:bg-[#11181d]/55 md:hidden">
+   <button type="button" className="absolute inset-0" aria-label="Close admin navigation" onClick={()=>setOpen(false)}/>
+   <aside className="relative flex h-full w-[min(86vw,320px)] flex-col bg-[#202830] shadow-2xl"><div className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 px-5"><span className="text-sm font-semibold">HelloCara Admin</span><button type="button" aria-label="Close admin navigation" onClick={()=>setOpen(false)} className="flex size-10 items-center justify-center rounded-lg hover:bg-white/10"><X size={20} aria-hidden/></button></div><AdminNav {...props}/></aside>
+  </dialog>
+ </>;
 }

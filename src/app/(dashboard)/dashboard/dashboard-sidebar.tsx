@@ -70,7 +70,6 @@ export { isDashboardNavItemActive } from "@/lib/dashboard-nav-active";
 type DashboardSidebarProps = {
   coreNav: DashboardSidebarNavItem[];
   accountNav: DashboardSidebarNavItem[];
-  needsPassword: boolean;
   account: DashboardAccountSummary;
   locations: AccountLocationRow[];
   activeOrganizationId: string;
@@ -162,7 +161,6 @@ function NavSection({
 export function DashboardSidebar({
   coreNav,
   accountNav,
-  needsPassword,
   account,
   locations,
   activeOrganizationId,
@@ -203,20 +201,6 @@ export function DashboardSidebar({
                 </p>
                 <AccountSidebarNav items={accountNav} />
               </section>
-            </>
-          ) : null}
-          {needsPassword ? (
-            <>
-              <Link
-                href="/dashboard/set-password"
-                className="mx-0.5 mt-0.5 rounded-lg border border-amber-200/80 bg-amber-50 px-2.5 py-1.5 text-[11px] font-medium text-amber-950 transition-colors hover:bg-amber-100/80"
-              >
-                Set your password
-              </Link>
-              <div className="mx-0.5 mt-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] leading-snug text-amber-950">
-                Finish setup: choose a password (required after your invite
-                link).
-              </div>
             </>
           ) : null}
         </nav>

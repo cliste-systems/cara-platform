@@ -1,4 +1,5 @@
 import "server-only";
+import {serviceSelectionIssue} from "./service-selection";
 
 import { compileCaraPhoneNotes } from "@/app/(onboarding)/onboarding/knowledge/train-cara-compile-notes";
 import { cleanAgentFaqs, type AgentFaq } from "@/app/(dashboard)/dashboard/agent-setup/agent-faqs";
@@ -102,6 +103,8 @@ export function buildCaraAgentKnowledgeOrgUpdate(
   if (servicesNotOffered.length > MAX_SERVICES) {
     return { ok: false, message: "What you don't offer text is too long." };
   }
+  const serviceIssue=serviceSelectionIssue(servicesOffered,servicesNotOffered,false);
+  if(serviceIssue)return {ok:false,message:serviceIssue.message};
   if (detailsToCollect.length > MAX_DETAILS) {
     return { ok: false, message: "Details to collect text is too long." };
   }

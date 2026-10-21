@@ -29,19 +29,19 @@ export const ONBOARDING_FIELD_BOX_INVALID =
   "border-red-300/90 bg-red-50/60 shadow-[0_8px_32px_rgba(220,38,38,0.08)] ring-1 ring-red-200";
 
 export const ONBOARDING_FIELD_ERROR =
-  "mt-1.5 text-[12px] font-medium leading-snug text-red-600";
+  "mt-1.5 text-[12px] font-medium leading-snug text-[#a13d35]";
 
 export const ONBOARDING_FIELD_LABEL =
-  "text-[11px] font-medium uppercase tracking-[0.08em] text-slate-400";
+  "text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500";
 
 export const ONBOARDING_FIELD_HINT =
-  "mt-1 text-[11px] leading-snug text-slate-400";
+  "mt-1 text-[11px] leading-snug text-slate-500";
 
 export const ONBOARDING_FIELD_INPUT =
-  "mt-1.5 w-full border-0 bg-transparent p-0 text-[15px] text-[#0b1220] shadow-none outline-none ring-0 placeholder:text-slate-400 focus-visible:ring-0";
+  "mt-1.5 w-full border-0 bg-transparent p-0 text-[15px] text-[#0b1220] shadow-none outline-none ring-0 placeholder:text-slate-500 focus-visible:ring-0";
 
 export const ONBOARDING_FIELD_TEXTAREA =
-  "mt-1.5 min-h-[56px] w-full resize-none border-0 bg-transparent p-0 text-[15px] leading-relaxed text-[#0b1220] shadow-none outline-none ring-0 placeholder:text-slate-400 focus-visible:ring-0";
+  "mt-1.5 min-h-[56px] w-full resize-none border-0 bg-transparent p-0 text-[15px] leading-relaxed text-[#0b1220] shadow-none outline-none ring-0 placeholder:text-slate-500 focus-visible:ring-0";
 
 /** Selection / panel cards (plan tiles, phone result). */
 export const ONBOARDING_SELECTION_CARD =

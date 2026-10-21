@@ -1,4 +1,5 @@
 import "server-only";
+import { usesSimpleSignup } from "@/lib/public-signup-flow";
 
 import type { User } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
@@ -45,7 +46,7 @@ export type OnboardingSession = {
   applicationFeeBps: number;
 };
 
-export async function requireOnboardingSession(): Promise<OnboardingSession> {
+export async function requireOnboardingSession(options?: { allowSimpleVoice?: boolean }): Promise<OnboardingSession> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -93,6 +94,8 @@ export async function requireOnboardingSession(): Promise<OnboardingSession> {
     (org.status as string | undefined) ??
     "onboarding";
 
+  if (usesSimpleSignup(user) && lifecycleStatus !== "active" && !options?.allowSimpleVoice) redirect("/signup/plan");
+
   if (lifecycleStatus === "active" && enforceOnboardingStepOrder()) {
     redirect("/dashboard");
   }
@@ -122,8 +125,8 @@ export async function requireOnboardingSession(): Promise<OnboardingSession> {
   };
 }
 
-export async function requireOnboardingAdminSession(): Promise<OnboardingSession> {
-  const session = await requireOnboardingSession();
+export async function requireOnboardingAdminSession(options?: { allowSimpleVoice?: boolean }): Promise<OnboardingSession> {
+  const session = await requireOnboardingSession(options);
   if (!(await hasAccountOwnerAccess(await createClient(), {
     userId: session.user.id, accountId: session.accountId, profileRole: session.role,
   }))) redirect("/dashboard");

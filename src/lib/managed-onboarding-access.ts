@@ -1,8 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 
-import { userNeedsPassword } from "@/lib/invite-onboarding";
 
-export type ManagedSetupRequirement = "password" | "agreements";
+export type ManagedSetupRequirement = "agreements";
 
 /** API guard for the managed flow; existing self-serve onboarding is unaffected. */
 export async function managedClientSetupRequirement(input: {
@@ -11,7 +10,6 @@ export async function managedClientSetupRequirement(input: {
   hasCurrentLegalAcceptances: (userId: string, organizationId: string) => Promise<boolean>;
 }): Promise<ManagedSetupRequirement | null> {
   if (input.user.app_metadata?.managed_onboarding !== true) return null;
-  if (userNeedsPassword(input.user)) return "password";
   if (!input.organizationId) return "agreements";
   try {
     return await input.hasCurrentLegalAcceptances(input.user.id, input.organizationId)

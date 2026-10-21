@@ -68,9 +68,7 @@ export async function POST(request: Request) {
   });
   if (setupRequirement) {
     return NextResponse.json({
-      error: setupRequirement === "password"
-        ? "Choose your account password before using voice preview."
-        : "Review and accept your organisation agreements before using voice preview.",
+      error: "Review and accept your organisation agreements before using voice preview.",
       requiredSetup: setupRequirement,
     }, { status: 403 });
   }

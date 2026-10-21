@@ -2,7 +2,6 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { getMissingLegalAcceptances, type LegalDocumentType } from "@/lib/legal-acceptances";
 import { requireDashboardSession } from "@/lib/dashboard-session";
-import { userNeedsPassword } from "@/lib/invite-onboarding";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export type LegalAcceptPageData = {
@@ -17,7 +16,6 @@ export type LegalAcceptPageData = {
 
 export async function loadLegalAcceptPageData(): Promise<LegalAcceptPageData> {
   const session = await requireDashboardSession({ allowOnboarding: true });
-  if (userNeedsPassword(session.user)) redirect("/dashboard/set-password");
   const admin = createAdminClient();
   const [{ data: account, error }, { data: stores, error: storeError }, missing] = await Promise.all([
     admin.from("accounts").select("id, name, billing_email, billing_method").eq("id", session.accountId).single(),

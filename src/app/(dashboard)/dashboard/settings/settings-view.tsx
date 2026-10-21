@@ -1,4 +1,6 @@
 "use client";
+import {CallHandlingPreferencesEditor} from "@/components/dashboard/call-handling-preferences-editor";
+import type {OutsideHoursPolicy} from "@/lib/outside-hours-policy";
 
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
@@ -39,6 +41,8 @@ import { useDashboardVertical } from "../dashboard-vertical-context";
 
 type SettingsViewProps = {
   initial: SettingsInitial;
+  callHandling?: OutsideHoursPolicy;
+  smsPricing?:import("@/lib/sms-plan-pricing").SmsPlanPricing|null;
   blockedNumbers: BlockedNumbersInitial;
   profileInitial: {
     name: string;
@@ -68,6 +72,8 @@ function settingsPageDescription(
 
 export function SettingsView({
   initial,
+  callHandling,
+  smsPricing,
   blockedNumbers,
   profileInitial,
   signInEmail,
@@ -223,6 +229,7 @@ export function SettingsView({
             </div>
           </SettingsSection>
 
+          {canManageAccount&&callHandling&&<SettingsSection title="Call handling & SMS alerts"><CallHandlingPreferencesEditor initial={callHandling} smsPricing={smsPricing}/></SettingsSection>}
           <BlockedNumbersSection initial={blockedNumbers} />
         </DashboardAnimatedStack>
       </DashboardFormScrollRegion>

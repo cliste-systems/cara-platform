@@ -1,5 +1,6 @@
 "use client";
 
+import {AuthFormAlert} from "@/components/auth/auth-form-alert";
 import { motion, useReducedMotion } from "motion/react";
 import { createContext, useContext, type ReactNode } from "react";
 
@@ -21,7 +22,7 @@ type FieldSurface = "default" | "profile";
 type Props = {
   children: ReactNode;
   footer: ReactNode;
-  error?: ReactNode;
+  error?: string|null;
   className?: string;
   action?: string | ((formData: FormData) => void | Promise<void>);
   noValidate?: boolean;
@@ -70,11 +71,7 @@ export function OnboardingFormCard({
         className={cn("w-full space-y-2.5", className)}
       >
         {children}
-        {error ? (
-          <p className="text-center text-sm text-red-600" role="alert">
-            {error}
-          </p>
-        ) : null}
+        <AuthFormAlert message={error}/>
         <OnboardingEnter
           tone={enterTone}
           className="flex items-center justify-center gap-3 pt-4"

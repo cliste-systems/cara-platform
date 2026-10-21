@@ -1,5 +1,5 @@
+import { usesSimpleSignup } from "@/lib/public-signup-flow";
 import { redirect } from "next/navigation";
-import { userNeedsPassword } from "@/lib/invite-onboarding";
 
 import { getAdminStaffRecord } from "@/lib/admin-staff-access";
 import { isEnabledAdminStaff } from "@/lib/admin-permissions";
@@ -66,7 +66,6 @@ export default async function PostLoginRoutePage() {
     await stampAdminInviteAccepted(user.id, user.email);
   }
 
-  if (userNeedsPassword(user)) redirect("/dashboard/set-password");
 
   // Gate on the salon's lifecycle. SaaS signups land here while still
   // onboarding (status != 'active') and are routed into the wizard so they
@@ -85,7 +84,7 @@ export default async function PostLoginRoutePage() {
       .maybeSingle();
     const status = (org?.status as string | undefined) ?? "active";
     if (status === "pending_verification" || status === "onboarding") {
-      redirect("/onboarding");
+      redirect(usesSimpleSignup(user) ? "/signup/voice" : "/onboarding");
     }
     if (status === "suspended") {
       redirect("/dashboard/billing?suspended=1");

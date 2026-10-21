@@ -30,6 +30,7 @@ import { verticalPackForNiche } from "@/lib/verticals";
 import { formatWeekScheduleForAgent } from "@/lib/agent-knowledge-format";
 import {
   serializeBusinessHours,
+  parseBusinessHoursBundle,
   weekScheduleHasOpenDay,
   type WeekSchedule,
   type BankHolidayConfig,
@@ -267,7 +268,7 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
   const { data: orgMeta } = await supabase
     .from("organizations")
     .select(
-      "niche, quote_prices_on_calls, routing_links, fallback_number, agent_business_type",
+      "niche, quote_prices_on_calls, routing_links, fallback_number, agent_business_type, business_hours",
     )
     .eq("id", organizationId)
     .maybeSingle();
@@ -331,6 +332,7 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
       open24_7,
       hoursNote,
       bankHolidays: payload.bankHolidays,
+      outsideHours: parseBusinessHoursBundle(orgMeta?.business_hours).meta.outsideHours,
     }),
     serviceArea,
     serviceAreaExclusions,

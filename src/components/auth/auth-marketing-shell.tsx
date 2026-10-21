@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import { SignupBrandFrame } from "@/components/onboarding/signup-brand-frame";
+import { SignupSceneBackground } from "@/components/onboarding/signup-scene-background";
 import { motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 
@@ -30,6 +32,10 @@ import { AUTH_CARD, AUTH_PAGE_BG } from "./auth-ui";
 type PageBackground = {
   jpg: string;
   webp: string;
+  smallWebp?: string;
+  mobileWebp?: string;
+  ruled?: true;
+  blend?: true;
 };
 
 type Props = {
@@ -54,13 +60,14 @@ const PROFILE_TOP_BOTTOM_SOFTEN =
   "linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 16%, transparent 84%, rgba(255,255,255,0.08) 100%)";
 
 const PROFILE_MOBILE_WASH =
-  "linear-gradient(180deg, rgba(255,255,255,0.78) 0%, rgba(255,255,255,0.5) 58%, rgba(255,255,255,0.32) 100%)";
+  "linear-gradient(180deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.24) 58%, rgba(255,255,255,0.12) 100%)";
 
 function AuthPageBackground({ assets }: { assets: PageBackground }) {
   const ready = useOnboardingAnimateIn();
   const reduceMotion = useReducedMotion() ?? false;
   const animationKey = `${assets.jpg}-${ready ? "on" : "off"}`;
   const objectPosition = "50% 42%";
+  if (assets.blend && assets.smallWebp) return <SignupSceneBackground portraitHeader asset={{jpg:assets.jpg,webp:assets.webp,smallWebp:assets.smallWebp,blend:true}} />;
 
   return (
     <div
@@ -68,6 +75,9 @@ function AuthPageBackground({ assets }: { assets: PageBackground }) {
       style={{ backgroundColor: "#f6f5f3" }}
       aria-hidden
     >
+      <picture className="absolute inset-0 block">
+      {assets.mobileWebp ? <source media="(max-width: 767px)" srcSet={assets.mobileWebp} type="image/webp" /> : null}
+      <source srcSet={assets.webp} type="image/webp" />
       {reduceMotion ? (
         <img
           src={assets.jpg}
@@ -86,6 +96,7 @@ function AuthPageBackground({ assets }: { assets: PageBackground }) {
           resetKey={animationKey}
         />
       )}
+      </picture>
       <div
         className="absolute inset-0 md:hidden"
         style={{ background: PROFILE_MOBILE_WASH }}
@@ -120,6 +131,33 @@ function SignupGlassShell({
   contentExiting?: boolean;
 }) {
   const reduceMotion = useReducedMotion() ?? false;
+  if (assets.ruled) return (
+    <div className="min-h-0 flex-1 bg-white text-[#0b1220] antialiased">
+      <main className="mx-auto flex min-h-dvh w-[calc(100%-32px)] max-w-[1320px] flex-col justify-center border-x border-slate-200/70 py-6 sm:w-[calc(100%-64px)] sm:py-10">
+        <OnboardingEnterProvider>
+          <div className="grid border-y border-slate-200/70 lg:min-h-[min(744px,calc(100dvh-80px))] lg:grid-cols-2">
+            <section className="order-2 flex items-center px-5 py-8 sm:px-9 sm:py-12 lg:order-1 lg:px-14">
+              <motion.div className="mx-auto w-full max-w-md" animate={contentExiting && !reduceMotion ? { opacity: 0, y: -16 } : { opacity: 1, y: 0 }} transition={{ duration: 0.52, ease: ONBOARDING_EASE }}>
+                <OnboardingEnter className="mb-8 text-center lg:text-left">
+                  <div className="mb-6 flex justify-center lg:justify-start"><ClisteLogoMark size={48} priority /></div>
+                  <h1 className="text-[30px] font-semibold leading-[1.12] tracking-[-0.035em] sm:text-[36px]">{title}</h1>
+                  {subtitle ? <p className="mt-3 text-sm leading-6 text-slate-500">{subtitle}</p> : null}
+                </OnboardingEnter>
+                {urlError ? <div className="mb-4"><AuthFormAlert message={urlError} /></div> : null}
+                {children}
+              </motion.div>
+            </section>
+            <div aria-hidden="true" className="relative order-2 hidden overflow-hidden border-l border-slate-200/70 bg-[#f3f0eb] lg:block lg:min-h-[560px]">
+              <motion.div className="absolute inset-0" initial={reduceMotion ? false : { opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: ONBOARDING_EASE }}>
+                <Image src={assets.webp} alt="" fill sizes="(max-width: 1023px) 100vw, 660px" className="object-cover object-[50%_25%]" priority />
+              </motion.div>
+            </div>
+          </div>
+        </OnboardingEnterProvider>
+      </main>
+    </div>
+  );
+  if (assets.blend) return <SignupBrandFrame stage="signup" title={title} description={subtitle}><div className="space-y-5">{urlError ? <AuthFormAlert message={urlError} /> : null}{children}</div></SignupBrandFrame>;
   const panel = (
     <div
       className={cn(
@@ -190,7 +228,7 @@ function SignupGlassShell({
   );
 
   return (
-    <div className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-[#f6f5f3] p-4 antialiased sm:p-6">
+    <div className={cn("relative flex min-h-[100dvh] items-center justify-center overflow-hidden p-4 antialiased sm:p-6", assets.ruled ? "bg-white" : "bg-[#f6f5f3]")}>
       <AuthPageBackground assets={assets} />
       <main className="relative z-10 w-full max-w-lg">{panel}</main>
     </div>

@@ -4,7 +4,6 @@ import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Circle } from "lucide-react";
 
-import type { AdminCaraTrainingSectionCheck } from "@/lib/admin-cara-training-readiness";
 import { CaraTrainingFeedLegend } from "@/components/admin/cara-training-field";
 import { cn } from "@/lib/utils";
 
@@ -28,49 +27,10 @@ type Props = {
   initial: CaraTrainingData;
 };
 
-function CompletenessRail({ checks }: { checks: AdminCaraTrainingSectionCheck[] }) {
-  return (
-    <nav
-      aria-label="Training completeness"
-      className="sticky top-4 rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] p-5 shadow-[0_1px_0_rgba(17,24,29,0.05),0_14px_34px_-28px_rgba(17,24,29,0.32)]"
-    >
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        Completeness
-      </p>
-      <ul className="mt-3 space-y-2">
-        {checks.map((check) => (
-          <li key={check.id} className="flex items-start gap-2 text-sm">
-            {check.complete ? (
-              <CheckCircle2
-                className="mt-0.5 size-4 shrink-0 text-emerald-600"
-                aria-hidden
-              />
-            ) : (
-              <Circle className="mt-0.5 size-4 shrink-0 text-slate-300" aria-hidden />
-            )}
-            <div>
-              <p
-                className={cn(
-                  "font-medium",
-                  check.complete ? "text-slate-800" : "text-slate-600",
-                )}
-              >
-                {check.label}
-              </p>
-              {!check.complete ? (
-                <p className="text-muted-foreground text-xs">{check.detail}</p>
-              ) : null}
-            </div>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
-}
-
 export function CaraTrainingShell({ initial }: Props) {
   const router = useRouter();
   const [data, setData] = useState(initial);
+  const [selected, setSelected] = useState("identity");
   const [, startRefresh] = useTransition();
 
   const refreshPrompt = useCallback(async () => {
@@ -92,27 +52,26 @@ export function CaraTrainingShell({ initial }: Props) {
     [],
   );
 
-  return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_260px]">
-      <div className="space-y-6">
-        <CaraTrainingFeedLegend />
-        <IdentityVoiceSection data={data} onChange={patch} onSaved={refreshPrompt} />
-        <StoreFactsSection data={data} onChange={patch} onSaved={refreshPrompt} />
-        <DepartmentsSection data={data} onChange={patch} onSaved={refreshPrompt} />
-        <PeopleEscalationSection data={data} onChange={patch} onSaved={refreshPrompt} />
-        <PhoneSystemSection data={data} onChange={patch} onSaved={refreshPrompt} />
-        <BoundariesSection data={data} onChange={patch} onSaved={refreshPrompt} />
-        <WeeklyOffersSection data={data} onChange={patch} onSaved={refreshPrompt} />
-        <FaqsSection data={data} onChange={patch} onSaved={refreshPrompt} />
-        <FallbackCaptureSection data={data} onChange={patch} onSaved={refreshPrompt} />
-        <KnowledgeGapsSection gaps={data.trainingGaps} organizationId={data.organizationId} />
-        <FilesLinkSection organizationId={data.organizationId} />
-        <ReviewPublishSection data={data} onChange={patch} onSaved={refreshPrompt} />
-      </div>
-
-      <aside className="hidden xl:block">
-        <CompletenessRail checks={data.sectionChecks} />
-      </aside>
-    </div>
-  );
+  const sections = [
+    { id: "identity", label: "Identity & voice", content: <IdentityVoiceSection data={data} onChange={patch} onSaved={refreshPrompt} /> },
+    { id: "storeFacts", label: "Business facts", content: <StoreFactsSection data={data} onChange={patch} onSaved={refreshPrompt} /> },
+    { id: "departments", label: "Departments", content: <DepartmentsSection data={data} onChange={patch} onSaved={refreshPrompt} /> },
+    { id: "people", label: "People & escalation", content: <PeopleEscalationSection data={data} onChange={patch} onSaved={refreshPrompt} /> },
+    { id: "phoneSystem", label: "Phone & transfers", content: <PhoneSystemSection data={data} onChange={patch} onSaved={refreshPrompt} /> },
+    { id: "boundaries", label: "Boundaries", content: <BoundariesSection data={data} onChange={patch} onSaved={refreshPrompt} /> },
+    { id: "offers", label: "Weekly offers", content: <WeeklyOffersSection data={data} onChange={patch} onSaved={refreshPrompt} /> },
+    { id: "faqs", label: "FAQs", content: <FaqsSection data={data} onChange={patch} onSaved={refreshPrompt} /> },
+    { id: "fallback", label: "Fallback capture", content: <FallbackCaptureSection data={data} onChange={patch} onSaved={refreshPrompt} /> },
+    { id: "gaps", label: "Knowledge gaps", content: <KnowledgeGapsSection gaps={data.trainingGaps} organizationId={data.organizationId} /> },
+    { id: "files", label: "Files & links", content: <FilesLinkSection organizationId={data.organizationId} /> },
+    { id: "review", label: "Review & publish", content: <ReviewPublishSection data={data} onChange={patch} onSaved={refreshPrompt} /> },
+  ];
+  const complete = data.sectionChecks.filter(check => check.complete).length;
+  return <div className="flex min-h-0 flex-1 gap-5 overflow-hidden">
+    <nav aria-label="Training sections" className="w-56 shrink-0 overflow-y-auto border-r border-[#e0e3e6] pr-4">
+      <p className="mb-3 text-xs text-[#697078]">{complete} of {data.sectionChecks.length} checks complete</p>
+      <div className="space-y-1">{sections.map(section => { const check = data.sectionChecks.find(item => item.id === section.id); return <button key={section.id} type="button" aria-current={selected === section.id ? "page" : undefined} onClick={() => setSelected(section.id)} className={cn("flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-[13px]", selected === section.id ? "bg-[#f0f2f4] font-medium text-[#11181d]" : "text-[#697078] hover:bg-[#f7f8f9]")}><span>{section.label}</span>{check ? check.complete ? <CheckCircle2 className="size-3.5 shrink-0 text-[#697078]" aria-label="Complete" /> : <Circle className="size-3.5 shrink-0 text-amber-600" aria-label={check.detail} /> : null}</button>; })}</div>
+    </nav>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3"><CaraTrainingFeedLegend />{sections.map(section => <section key={section.id} aria-label={section.label} hidden={selected !== section.id} className="min-h-0 flex-1 overflow-y-auto">{section.content}</section>)}</div>
+  </div>;
 }

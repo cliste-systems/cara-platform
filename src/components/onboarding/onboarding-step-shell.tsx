@@ -3,6 +3,8 @@
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { PUBLIC_ASSETS } from "@/lib/public-assets";
+import { SignupBrandFrame } from "./signup-brand-frame";
 import { ClisteLogoMark } from "@/components/cliste-logo-mark";
 import {
   ONBOARDING_LOGO_SIZE,
@@ -32,6 +34,9 @@ const VARIANT_MAX_WIDTH: Record<OnboardingStepShellVariant, string> = {
 };
 
 type Props = {
+  backAction?: () => void;
+  backDisabled?: boolean;
+  signupScene?: keyof typeof PUBLIC_ASSETS.signupScenes;
   title?: string;
   /** First name only — rendered as “Hey {name}, {title}”. */
   firstName?: string;
@@ -58,6 +63,9 @@ export function OnboardingStepShell({
   compact = false,
   centered = false,
   hideLogo = false,
+  signupScene,
+  backAction,
+  backDisabled,
 }: Props) {
   const pathname = usePathname();
   const showHeader = !contentOnly && Boolean(title?.trim());
@@ -67,6 +75,13 @@ export function OnboardingStepShell({
   const isKnowledge = pathname === "/onboarding/knowledge";
   const isPlan = variant === "plan";
   const showShellLogo = !isKnowledge && !hideLogo;
+  const signupPath = pathname
+    .replace(/^\/dev\/onboarding/, "/signup")
+    .replace(/^\/preview\/signup\/billing$/, "/signup/plan/checkout")
+    .replace(/^\/preview\/signup\/[^/]+\/checkout$/, "/signup/plan/checkout")
+    .replace(/^\/preview\/signup\/[^/]+\/plan$/, "/signup/plan");
+  const signupStage = signupPath === "/signup/voice" ? "voice" : signupPath.startsWith("/signup/plan/checkout") ? "billing" : signupPath === "/signup/plan" ? "plans" : null;
+  if (signupStage) return <SignupBrandFrame backAction={backAction} backDisabled={backDisabled} scene={signupScene} stage={signupStage} title={contentOnly ? undefined : title} description={contentOnly ? undefined : description}>{children}</SignupBrandFrame>;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

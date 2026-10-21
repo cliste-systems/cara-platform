@@ -20,6 +20,7 @@ type Props = {
   continueHref: string;
   continueLabel?: string;
   className?: string;
+  description?: string;
 };
 
 export function ClisteCheckoutSuccess({
@@ -27,6 +28,7 @@ export function ClisteCheckoutSuccess({
   continueHref,
   continueLabel = "Continue to dashboard",
   className,
+  description,
 }: Props) {
   return (
     <OnboardingEnter tone="profile" className={cn("w-full", className)}>
@@ -53,7 +55,7 @@ export function ClisteCheckoutSuccess({
 
           <OnboardingEnter tone="profile" className="w-full">
             <p className={cn(ONBOARDING_SUBHEADLINE, "mt-2 max-w-md")}>
-              You&apos;re set. Cara takes it from here.
+              {description ?? "You’re set. Cara takes it from here."}
             </p>
           </OnboardingEnter>
         </div>

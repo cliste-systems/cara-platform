@@ -23,7 +23,9 @@ type SearchParams = Promise<{
 export const dynamic = "force-dynamic";
 
 export default async function SignupPage(props: { searchParams?: SearchParams }) {
-  const user = await getAuthUserOrNull();
+  // Local QA can open signup without being redirected by an existing admin session.
+  const relaxed = isSignupOnboardingDevRelaxed();
+  const user = relaxed ? null : await getAuthUserOrNull();
   if (user) {
     redirect("/auth/post-login");
   }
@@ -35,7 +37,7 @@ export default async function SignupPage(props: { searchParams?: SearchParams })
     <SignupFlow
       planTier={intent.planTier}
       billingInterval={intent.interval}
-      skipTurnstile={isSignupOnboardingDevRelaxed()}
+      skipTurnstile={relaxed}
     />
   );
 }

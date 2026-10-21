@@ -2,9 +2,10 @@ import "server-only";
 
 import type Stripe from "stripe";
 
+import { patchAccountAndLocations } from "@/lib/account-billing";
 import { resolveAccountIdForOrganization } from "@/lib/account-access";
 import type { LaunchTier, PlanTier } from "@/lib/cliste-plans";
-import { PLANS, PLATFORM_TRIAL_DAYS } from "@/lib/cliste-plans";
+import { PLANS, LAUNCHES, PLATFORM_TRIAL_DAYS } from "@/lib/cliste-plans";
 import { ONBOARDING_STEPS } from "@/lib/onboarding-session";
 import { activatePlatformSubscriptionGoLive } from "@/lib/platform-billing-checkout";
 import { getStripeClient } from "@/lib/stripe";
@@ -12,6 +13,8 @@ import { createAdminClient } from "@/utils/supabase/admin";
 
 export type PlatformElementsCheckoutSummary = {
   planName: string;
+  setupLabel?: string;
+  setupTier?: "diy" | "remote" | "onsite_dublin";
   trialDays: number;
   amountLabel: string;
   intervalLabel: string;
@@ -35,6 +38,8 @@ type ElementsCheckoutInput = {
   organizationId?: string;
   accountId?: string;
   devPreview?: boolean;
+  signupFlow?: string;
+  idempotencyKey?: string;
 };
 
 function subscriptionCustomerId(subscription: Stripe.Subscription): string | null {
@@ -131,8 +136,9 @@ async function loadSubscriptionPriceIds(
   planTier: PlanTier,
   launchTier: LaunchTier,
   interval: "month" | "year",
+  signupFlow?: string,
 ): Promise<
-  | { ok: true; planPriceId: string; overagePriceId: string; smsOveragePriceId?: string }
+  | { ok: true; planPriceId: string; overagePriceId: string; smsOveragePriceId?: string; setupPriceId?: string }
   | { ok: false; message: string }
 > {
   const planKey =
@@ -141,17 +147,17 @@ async function loadSubscriptionPriceIds(
       : `cliste_plan_${planTier}_monthly`;
   const overageKey = `cliste_plan_${planTier}_overage_min`;
   const smsOverageKey = `cliste_plan_${planTier}_overage_sms`;
-  const wantedKeys = [planKey, overageKey, smsOverageKey];
+  // The public signup offer is minute-based; retain legacy SMS billing only in the older flow.
+  const wantedKeys = signupFlow ? [planKey, overageKey] : [planKey, overageKey, smsOverageKey];
   if (launchTier !== "diy") {
     wantedKeys.push(`cliste_setup_${launchTier}_once`);
   }
 
   const admin = createAdminClient();
-  const { data: priceRows } = await admin
-    .from("stripe_platform_prices")
-    .select("key, stripe_price_id")
-    .in("key", wantedKeys)
-    .eq("active", true);
+  const stripePrices = signupFlow ? await getStripeClient().prices.list({lookup_keys:wantedKeys,active:true,limit:100}) : null;
+  const { data: priceRows } = stripePrices
+    ? {data:stripePrices.data.map(price=>({key:price.lookup_key!,stripe_price_id:price.id}))}
+    : await admin.from("stripe_platform_prices").select("key, stripe_price_id").in("key", wantedKeys).eq("active", true);
 
   const priceMap = new Map<string, string>();
   for (const row of priceRows ?? []) {
@@ -169,7 +175,17 @@ async function loadSubscriptionPriceIds(
     };
   }
 
-  return { ok: true, planPriceId, overagePriceId, smsOveragePriceId };
+  const setupPriceId = !signupFlow || launchTier === "diy" ? undefined : priceMap.get(`cliste_setup_${launchTier}_once`);
+  if (signupFlow && launchTier !== "diy" && !setupPriceId) return {ok:false,message:"Setup pricing is temporarily unavailable."};
+  if (stripePrices) {
+    const expected = new Map([[planKey, interval === "year" ? PLANS[planTier].annualCents : PLANS[planTier].monthlyCents], [overageKey, PLANS[planTier].overageRateCents]]);
+    if (setupPriceId) expected.set(`cliste_setup_${launchTier}_once`, LAUNCHES[launchTier].priceCents);
+    for (const [key, amount] of expected) {
+      const price = stripePrices.data.find(price => price.lookup_key === key);
+      if (price?.unit_amount !== amount || price.currency !== "eur") return {ok:false,message:"Billing prices are being updated. Please try again shortly."};
+    }
+  }
+  return { ok: true, planPriceId, overagePriceId, smsOveragePriceId, setupPriceId };
 }
 
 function formatEuro(cents: number): string {
@@ -185,7 +201,7 @@ function checkoutSummary(
 ): PlatformElementsCheckoutSummary {
   const plan = PLANS[planTier];
   const monthlyCents =
-    interval === "year" ? plan.annualCents / 12 : plan.monthlyCents;
+    interval === "year" ? plan.annualCents : plan.monthlyCents;
 
   return {
     planName: plan.name,
@@ -212,6 +228,7 @@ export async function createPlatformElementsCheckout(
     input.planTier,
     input.launchTier,
     input.interval,
+    input.signupFlow,
   );
   if (!prices.ok) return prices;
 
@@ -234,13 +251,15 @@ export async function createPlatformElementsCheckout(
           : {}),
         ...(input.accountId ? { cliste_account_id: input.accountId } : {}),
         ...(input.devPreview ? { cliste_dev_preview: "true" } : {}),
+        ...(input.signupFlow ? { cliste_signup_flow: input.signupFlow } : {}),
       },
-    });
+    }, input.idempotencyKey ? {idempotencyKey:`${input.idempotencyKey}-customer`} : undefined);
 
     const subscription = await stripe.subscriptions.create({
       customer: customer.id,
       items: lineItems,
       trial_period_days: PLATFORM_TRIAL_DAYS,
+      ...(input.signupFlow ? {trial_settings:{end_behavior:{missing_payment_method:"cancel" as const}}} : {}),
       payment_behavior: "default_incomplete",
       payment_settings: { save_default_payment_method: "on_subscription" },
       expand: ["pending_setup_intent"],
@@ -252,8 +271,9 @@ export async function createPlatformElementsCheckout(
           : {}),
         ...(input.accountId ? { cliste_account_id: input.accountId } : {}),
         ...(input.devPreview ? { cliste_dev_preview: "true" } : {}),
+        ...(input.signupFlow ? { cliste_signup_flow: input.signupFlow } : {}),
       },
-    });
+    }, input.idempotencyKey ? {idempotencyKey:`${input.idempotencyKey}-subscription`} : undefined);
 
     const setupIntentRef = subscription.pending_setup_intent;
     const setupIntentId =
@@ -265,7 +285,6 @@ export async function createPlatformElementsCheckout(
 
     if (setupIntentId) {
       await stripe.setupIntents.update(setupIntentId, {
-        payment_method_types: ["card", "revolut_pay", "klarna"],
         metadata: {
           cliste_subscription_id: subscription.id,
           ...(input.organizationId
@@ -273,6 +292,7 @@ export async function createPlatformElementsCheckout(
             : {}),
           ...(input.accountId ? { cliste_account_id: input.accountId } : {}),
           ...(input.devPreview ? { cliste_dev_preview: "true" } : {}),
+        ...(input.signupFlow ? { cliste_signup_flow: input.signupFlow } : {}),
         },
       });
     }
@@ -289,11 +309,15 @@ export async function createPlatformElementsCheckout(
       };
     }
 
+    if (prices.setupPriceId) {
+      // Created after the trial subscription's initial invoice: charged once at trial end.
+      await stripe.invoiceItems.create({customer:customer.id,subscription:subscription.id,pricing:{price:prices.setupPriceId},quantity:1,metadata:{cliste_subscription_id:subscription.id,cliste_launch_tier:input.launchTier}}, {idempotencyKey:`setup-fee-${subscription.id}`});
+    }
     return {
       ok: true,
       clientSecret,
       subscriptionId: subscription.id,
-      summary: checkoutSummary(input.planTier, input.interval, email),
+      summary: {...checkoutSummary(input.planTier, input.interval, email), setupTier: input.launchTier === "remote" ? "remote" : input.launchTier === "diy" ? "diy" : "onsite_dublin", ...(prices.setupPriceId ? {setupLabel:`${LAUNCHES[input.launchTier].name} · ${formatEuro(LAUNCHES[input.launchTier].priceCents)} once, on your first invoice after the trial`} : {})},
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Checkout failed.";
@@ -337,10 +361,7 @@ export async function syncSubscriptionDefaultPaymentMethod(
     return subscription;
   }
 
-  const metaSub = (setupIntent.metadata?.cliste_subscription_id ?? "").trim();
-  if (metaSub && metaSub !== subscriptionId) {
-    throw new Error("Payment setup does not match this subscription.");
-  }
+  assertSetupIntentMatchesSubscription(setupIntent, subscription, subscriptionId);
 
   const paymentMethodId = setupIntentPaymentMethodId(setupIntent);
   if (!paymentMethodId) return subscription;
@@ -399,7 +420,7 @@ export async function persistPlatformElementsSubscription(input: {
   subscriptionId: string;
   accountId?: string;
   setupIntentId?: string;
-}): Promise<{ customerId: string | null }> {
+}): Promise<{ customerId: string | null; signupFlow?: string }> {
   const trimmed = input.subscriptionId.trim();
   if (!trimmed) {
     throw new Error("Missing subscription.");
@@ -412,6 +433,10 @@ export async function persistPlatformElementsSubscription(input: {
     throw new Error("Organisation is not linked to an account.");
   }
 
+  // Authorize before syncing payment methods, which mutates Stripe records.
+  const candidate = await getStripeClient().subscriptions.retrieve(trimmed);
+  assertPlatformSubscriptionOwnership(candidate, { organizationId: input.organizationId, accountId });
+
   const { customerId, subscription } = await assertElementsSubscriptionReady(
     trimmed,
     input.setupIntentId,
@@ -421,19 +446,14 @@ export async function persistPlatformElementsSubscription(input: {
     accountId,
   });
 
-  const admin = createAdminClient();
   const billingPatch = {
     platform_subscription_id: trimmed,
     platform_customer_id: customerId,
     updated_at: new Date().toISOString(),
   };
-  await admin.from("accounts").update(billingPatch).eq("id", accountId);
-  await admin
-    .from("organizations")
-    .update(billingPatch)
-    .eq("account_id", accountId);
+  await patchAccountAndLocations(accountId, billingPatch);
 
-  return { customerId };
+  return { customerId, signupFlow: subscription.metadata?.cliste_signup_flow };
 }
 
 export async function organizationNeedsElementsGoLive(
@@ -465,8 +485,8 @@ export async function activateElementsOnboardingIfReady(input: {
   if (!needsGoLive) return false;
 
   try {
-    await persistPlatformElementsSubscription(input);
-    await activatePlatformSubscriptionGoLive(input.organizationId);
+    const billing = await persistPlatformElementsSubscription(input);
+    await activatePlatformSubscriptionGoLive(input.organizationId, { dashboardOnly: billing.signupFlow === "simple_v1" });
     return true;
   } catch (err) {
     console.warn(

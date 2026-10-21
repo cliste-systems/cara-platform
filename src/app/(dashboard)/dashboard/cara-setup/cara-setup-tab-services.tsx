@@ -28,11 +28,11 @@ export function CaraSetupTabServices() {
   return (
     <SectionCard
       flat
-      title="Services boundary"
+      title="Your services"
       description={
         isSalon
-          ? "Your service menu, prices, and durations — plus what Cara must never promise."
-          : "Cara uses both lists on every call — what she can confirm, and what she must never promise."
+          ? "Add your services, with prices and durations if needed. Cara confirms only what you list; for anything else, she takes a message."
+          : "Cara confirms the services you list here. For anything unlisted, she takes a message. Add exclusions for services she should decline."
       }
       bodyClassName="p-0"
       id="cara-services-boundary"

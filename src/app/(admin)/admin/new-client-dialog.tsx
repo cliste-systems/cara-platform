@@ -4,6 +4,7 @@ import { useId, useState, useTransition } from "react";
 import Link from "next/link";
 import { Building2, Check, CheckCircle2, ChevronLeft, FileText, Mail, Store } from "lucide-react";
 
+import { adminCreateButtonClass } from "@/components/admin/admin-interactive";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -102,7 +103,7 @@ export function NewClientDialog() {
       setOpen(next);
       if (next) { reset(); void loadAccounts(); }
     }}>
-      <DialogTrigger render={<Button type="button" variant="outline" className="shrink-0 bg-white shadow-sm" />}>New client</DialogTrigger>
+      <DialogTrigger render={<Button type="button" variant="outline" className={adminCreateButtonClass} />}>New client</DialogTrigger>
       <DialogContent showCloseButton={!pending} className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader className="pr-7">
           <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"><Store className="size-4" /> Client setup</div>

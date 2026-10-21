@@ -14,6 +14,7 @@ type PhoneRow = {
   organization_id: string | null;
   country_code: string;
   created_at: string;
+  provider?: string; provider_sid?: string|null; livekit_sip_trunk_id?: string|null;
 };
 
 type OrgRow = {
@@ -45,6 +46,7 @@ function createMockAdmin(state: {
 
 function buildPhoneQuery(phones: PhoneRow[]) {
   const filters: Record<string, unknown> = {};
+  const required = new Set<string>();
   let updatePayload: Record<string, unknown> | null = null;
   let selecting = false;
 
@@ -57,6 +59,7 @@ function buildPhoneQuery(phones: PhoneRow[]) {
       filters[column] = value;
       return chain;
     },
+    not(column:string) { required.add(column); return chain; },
     order() {
       return chain;
     },
@@ -90,7 +93,7 @@ function buildPhoneQuery(phones: PhoneRow[]) {
       }
 
       const matches = phones.filter((p) =>
-        Object.entries(filters).every(
+        [...required].every(k=>(p as Record<string,unknown>)[k]!=null) && Object.entries(filters).every(
           ([k, v]) => (p as Record<string, unknown>)[k] === v,
         ),
       );
@@ -282,4 +285,16 @@ describe("assignFromPoolForOrg", () => {
     assert.equal(state.orgs[0]!.phone_number, e164);
     assert.equal(mockAdmin.orgUpdates.length, 1);
   });
+});
+
+describe("connected signup inventory",()=>{
+ it("skips manual placeholders and Twilio numbers without routing",async()=>{
+  const base={country_code:"IE",created_at:"2026-10-19",status:"available" as const,organization_id:null};
+  const state={phones:[{...base,id:"manual",e164:"+35315550001",provider:"manual",provider_sid:null,livekit_sip_trunk_id:null},{...base,id:"unrouted",e164:"+35315550002",provider:"twilio",provider_sid:"PNfixture",livekit_sip_trunk_id:null},{...base,id:"connected",e164:"+35315550003",provider:"twilio",provider_sid:"PNfixture2",livekit_sip_trunk_id:"STfixture"}],orgs:[{id:"signup",phone_number:null as string|null}]};
+  const result=await assignFromPoolForOrg(createMockAdmin(state),"signup","IE",{twilioOnly:true});
+  assert.equal(result.ok,true);if(result.ok)assert.equal(result.phoneNumberId,"connected");assert.equal(state.phones[0].status,"available");assert.equal(state.orgs[0].phone_number,"+35315550003");
+ });
+ it("leaves an empty connected pool pending instead of assigning a placeholder",async()=>{
+  const result=await assignFromPoolForOrg(createMockAdmin({phones:[],orgs:[{id:"signup",phone_number:null}]}),"signup","IE",{twilioOnly:true});assert.equal(result.ok,false);
+ });
 });

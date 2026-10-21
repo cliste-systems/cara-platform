@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
-import { CaraTrainingField, CaraTrainingFieldLabel } from "@/components/admin/cara-training-field";
+import { CaraTrainingFieldLabel } from "@/components/admin/cara-training-field";
 import { CaraTrainingFeedback, CaraTrainingSectionFooter } from "@/components/admin/cara-training-feedback";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -90,7 +90,7 @@ export function FaqsSection({ data, onChange, onSaved }: Props) {
         {data.agentFaqs.map((faq, index) => (
           <div
             key={`faq-${index}`}
-            className="rounded-lg border border-violet-200/60 bg-violet-50/30 p-3"
+            className="rounded-lg border border-gray-200/60 bg-gray-50/30 p-3"
           >
             <div className="space-y-2">
               <CaraTrainingFieldLabel label="Question" feed="prompt" />

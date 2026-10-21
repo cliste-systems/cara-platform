@@ -210,6 +210,10 @@ async function main() {
     );
   }
 
+  if (process.env.STRIPE_BOOTSTRAP_SKIP_DB === "1") {
+    console.log(`[ok] ${rows.length} sandbox prices ready; shared database catalogue unchanged`);
+    return;
+  }
   for (const r of rows) {
     const { error } = await supabase
       .from("stripe_platform_prices")

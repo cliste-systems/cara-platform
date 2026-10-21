@@ -101,7 +101,7 @@ export function normalizeCallOutcome(raw: string): CallOutcome {
   if (s === "callback_requested") return "callback_requested";
   if (s === "action_created") return "action_created";
   if (s === "transferred" || s === "transfer") return "transferred";
-  if (s === "failed") return "failed";
+  if (["failed", "stt_failure", "tts_failure", "speech_failure", "connection_failed", "dispatch_failed"].includes(s)) return "failed";
   if (s === "voicemail_or_no_speech") return "voicemail_or_no_speech";
   if (s === "spam_or_abuse") return "spam_or_abuse";
   if (s === "blocked" || s === "caller_blocked") return "blocked";

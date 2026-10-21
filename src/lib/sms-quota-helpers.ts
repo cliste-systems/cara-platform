@@ -1,6 +1,7 @@
 /** Staff/owner alerts on the platform sender — not part of the caller SMS allowance. */
 export const SMS_PURPOSES_EXCLUDED_FROM_CALLER_QUOTA = [
   "action_inbox_notify",
+  "owner_call_alert",
   "cara_training_notify",
 ] as const;
 

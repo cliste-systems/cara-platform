@@ -1,5 +1,7 @@
 "use client";
 
+import {BusinessClassificationEditor} from "@/components/dashboard/business-classification-editor";
+import type {BusinessClassification} from "@/lib/business-classification";
 import { Briefcase, Clock, Sparkles } from "lucide-react";
 
 import { DashboardAnimatedStack } from "@/components/dashboard/dashboard-animated-group";
@@ -17,7 +19,7 @@ import { ABOUT_PLACEHOLDER } from "@/app/(onboarding)/onboarding/knowledge/train
 import { formatE164ForDisplay } from "@/lib/call-history-types";
 import { signupSegmentLabel } from "@/lib/signup-segment-label";
 
-export function BusinessProfileTab() {
+export function BusinessProfileTab({classification=null,canManage=false}:{classification?:BusinessClassification|null;canManage?:boolean}) {
   const form = useCaraSetupForm();
   const { copy, vertical } = useDashboardVertical();
   const isRetail = vertical.id === "retail";
@@ -87,24 +89,7 @@ export function BusinessProfileTab() {
             {form.businessName.trim() || "Not set"}
           </div>
         </Field>
-        <Field
-          label="Business type"
-          htmlFor="cara-business-type"
-          hint="Chosen at signup — Cara uses this to tailor your dashboard. Contact support if it needs updating."
-        >
-          <div
-            id="cara-business-type"
-            className={cn(
-              "flex min-h-10 items-center rounded-lg border border-slate-200/90 bg-slate-50 px-3 py-2 text-[13px]",
-              businessTypeLabel.trim()
-                ? "font-medium text-[#0b1220]"
-                : "text-slate-500",
-            )}
-            aria-readonly="true"
-          >
-            {businessTypeLabel.trim() || "Not set"}
-          </div>
-        </Field>
+        {isRetail?<Field label="Business type" htmlFor="cara-business-type" hint="Your retail setup is managed by our team."><div id="cara-business-type" className="text-sm text-[#11181d]">{businessTypeLabel.trim()||"Retail"}</div></Field>:<div className="space-y-3"><h3 className="text-sm font-medium text-[#353D42]">Business type</h3><BusinessClassificationEditor initial={classification} canManage={canManage}/></div>}
         <Field
           label="Cliste number"
           htmlFor="cara-cliste-number"

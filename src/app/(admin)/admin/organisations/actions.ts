@@ -21,7 +21,7 @@ export async function saveBillingOrganisation(form: FormData): Promise<{ ok: boo
   const result = id
     ? await admin.from("accounts").update(values).eq("id", id).select("id").single()
     : await admin.from("accounts").insert({ ...values, slug: `${clientSlug(name) || "organisation"}-${crypto.randomUUID().slice(0, 8)}`, status: "active", launch_status: "not_started", plan_tier: "pro", billing_method: "manual_invoice" }).select("id").single();
-  if (result.error) return { ok: false, message: "The organisation could not be saved. Please try again." };
+  if (result.error) return { ok: false, message: result.error.code === "23505" && result.error.message.includes("company") ? "An organisation with this legal company name already exists. Use the existing organisation when adding a client." : "The organisation could not be saved. Please try again." };
   await logSecurityEvent(buildSecurityEventContext(await headers()), { eventType: id ? "admin_billing_organisation_updated" : "admin_billing_organisation_created", outcome: "success", actorUserId: staff.user_id, actorEmail: staff.email, metadata: { account_id: result.data.id } });
   revalidatePath("/admin/organisations");
   revalidatePath("/admin/customers", "layout");

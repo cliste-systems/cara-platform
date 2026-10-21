@@ -7,6 +7,8 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs" && process.env.NODE_ENV === "development") {
     const { startDevelopmentCallAnalysisWorker } = await import("@/lib/call-analysis-dev-worker");
     startDevelopmentCallAnalysisWorker();
+    const {startDevelopmentOwnerAlertWorker}=await import("@/lib/owner-call-alert-dev-worker");
+    startDevelopmentOwnerAlertWorker();
   }
 
   if (process.env.SENTRY_DSN?.trim()) {
