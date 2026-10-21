@@ -34,10 +34,6 @@
     {
       "path": "/api/cron/supervalu-offers-sync-retry",
       "schedule": "0 6 * * 5"
-    },
-    {
-      "path": "/api/cron/owner-call-alerts",
-      "schedule": "* * * * *"
     }
   ]
 }
