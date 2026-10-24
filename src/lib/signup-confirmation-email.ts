@@ -43,12 +43,12 @@ export function buildSignupConfirmationEmailBodies(
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
   const codeBlock = emailOtp ? `<div style="margin:24px 0;padding:20px 12px;background:#f5f5f5;border:1px solid #e5e5e5;border-radius:12px;color:#292929;font-size:30px;font-weight:600;letter-spacing:6px;text-align:center;"><span>${escapeHtml(emailOtp)}</span></div>` : "";
   const html = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="format-detection" content="telephone=no,date=no,address=no,email=no"><title>Confirm your email — HelloCara</title>
+<html lang="en" style="height:100%;"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="format-detection" content="telephone=no,date=no,address=no,email=no"><title>Confirm your email — HelloCara</title>
 <style>a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important}</style></head>
-<body style="margin:0;background:#f5f5f5;color:#292929;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:440px;background:#ffffff;border:1px solid #e5e5e5;border-radius:20px;"><tr><td style="padding:32px 24px;">
-<p style="margin:0 0 32px;font-size:20px;font-weight:700;letter-spacing:-.7px;">HelloCara<span style="color:#999;">.</span></p>
+<body style="margin:0;height:100%;background:#f5f5f5;color:#292929;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;">
+<table role="presentation" width="100%" height="100%" cellpadding="0" cellspacing="0" style="height:100%;min-height:100vh;"><tr><td align="center" valign="middle" style="padding:32px 16px;vertical-align:middle;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:440px;background:#ffffff;border:1px solid #e5e5e5;border-radius:20px;"><tr><td align="center" style="padding:32px 24px;text-align:center;">
+<img src="${escapeHtml(signupConfirmationLogoUrl())}" alt="HelloCara" width="40" height="48" style="display:block;width:40px;height:48px;margin:0 auto 24px;border:0;">
 <h1 style="margin:0 0 12px;font-size:28px;line-height:1.2;letter-spacing:-.8px;">You’re nearly in.</h1>
 <p style="margin:0;color:#737373;font-size:15px;line-height:1.6;">${emailOtp ? "Enter this code to confirm your email." : "Confirm your email to get started."}</p>
 ${codeBlock}

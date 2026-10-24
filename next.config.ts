@@ -179,6 +179,11 @@ const nextConfig: NextConfig = {
         headers: securityHeaders,
       },
       {
+        // Public brand mark is embedded in verification emails.
+        source: "/m8x4p2n7.png",
+        headers: [{ key: "Cross-Origin-Resource-Policy", value: "cross-origin" }],
+      },
+      {
         // The Stripe webhook is server-to-server only — no browser ever loads
         // it, so override CSP isn't needed but make sure no caching layer
         // touches the request body either.
