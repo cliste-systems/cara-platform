@@ -52,7 +52,7 @@ export function SignupBrandFrame({ stage, title, description, children, scene, b
         compactBilling && "lg:py-2",
         preview ? "min-h-[calc(100dvh-28px)]" : "min-h-dvh",
       )}>
-        <div className="shrink-0 border-y border-slate-200/70 lg:my-auto">
+        <div className={cn("shrink-0 border-y border-slate-200/70 lg:my-auto", pathname === "/signup/check-email" && "my-auto")}>
           <div className="flex items-center justify-between border-b border-slate-200/70 px-3 py-1.5 sm:px-6">
             {stage === "voice" ? (
               <Dialog open={accountNoticeOpen} onOpenChange={setAccountNoticeOpen}>
