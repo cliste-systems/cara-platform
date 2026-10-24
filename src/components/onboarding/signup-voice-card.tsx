@@ -1,5 +1,6 @@
 "use client";
 
+import interactions from "@/components/onboarding/signup-interactions.module.css";
 import Image from "next/image";
 import { useRef, useState, type ReactNode } from "react";
 import { Loader2, Play, Square } from "lucide-react";
@@ -37,7 +38,7 @@ export function SignupVoiceCard({ greeting, playing, loading, error, elapsed, on
             {Array.from({length:32},(_,i)=><span key={i} style={{height: `${[12,24,18,36,28,16,32,22][i%8]}px`,animationDelay:`${i%7*-.11}s`}} />)}
           </div>
           <div className={styles.actions}>
-            <button type="button" onClick={() => void toggle()} disabled={loading || disabled} aria-busy={loading} className={styles.play}>
+            <button type="button" onClick={() => void toggle()} disabled={loading || disabled} aria-busy={loading} className={`${styles.play} ${interactions.primary}`}>
               {loading ? <Loader2 size={16} className="animate-spin" aria-hidden /> : active ? <Square size={13} aria-hidden /> : <Play size={15} aria-hidden />}
               {loading ? "Preparing…" : active ? "Stop playback" : error || sampleError ? "Try again" : "Hear Cara"}
             </button>

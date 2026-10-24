@@ -1,3 +1,4 @@
+import interactions from "@/components/onboarding/signup-interactions.module.css";
 import Image from "next/image";
 import styles from "./signup-confirmation.module.css";
 import Link from "next/link";
@@ -17,7 +18,7 @@ export function SignupConfirmation({ continueHref = "/dashboard?welcome=1" }: { 
             <p className={`${styles.confirmed} flex items-center gap-2 text-[13px] text-[#626262]`}><CircleCheck className={styles.check} size={20} strokeWidth={1.5} aria-hidden />Billing confirmed</p>
             <h1 id="confirmation-title" className={`${signupDisplay.className} ${styles.heading} mt-5 text-[29px] font-semibold leading-[1.15] tracking-[-0.035em] sm:text-[36px]`}>Let’s get Cara ready for your business.</h1>
             <p className={`${styles.description} mt-3 max-w-[320px] text-sm leading-6 text-[#626262]`}>Set up Cara and verify your business to unlock your dashboard.</p>
-            <Link href={continueHref} prefetch={false} className={`${styles.action} mt-5 flex min-h-12 w-full max-w-[360px] items-center justify-center gap-3 rounded-full bg-[#292929] px-6 text-sm font-medium text-white transition-colors hover:bg-[#151515] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#292929]`}>Set up Cara <ArrowRight size={17} aria-hidden /></Link>
+            <Link href={continueHref} prefetch={false} className={`${styles.action} ${interactions.primary} mt-5 flex min-h-12 w-full max-w-[360px] items-center justify-center gap-3 rounded-full bg-[#292929] px-6 text-sm font-medium text-white transition-colors hover:bg-[#151515] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#292929]`}>Set up Cara <ArrowRight size={17} aria-hidden /></Link>
             <div className={`${styles.description} mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] leading-5 text-[#626262]`}>
               <span className="inline-flex items-center gap-1.5"><Clock3 size={14} strokeWidth={1.5} aria-hidden />About 5–10 minutes</span>
               <span className="inline-flex items-center gap-1.5"><CloudCheck size={15} strokeWidth={1.5} aria-hidden />Saves automatically</span>

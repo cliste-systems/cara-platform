@@ -65,7 +65,7 @@
 .frame { scrollbar-gutter:stable both-edges; overflow-anchor:none; }
 .frame [data-signup-primary] {
  background:#292929; border-color:#292929; color:#fff; box-shadow:none;
- transition:background-color .2s ease, transform .2s ease;
+ transition:background-color .2s ease, color .2s ease, translate .2s ease, scale .2s ease;
 }
 .frame [data-signup-primary]:is(:hover,:focus-visible,:active) { background:#151515; color:#fff; }
 .frame [data-signup-primary]:disabled { background:#626262; color:#fff; opacity:1; }

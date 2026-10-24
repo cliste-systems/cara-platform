@@ -1,5 +1,6 @@
 "use client";
 
+import interactions from "@/components/onboarding/signup-interactions.module.css";
 import {
   useActionState,
   useEffect,
@@ -323,7 +324,7 @@ export function VoiceForm({ businessName, defaultGreeting, visualPreview=false, 
         onSubmit={handleSubmit}
         error={formLevelError}
         footer={
-          visualPreview && !allowEditing ? <Link href="/preview/signup/plans" className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#292929] text-sm font-medium text-white hover:bg-[#151515]">Continue to plans <ArrowRight size={16} aria-hidden /></Link> : <OnboardingPrimaryButton
+          visualPreview && !allowEditing ? <Link href="/preview/signup/plans" className={`${interactions.primary} flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#292929] text-sm font-medium text-white`}>Continue to plans <ArrowRight size={16} aria-hidden /></Link> : <OnboardingPrimaryButton
             type="submit"
             pending={continuePending}
             disabled={visualPreview}

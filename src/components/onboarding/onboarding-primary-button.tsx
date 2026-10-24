@@ -1,5 +1,6 @@
 "use client";
 
+import interactions from "@/components/onboarding/signup-interactions.module.css";
 import { motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 
@@ -67,8 +68,9 @@ export function OnboardingPrimaryButton({
         form={form}
         name={name}
         value={value}
+        aria-busy={Boolean(pending)}
         aria-label={ariaLabel}
-        className={cn(ONBOARDING_PRIMARY_BUTTON, className)}
+        className={cn(ONBOARDING_PRIMARY_BUTTON, interactions.primary, className)}
       >
         {children}
       </button>
@@ -84,10 +86,9 @@ export function OnboardingPrimaryButton({
       form={form}
       name={name}
       value={value}
+      aria-busy={Boolean(pending)}
       aria-label={ariaLabel}
-      className={cn(ONBOARDING_PRIMARY_BUTTON, className)}
-      whileHover={isDisabled ? undefined : { y: -1 }}
-      whileTap={isDisabled ? undefined : { scale: 0.995, y: 0 }}
+      className={cn(ONBOARDING_PRIMARY_BUTTON, interactions.primary, className)}
       transition={{ type: "spring", stiffness: 420, damping: 24 }}
     >
       <PrimaryButtonContent showShimmer={false}>

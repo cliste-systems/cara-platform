@@ -1,5 +1,6 @@
 "use client";
 
+import interactions from "@/components/onboarding/signup-interactions.module.css";
 import Link from "next/link";
 import {AuthFormAlert} from "@/components/auth/auth-form-alert";
 import { useActionState, useState, type FormEvent } from "react";
@@ -189,7 +190,7 @@ export function PlanPicker({
         </fieldset>
         <AuthFormAlert title="Plan could not be continued" message={errorMessage} />
         <div className="mx-auto w-full max-w-[600px] space-y-3">
-          {previewCheckoutPath ? <Link href={`${previewCheckoutPath}?plan=${plan}`} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[#292929] px-5 text-sm font-medium text-white transition-colors hover:bg-[#151515]">Continue to setup options <ArrowRight size={16} aria-hidden /></Link>
+          {previewCheckoutPath ? <Link href={`${previewCheckoutPath}?plan=${plan}`} className={`${interactions.primary} flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[#292929] px-5 text-sm font-medium text-white`}>Continue to setup options <ArrowRight size={16} aria-hidden /></Link>
             : <OnboardingPrimaryButton type="submit" disabled={pending} pending={pending} className="w-full max-w-none bg-[#292929] shadow-none hover:bg-[#151515]">{pending ? "Continuing…" : "Continue to setup options"}{!pending && <ArrowRight size={16} aria-hidden />}</OnboardingPrimaryButton>}
           <p role="status" className="text-center text-xs text-[#626262]">{selectedPlan?.name} selected · {formatEuro(selectedPlan?.monthlyCents ?? 0)}/month after your trial</p>
         </div>

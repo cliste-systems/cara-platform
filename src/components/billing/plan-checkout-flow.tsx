@@ -1,5 +1,6 @@
 "use client";
 
+import interactions from "@/components/onboarding/signup-interactions.module.css";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useLayoutEffect, useRef, useState, type ReactNode } from "react";
@@ -136,7 +137,7 @@ function PlanCheckoutFlowInner({
             <div className="w-full">{setupControl}</div>
             <div className="w-full space-y-4">
               <BillingTimingNote paidSetup={Boolean(summary.setupTier && summary.setupTier !== "diy")} trialDays={summary.trialDays} />
-              <button type="button" disabled={setupBusy} onClick={() => setPaymentStep(true)} className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#292929] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#151515] disabled:cursor-not-allowed disabled:opacity-60">Continue to billing <span aria-hidden="true">→</span></button>
+              <button type="button" disabled={setupBusy} onClick={() => setPaymentStep(true)} className={`${interactions.primary} flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#292929] px-5 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60`}>Continue to billing <span aria-hidden="true">→</span></button>
             </div>
           </div>
         </motion.div> : !activated ? (

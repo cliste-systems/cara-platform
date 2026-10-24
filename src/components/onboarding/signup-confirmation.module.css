@@ -16,8 +16,8 @@
 .description { animation: arrive 500ms 360ms cubic-bezier(.22,1,.36,1) both; }
 .action { animation: arrive 500ms 440ms cubic-bezier(.22,1,.36,1) both; }
 .action svg { transition: transform 180ms ease; }
-.action:hover svg { transform: translateX(3px); }
-.action:active svg { transform: translateX(1px); }
+.action:hover svg { transform: none; }
+.action:active svg { transform: none; }
 @media (prefers-reduced-motion: reduce) {
   .graphic, .confirmed, .heading, .description, .action,
   .check path, .check polyline { animation: none; }

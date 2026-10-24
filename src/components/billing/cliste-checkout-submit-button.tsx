@@ -1,5 +1,6 @@
 "use client";
 
+import interactions from "@/components/onboarding/signup-interactions.module.css";
 import { Check, Loader2 } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
@@ -39,6 +40,7 @@ export function ClisteCheckoutSubmitButton({
       aria-live="polite"
       className={cn(
         ONBOARDING_PRIMARY_BUTTON,
+        interactions.primary,
         "relative h-12 w-full overflow-hidden px-6 text-[15px]",
         isSuccess &&
           "border-[#292929] bg-[#292929] text-white hover:bg-[#292929] hover:text-white",

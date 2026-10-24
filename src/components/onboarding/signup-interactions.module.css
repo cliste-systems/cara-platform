@@ -1,0 +1,14 @@
+.primary.primary {
+ transition: background-color 200ms ease, color 200ms ease, translate 200ms ease, scale 200ms ease;
+}
+.primary:is(:hover,:focus-visible,:active) { color:#fff; }
+.primary:focus-visible { outline:2px solid #626262; outline-offset:3px; }
+@media (hover:hover) and (pointer:fine) {
+ .primary:not(:disabled):hover { background:#151515; translate:0 -1px; }
+}
+.primary:not(:disabled):active { translate:0 0; scale:.995; }
+.primary:disabled { cursor:not-allowed; }
+@media (prefers-reduced-motion:reduce) {
+ .primary.primary { transition:none; }
+ .primary:not(:disabled):is(:hover,:active) { translate:none; scale:none; }
+}

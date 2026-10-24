@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { ArrowRight } from "lucide-react";
 
 import {
@@ -22,17 +22,24 @@ import { verifySignupCode } from "../verify-code";
 
 export function VerifyCodeForm({ email }: { email: string }) {
   const router = useRouter();
+  const codeInput = useRef<HTMLInputElement>(null);
   const [code, setCode] = useState("");
   const [pending, startTransition] = useTransition();
   const [resendPending, startResendTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!error) return;
+    codeInput.current?.focus({ preventScroll: true });
+    codeInput.current?.scrollIntoView({ block: "nearest", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+  }, [error]);
+
   function handleVerify() {
     setError(null);
     setNotice(null);
     startTransition(async () => {
-      const result = await verifySignupCode(email, code);
+      const result = await verifySignupCode(email, code).catch(() => ({ ok: false as const, message: "We couldn’t verify your code. Please try again." }));
       if (result.ok) {
         router.replace("/auth/post-login");
         router.refresh();
@@ -46,7 +53,7 @@ export function VerifyCodeForm({ email }: { email: string }) {
     setError(null);
     setNotice(null);
     startResendTransition(async () => {
-      const result = await resendSignupConfirmationEmail(email);
+      const result = await resendSignupConfirmationEmail(email).catch(() => ({ ok: false as const, message: "We couldn’t resend your code. Please try again." }));
       if (result.ok) {
         setCode("");
         setNotice("New code sent. Check your inbox.");
@@ -67,12 +74,14 @@ export function VerifyCodeForm({ email }: { email: string }) {
           }}
         >
           <OnboardingFieldBox
+            static
             label="Verification code"
             htmlFor="verification-code"
             error={error ?? undefined}
-            className="border border-[#dedede] bg-white px-4 py-4 shadow-none"
+            className={cn("border px-4 py-4 shadow-none", error ? "border-[#b7473f] bg-[#fff7f6] ring-1 ring-[#b7473f]" : "border-[#dedede] bg-white")}
           >
             <input
+              ref={codeInput}
               id="verification-code"
               name="code"
               type="text"
