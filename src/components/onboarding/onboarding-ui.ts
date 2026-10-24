@@ -51,7 +51,7 @@ export const ONBOARDING_SELECTION_CARD_ACTIVE =
   "border-[#0b1220]/25 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.1)] ring-1 ring-[#0b1220]/10";
 
 export const ONBOARDING_PRIMARY_BUTTON =
-  "group relative inline-flex h-11 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-full border border-[#0b1220] bg-[#0b1220] px-8 text-[14px] font-medium text-white shadow-[0_8px_24px_rgba(11,18,32,0.22)] transition-[color,background-color,box-shadow,transform] duration-300 ease-out hover:bg-white hover:text-[#0b1220] hover:shadow-[0_10px_32px_rgba(11,18,32,0.14)] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none disabled:hover:bg-[#0b1220] disabled:hover:text-white [&_svg]:transition-transform [&_svg]:duration-300 [&_svg]:ease-out group-hover:[&_svg]:translate-x-1";
+  "group relative inline-flex h-11 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-full border border-[#0b1220] bg-[#0b1220] px-8 text-[14px] font-medium text-white shadow-[0_8px_24px_rgba(11,18,32,0.22)] transition-[color,background-color,box-shadow,transform] duration-200 ease-out hover:bg-[#151515] hover:text-white hover:shadow-[0_10px_32px_rgba(11,18,32,0.14)] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none disabled:hover:bg-[#0b1220] disabled:hover:text-white [&_svg]:transition-transform [&_svg]:duration-300 [&_svg]:ease-out group-hover:[&_svg]:translate-x-1";
 
 export const ONBOARDING_PRIMARY_BUTTON_SHIMMER =
   "pointer-events-none absolute inset-0 -translate-x-full bg-white/20 transition-transform duration-500 ease-out group-hover:translate-x-full";

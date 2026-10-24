@@ -1,8 +1,9 @@
 "use server";
 
+import { beginSignupBilling, selectSignupOffer } from "@/lib/signup-billing-security";
 import { redirect } from "next/navigation";
 import { isPlanTier, planSupportsSelfServeCheckout } from "@/lib/cliste-plans";
-import { persistOrgBillingSelection, persistPlatformCheckoutSession, activatePlatformSubscriptionGoLive, resolveCheckoutReturnOrigin } from "@/lib/platform-billing-checkout";
+import { persistPlatformCheckoutSession, activatePlatformSubscriptionGoLive, resolveCheckoutReturnOrigin } from "@/lib/platform-billing-checkout";
 import { createPlatformElementsCheckout, persistPlatformElementsSubscription } from "@/lib/platform-billing-elements";
 import { PUBLIC_SIGNUP_FLOW } from "@/lib/public-signup-flow";
 import { requirePublicSignupSession } from "@/lib/public-signup-session";
@@ -22,8 +23,9 @@ export async function startPublicCheckout(_: unknown, form: FormData): Promise<{
   const { data: account, error } = await admin.from("accounts").select("name, status, platform_subscription_id").eq("id", session.accountId).single();
   if (error || !account) return {ok:false,message:"Your business could not be loaded. Please try again."};
   if (account.status === "active" && account.platform_subscription_id) redirect("/dashboard");
+  await beginSignupBilling(session.accountId, session.organizationId);
   try {
-    await persistOrgBillingSelection({organizationId:session.organizationId,planTier:plan,launchTier,interval});
+    await selectSignupOffer(session.accountId,session.organizationId,plan,launchTier,interval);
   } catch {
     return {ok:false,message:"Your plan could not be saved. Please try again."};
   }
@@ -40,7 +42,8 @@ export async function preparePublicCheckout() {
   if(account.status==="active" && account.platform_subscription_id) redirect("/dashboard");
   if(!isPlanTier(account.plan_tier) || !planSupportsSelfServeCheckout(account.plan_tier)) redirect("/signup/plan");
   const launchTier = account.launch_tier === "remote" ? "remote" : account.launch_tier === "onsite" ? "onsite_dublin" : "diy";
-  const result=await createPlatformElementsCheckout({organizationId:session.organizationId,accountId:session.accountId,userEmail:session.user.email??"",planTier:account.plan_tier,launchTier,interval:account.billing_interval==="year"?"year":"month",signupFlow:PUBLIC_SIGNUP_FLOW,idempotencyKey:`signup-elements-${session.accountId}-${account.plan_tier}-${account.billing_interval}-${launchTier}-${Math.floor(Date.now()/86400000)}`});
+  const trialEnd = await beginSignupBilling(session.accountId, session.organizationId);
+  const result=await createPlatformElementsCheckout({organizationId:session.organizationId,accountId:session.accountId,userEmail:session.user.email??"",planTier:account.plan_tier,launchTier,interval:account.billing_interval==="year"?"year":"month",signupFlow:PUBLIC_SIGNUP_FLOW,trialEnd,idempotencyKey:`signup-elements-${session.accountId}-${account.plan_tier}-${account.billing_interval}-${launchTier}`});
   if(!result.ok) return {ok:false as const,message:"Payment setup is temporarily unavailable. Please try again."};
   const origin=await resolveCheckoutReturnOrigin();
   return {...result,returnUrl:`${origin}/signup/complete?subscription_id=${result.subscriptionId}`};
@@ -73,6 +76,7 @@ export async function updatePublicCheckoutSetup(choice: string) {
   const {data:account,error} = await session.supabase.from("accounts").select("plan_tier,billing_interval,status,platform_subscription_id").eq("id",session.accountId).single();
   if (error || !account || !isPlanTier(account.plan_tier)) return {ok:false as const,message:"Your billing details could not be loaded."};
   if (account.status === "active" && account.platform_subscription_id) redirect("/dashboard");
-  await persistOrgBillingSelection({organizationId:session.organizationId,planTier:account.plan_tier,launchTier:choice as "diy"|"remote"|"onsite_dublin",interval:account.billing_interval === "year" ? "year" : "month"});
+  await beginSignupBilling(session.accountId, session.organizationId);
+  await selectSignupOffer(session.accountId,session.organizationId,account.plan_tier,choice,account.billing_interval === "year" ? "year" : "month");
   return preparePublicCheckout();
 }

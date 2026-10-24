@@ -1,9 +1,12 @@
+import { cancelSupersededSignupSubscription } from "@/lib/signup-billing-security";
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import type Stripe from "stripe";
 
 import {
   activatePlatformSubscriptionGoLive,
+  persistPlatformCheckoutSession,
   assertWebhookPlatformCheckoutSessionComplete,
 } from "@/lib/platform-billing-checkout";
 import {
@@ -98,24 +101,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { data: claimedEvent, error: claimErr } = await admin
-    .from("stripe_webhook_events")
-    .update({
-      status: "processing",
-      attempts: 1,
-      processing_started_at: new Date().toISOString(),
-      last_error: null,
-    })
-    .eq("event_id", event.id)
-    .in("status", ["pending", "failed"])
-    .select("event_id")
-    .maybeSingle();
+  const lease = randomUUID();
+  const { data: claimedEvent, error: claimErr } = await admin.rpc("claim_stripe_webhook", {p_event:event.id,p_lease:lease});
   if (claimErr) {
     await captureObservedError(claimErr, { route: "stripe/webhook", eventId: event.id });
     return new NextResponse("webhook claim error", { status: 500 });
   }
   if (!claimedEvent) {
-    return NextResponse.json({ received: true, in_progress: true });
+    return new NextResponse("event is processing; retry", { status: 503 });
   }
 
   try {
@@ -175,14 +168,15 @@ export async function POST(req: NextRequest) {
       default:
         break;
     }
-    await admin
+    const { error: completionError } = await admin
       .from("stripe_webhook_events")
       .update({
         status: "completed",
         processed_at: new Date().toISOString(),
         processing_started_at: null,
       })
-      .eq("event_id", event.id);
+      .eq("event_id", event.id).eq("lease_token", lease);
+    if (completionError) throw completionError;
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown webhook error";
     await admin
@@ -192,7 +186,7 @@ export async function POST(req: NextRequest) {
         last_error: message.slice(0, 2000),
         next_attempt_at: new Date(Date.now() + 60_000).toISOString(),
       })
-      .eq("event_id", event.id);
+      .eq("event_id", event.id).eq("lease_token", lease);
     await captureObservedError(err, {
       route: "stripe/webhook",
       eventType: event.type,
@@ -241,7 +235,7 @@ async function syncBillingInvoice(
 ) {
   const customerId = stripeId(invoice.customer);
   const accountId = await resolveProjectionAccountId(admin, invoice.metadata, customerId);
-  await admin.from("billing_invoices").upsert(
+  const { error: projectionError } = await admin.from("billing_invoices").upsert(
     {
       account_id: accountId,
       stripe_invoice_id: invoice.id,
@@ -269,6 +263,7 @@ async function syncBillingInvoice(
     },
     { onConflict: "stripe_invoice_id,livemode" },
   );
+  if (projectionError) throw projectionError;
 }
 
 async function syncBillingPaymentIntent(
@@ -279,7 +274,7 @@ async function syncBillingPaymentIntent(
   const customerId = stripeId(intent.customer);
   const accountId = await resolveProjectionAccountId(admin, intent.metadata, customerId);
   const latestCharge = stripeId(intent.latest_charge);
-  await admin.from("billing_payments").upsert(
+  const { error: projectionError } = await admin.from("billing_payments").upsert(
     {
       account_id: accountId,
       stripe_payment_intent_id: intent.id,
@@ -298,6 +293,7 @@ async function syncBillingPaymentIntent(
     },
     { onConflict: "stripe_payment_intent_id,livemode" },
   );
+  if (projectionError) throw projectionError;
 }
 
 async function syncBillingAdjustment(
@@ -314,7 +310,7 @@ async function syncBillingAdjustment(
   const customerId = charge ? stripeId(charge.customer) : null;
   const accountId = await resolveProjectionAccountId(admin, metadata, customerId);
   const kind = eventType.startsWith("charge.dispute") ? "dispute" : "refund";
-  await admin.from("billing_adjustments").upsert(
+  const { error: projectionError } = await admin.from("billing_adjustments").upsert(
     {
       account_id: accountId,
       stripe_object_id: source.id,
@@ -329,6 +325,7 @@ async function syncBillingAdjustment(
     },
     { onConflict: "stripe_object_id,livemode" },
   );
+  if (projectionError) throw projectionError;
 }
 
 async function handlePlatformCheckoutCompleted(
@@ -352,6 +349,11 @@ async function handlePlatformCheckoutCompleted(
       ? session.customer
       : (session.customer?.id ?? null);
 
+  if (session.metadata?.cliste_signup_flow === "simple_v1") {
+    await persistPlatformCheckoutSession(orgId, session.id);
+    await activatePlatformSubscriptionGoLive(orgId, {dashboardOnly:true});
+    return;
+  }
   await patchAccountAndLocations(
     accountId,
     {
@@ -374,18 +376,27 @@ async function handlePlatformCheckoutCompleted(
   }
 }
 
-async function handlePlatformSubscriptionChange(
-  admin: AdminClient,
-  sub: Stripe.Subscription,
-) {
+async function handlePlatformSubscriptionChange(admin:AdminClient, sub:Stripe.Subscription) {
+  const lease=randomUUID();
+  const {data:claimed,error}=await admin.rpc("claim_stripe_subscription",{p_subscription:sub.id,p_lease:lease});
+  if(error || !claimed) throw new Error("Subscription reconciliation is busy; retry.");
+  try { await reconcileSubscription(admin,sub,lease); }
+  finally {
+    const {error:releaseError}=await admin.from("stripe_subscription_leases").delete().eq("subscription_id",sub.id).eq("lease_token",lease);
+    if(releaseError) throw releaseError;
+  }
+}
+async function reconcileSubscription(admin:AdminClient,sub:Stripe.Subscription,lease:string) {
+  sub = await getStripeClient().subscriptions.retrieve(sub.id);
   const orgId = (sub.metadata?.cliste_organization_id ?? "").trim() || null;
   const accountId = await resolveAccountIdFromBillingMetadata({
     accountId: sub.metadata?.cliste_account_id,
     organizationId: orgId,
   });
   if (!accountId) return;
+  if (await cancelSupersededSignupSubscription(accountId, sub)) return;
 
-  await admin.from("billing_subscriptions").upsert(
+  const { error: projectionError } = await admin.from("billing_subscriptions").upsert(
     {
       account_id: accountId,
       stripe_subscription_id: sub.id,
@@ -409,55 +420,11 @@ async function handlePlatformSubscriptionChange(
     },
     { onConflict: "stripe_subscription_id,livemode" },
   );
+  if (projectionError) throw projectionError;
 
-  const isHealthy =
-    sub.status === "active" ||
-    sub.status === "trialing" ||
-    sub.status === "past_due";
-  const shouldSuspend =
-    sub.status === "unpaid" ||
-    sub.status === "incomplete_expired" ||
-    sub.status === "canceled";
-
-  const { data: account } = await admin
-    .from("accounts")
-    .select("status, platform_subscription_id")
-    .eq("id", accountId)
-    .maybeSingle();
-  const currentStatus = (account?.status as string | undefined) ?? "active";
-  // A late event from an abandoned signup must not replace the subscribed plan.
-  if (sub.metadata?.cliste_signup_flow === "simple_v1" && account?.platform_subscription_id && account.platform_subscription_id !== sub.id && currentStatus !== "onboarding") return;
-
-  const patch: Record<string, unknown> = {
-    platform_subscription_id: sub.id,
-    platform_customer_id:
-      typeof sub.customer === "string" ? sub.customer : sub.customer.id,
-    updated_at: new Date().toISOString(),
-  };
-
-  if (shouldSuspend && currentStatus === "active") {
-    patch.status = "suspended";
-    patch.suspended_reason = `stripe_subscription_${sub.status}`;
-    patch.suspended_at = new Date().toISOString();
-  } else if (isHealthy && currentStatus === "suspended") {
-    patch.status = "active";
-    patch.suspended_reason = null;
-    patch.suspended_at = null;
-  }
-
-  await patchAccountAndLocations(accountId, patch);
-  if (shouldSuspend && currentStatus === "active") {
-    await admin
-      .from("organizations")
-      .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq("account_id", accountId);
-  } else if (isHealthy && currentStatus === "suspended") {
-    await admin
-      .from("organizations")
-      .update({ is_active: true, updated_at: new Date().toISOString() })
-      .eq("account_id", accountId);
-  }
-
+  const {error:reconcileError}=await admin.rpc("reconcile_stripe_subscription",{p_account:accountId,p_subscription:sub.id,p_status:sub.status,p_lease:lease});
+  if(reconcileError) throw reconcileError;
+  const isHealthy = sub.status === "active" || sub.status === "trialing";
   const defaultPm =
     typeof sub.default_payment_method === "string"
       ? sub.default_payment_method
@@ -483,6 +450,7 @@ async function handlePlatformSubscriptionChange(
         sideEffect: "elements_go_live",
         orgId,
       });
+      throw err;
     }
   }
 }
@@ -491,30 +459,8 @@ async function handlePlatformSubscriptionDeleted(
   admin: AdminClient,
   sub: Stripe.Subscription,
 ) {
-  const orgId = (sub.metadata?.cliste_organization_id ?? "").trim() || null;
-  const accountId = await resolveAccountIdFromBillingMetadata({
-    accountId: sub.metadata?.cliste_account_id,
-    organizationId: orgId,
-  });
-  if (!accountId) return;
-  if (sub.metadata?.cliste_signup_flow === "simple_v1") {
-    const {data:account,error}=await admin.from("accounts").select("platform_subscription_id").eq("id",accountId).maybeSingle();
-    if(error) throw error;
-    if(account?.platform_subscription_id !== sub.id) return;
-  }
-  await patchAccountAndLocations(accountId, {
-    status: "churned",
-    suspended_reason: "platform_subscription_cancelled",
-    suspended_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  });
-  await admin
-    .from("organizations")
-    .update({
-      is_active: false,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("account_id", accountId);
+  sub = await getStripeClient().subscriptions.retrieve(sub.id);
+  await handlePlatformSubscriptionChange(admin, sub);
 }
 
 async function handleSetupIntentSucceeded(
@@ -542,7 +488,10 @@ async function handleSetupIntentSucceeded(
   if (setupIntent.metadata?.cliste_signup_flow === "simple_v1") {
     const {data:account,error}=await createAdminClient().from("accounts").select("status,platform_subscription_id").eq("id",accountId).maybeSingle();
     if(error) throw error;
-    if(account?.status === "active" && account.platform_subscription_id && account.platform_subscription_id !== subscriptionId) return;
+    if(account?.platform_subscription_id && account.platform_subscription_id !== subscriptionId) {
+      const candidate = await getStripeClient().subscriptions.retrieve(subscriptionId);
+      if (await cancelSupersededSignupSubscription(accountId, candidate)) return;
+    }
     await persistPlatformElementsSubscription({organizationId:orgId,subscriptionId,accountId,setupIntentId:setupIntent.id});
     await activatePlatformSubscriptionGoLive(orgId,{dashboardOnly:true});
     return;
@@ -561,5 +510,6 @@ async function handleSetupIntentSucceeded(
       orgId,
       setupIntentId: setupIntent.id,
     });
+    throw err;
   }
 }

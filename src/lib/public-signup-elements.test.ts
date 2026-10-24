@@ -14,7 +14,7 @@ function fixture(stalePrice = false) {
     invoiceItems:{create:async(payload:Record<string,unknown>,options?:Record<string,unknown>)=>{requests.push({kind:"setupFee",payload,options});return {id:"ii_fixture"};}},
     setupIntents:{update:async(_id:string,payload:Record<string,unknown>)=>{requests.push({kind:"setup",payload});},retrieve:async()=>({id:"seti_fixture",client_secret:"fixture_secret"})},
   };
-  const imports:Record<string,unknown>={
+  const imports:Record<string,unknown>={"@/lib/signup-billing-security":{},
     "server-only":{},"@/lib/cliste-plans":plans,
     "@/lib/account-access":{},"@/lib/account-billing":{},"@/lib/onboarding-session":{ONBOARDING_STEPS:{done:6}},
     "@/lib/platform-billing-checkout":{},"@/lib/stripe":{getStripeClient:()=>stripe},

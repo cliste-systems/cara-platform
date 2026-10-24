@@ -1,12 +1,12 @@
 "use server";
 
+import { checkSignupPassword } from "@/lib/signup-password-security";
 import { signupDetails, PUBLIC_SIGNUP_FLOW } from "@/lib/public-signup-flow";
 import { isPublicSignupEnabled } from "@/lib/public-signup";
 import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 import {
-  getRateLimitStatus,
   rateLimitFingerprint,
   recordRateLimitFailure,
 } from "@/lib/auth-rate-limit";
@@ -102,7 +102,7 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
   if (ownerName.length > MAX_SALON_NAME) {
     return { ok: false, message: "Name is too long." };
   }
-  if (!email || !EMAIL_RE.test(email)) {
+  if (!email || email.length > 254 || !EMAIL_RE.test(email)) {
     return { ok: false, message: "Enter a valid email address." };
   }
   if (phone && !PHONE_COMPACT_RE.test(phone)) {
@@ -151,7 +151,7 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
 
   const ipFp = rateLimitFingerprint(h, "signup-ip");
   if (!devRelaxed) {
-    const ipStatus = await getRateLimitStatus("authenticate", ipFp);
+    const ipStatus = await recordRateLimitFailure("authenticate", ipFp);
     if (!ipStatus.allowed) {
       return {
         ok: false,
@@ -159,6 +159,11 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
         retryAfterSeconds: ipStatus.retryAfterSeconds,
       };
     }
+  }
+
+  if (IS_PRODUCTION) {
+    const passwordCheck = await checkSignupPassword(password);
+    if (!passwordCheck.ok) return passwordCheck;
   }
 
   const ua = h.get("user-agent");
@@ -181,7 +186,6 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
   const companyCheck = await admin.rpc("company_name_exists", {p_name:legalCompanyName});
   if (companyCheck.error) return {ok:false,message:"The signup service could not check your company details. Please try again shortly."};
   if (companyCheck.data) {
-    await recordRateLimitFailure("authenticate", ipFp);
     return {ok:false,message:"An organisation with this legal company name already exists. Sign in to your existing account or contact support for access."};
   }
   const baseSlug = slugifySalonName(salonName);
@@ -218,14 +222,12 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
     }
     const raw = authError?.message?.toLowerCase() ?? "";
     if (raw.includes("already") || raw.includes("duplicate") || raw.includes("exists")) {
-      await recordRateLimitFailure("authenticate", ipFp);
-      return {
+        return {
         ok: false,
         message:
           "An account with this email already exists. Log in instead, or use a different email.",
       };
     }
-    await recordRateLimitFailure("authenticate", ipFp);
     return {
       ok: false,
       message: authError?.message ?? "Could not create account.",
@@ -256,7 +258,6 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
 
   if (accountErr || !accountRow?.id) {
     await admin.auth.admin.deleteUser(userId).catch(() => undefined);
-    await recordRateLimitFailure("authenticate", ipFp);
     return {
       ok: false,
       message: accountErr?.code === "23505" && accountErr.message.includes("company") ? "An organisation with this legal company name already exists. Sign in or contact support for access." : "Could not create your organisation. Please try again.",
@@ -289,7 +290,6 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
   if (orgErr || !orgRow?.id) {
     await admin.auth.admin.deleteUser(userId).catch(() => undefined);
     await admin.from("accounts").delete().eq("id", accountId).then(() => undefined);
-    await recordRateLimitFailure("authenticate", ipFp);
     return {
       ok: false,
       message: orgErr?.message ?? "Could not create organisation.",
@@ -328,15 +328,20 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
   }
 
   const willReview = devRelaxed ? false : shouldRouteToReview(fraud.score);
-  await admin
+  const { error: reviewError } = await admin
     .from("onboarding_applications")
     .insert({
       organization_id: orgId,
       review_status: willReview ? "pending_review" : "auto_approved",
       fraud_score: fraud.score,
       reasons: fraud.reasons,
-    })
-    .then(() => undefined);
+    });
+  if (reviewError) {
+    await admin.auth.admin.deleteUser(userId).catch(() => undefined);
+    await admin.from("organizations").delete().eq("id", orgId);
+    await admin.from("accounts").delete().eq("id", accountId);
+    return { ok: false, message: "We could not complete the security checks. Please try again." };
+  }
 
   try {
     await recordLegalAcceptances(admin, {

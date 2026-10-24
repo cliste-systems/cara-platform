@@ -3,7 +3,7 @@
 import Link from "next/link";
 import {AuthFormAlert} from "@/components/auth/auth-form-alert";
 import { useActionState, useState, type FormEvent } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Check, Phone, MessageSquare } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import {
@@ -146,6 +146,56 @@ export function PlanPicker({
     }
 
     setLegalHighlight(LEGAL_HIGHLIGHT_INITIAL);
+  }
+
+  if (configureAfterCheckout && !requiresDpaAcceptance) {
+    const selectedPlan = selfServePlans.find(p => p.tier === plan);
+    const sharedFeatures = selfServePlans[0]?.features.filter(feature => selfServePlans.every(p => p.features.includes(feature))) ?? [];
+    return (
+      <form action={formAction} onSubmit={handleSubmit} className="w-full space-y-5">
+        <input type="hidden" name="interval" value="month" />
+        <fieldset disabled={pending} className="min-w-0">
+          <legend className="sr-only">Choose your monthly plan</legend>
+          <div className="grid gap-3 md:grid-cols-3">
+            {selfServePlans.map(p => {
+              const selected = plan === p.tier;
+              return <label key={p.tier} className={cn("relative flex cursor-pointer flex-col rounded-[20px] border bg-white p-5 text-left transition-[border-color,box-shadow] duration-200 has-[:focus-visible]:border-[#292929] has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-[#292929]", selected ? "border-[#292929] ring-1 ring-[#292929]" : "border-[#dedede] hover:border-[#929292]", pending && "cursor-wait opacity-70")}>
+                <input className="sr-only" type="radio" name="planTier" value={p.tier} checked={selected} onChange={() => setPlan(p.tier)} />
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex flex-wrap items-center gap-2 text-base font-semibold text-[#292929]">{p.name}{p.recommended && <span className="rounded-full bg-[#eeeeee] px-2 py-1 text-[10px] font-medium text-[#444444]">Most Popular</span>}</span>
+                  <span className={cn("flex size-5 items-center justify-center rounded-full border", selected ? "border-[#292929] bg-[#292929] text-white" : "border-[#b8b8b8]")} aria-hidden>{selected && <Check size={12} strokeWidth={2.5} />}</span>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-[#626262] md:min-h-[40px]">{p.tagline}</p>
+                <div className="mt-4 flex items-baseline gap-1.5"><span className="text-[32px] font-semibold tracking-tight text-[#292929]">{formatEuro(p.monthlyCents)}</span><span className="text-xs text-[#626262]">/ month</span></div>
+                <div className="mt-4 space-y-2.5 border-t border-[#e5e5e5] pt-4">
+                  <p className="flex items-center gap-2 text-sm text-[#292929]"><Phone size={15} aria-hidden /><strong className="font-medium">{p.includedMinutes.toLocaleString()} minutes</strong><span className="text-xs text-[#626262]">/ month</span></p>
+                  <p className="flex items-center gap-2 text-sm text-[#292929]"><MessageSquare size={15} aria-hidden /><strong className="font-medium">{p.includedSms.toLocaleString()} SMS</strong><span className="text-xs text-[#626262]">/ month</span></p>
+                  <p className="text-[11px] leading-5 text-[#626262]">Extra usage: {formatEuro(p.overageRateCents)}/min · {formatEuro(p.smsOverageRateCents)}/SMS</p>
+                  <p className="text-[11px] leading-5 text-[#626262]">Around {Math.floor(p.includedMinutes / 2).toLocaleString()} calls at 2 minutes each</p>
+                </div>
+                {p.features.filter(f => !sharedFeatures.includes(f)).map(f => <p key={f} className="mt-2 text-xs text-[#626262]">{f}</p>)}
+                <div className="mt-4 space-y-2.5 border-t border-[#e5e5e5] pt-4">
+                  {[
+                    { text: "Cara answers your calls 24/7" },
+                    { text: "Transcripts, summaries & callbacks" },
+                    { text: "Knowledge Base & dashboard" },
+                    { text: "Keep your number with call forwarding" },
+                  ].map(({ text }) => <p key={text} className="flex items-start gap-2 text-xs leading-5 text-[#626262]"><Check size={15} strokeWidth={1.5} className="mt-0.5 shrink-0 text-[#292929]" aria-hidden /><span>{text}</span></p>)}
+                </div>
+
+              </label>;
+            })}
+          </div>
+        </fieldset>
+        <AuthFormAlert title="Plan could not be continued" message={errorMessage} />
+        <div className="mx-auto w-full max-w-[600px] space-y-3">
+          {previewCheckoutPath ? <Link href={`${previewCheckoutPath}?plan=${plan}`} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[#292929] px-5 text-sm font-medium text-white transition-colors hover:bg-[#151515]">Continue to setup options <ArrowRight size={16} aria-hidden /></Link>
+            : <OnboardingPrimaryButton type="submit" disabled={pending} pending={pending} className="w-full max-w-none bg-[#292929] shadow-none hover:bg-[#151515]">{pending ? "Continuing…" : "Continue to setup options"}{!pending && <ArrowRight size={16} aria-hidden />}</OnboardingPrimaryButton>}
+          <p role="status" className="text-center text-xs text-[#626262]">{selectedPlan?.name} selected · {formatEuro(selectedPlan?.monthlyCents ?? 0)}/month after your trial</p>
+        </div>
+
+      </form>
+    );
   }
 
   return (

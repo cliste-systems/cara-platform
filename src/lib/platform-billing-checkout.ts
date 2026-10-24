@@ -1,4 +1,5 @@
 import "server-only";
+import { finalizeSignupBilling } from "@/lib/signup-billing-security";
 import { reserveSignupPoolNumber } from "@/lib/reserve-signup-number";
 
 import { headers } from "next/headers";
@@ -266,6 +267,13 @@ export async function persistPlatformCheckoutSession(
   if (!accountId) {
     throw new Error("Organisation is not linked to an account.");
   }
+  if (co.metadata?.cliste_signup_flow === "simple_v1") {
+    if (!subscriptionId) throw new Error("Missing subscription.");
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    if (!["active", "trialing"].includes(subscription.status) || subscription.metadata.cliste_account_id !== accountId || subscription.metadata.cliste_organization_id !== organizationId) throw new Error("Invalid subscription.");
+    await finalizeSignupBilling(accountId, organizationId, subscription);
+    return;
+  }
   const billingPatch = {
     platform_subscription_id: subscriptionId,
     platform_customer_id: customerId,
@@ -291,7 +299,7 @@ export async function activatePlatformSubscriptionGoLive(
   const admin = createAdminClient();
   const { data: account } = await admin
     .from("accounts")
-    .select("platform_subscription_id, platform_customer_id")
+    .select("platform_subscription_id, platform_customer_id, status")
     .eq("id", accountId)
     .maybeSingle();
 
@@ -304,11 +312,8 @@ export async function activatePlatformSubscriptionGoLive(
 
   const nowIso = new Date().toISOString();
   if (options?.dashboardOnly) {
-    await patchAccountAndLocations(accountId, {
-      platform_subscription_id: subscriptionId,
-      platform_customer_id: account?.platform_customer_id ?? null,
-      status: "active", updated_at: nowIso,
-    }, { primaryOrganizationId: organizationId });
+    // Activation was committed atomically by finalize_signup_billing.
+    if (account?.status !== "active") throw new Error("Billing has not been confirmed.");
     // Confirmed payment setup reserves existing inventory, without activating calls.
     // An empty pool must not fail checkout or trigger a paid purchase.
     try { await reserveSignupPoolNumber(organizationId); } catch { console.warn("[signup] Pool reservation unavailable; workspace remains accessible."); }

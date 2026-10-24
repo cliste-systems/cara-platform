@@ -12,7 +12,7 @@ function fixture(options: {org?:string; account?:string; customer?:string; inten
     setupIntents:{retrieve:async()=>({id:"seti_qa",status:options.intentStatus??"succeeded",customer:options.customer??"cus_qa",payment_method:"pm_qa",metadata:{cliste_subscription_id:"sub_qa"}})},
     customers:{update:async()=>{writes.push("customer");}},
   };
-  const imports:Record<string,unknown>={"server-only":{},"@/lib/cliste-plans":{},"@/lib/account-access":{},"@/lib/account-billing":{patchAccountAndLocations:async()=>{writes.push("database");}},"@/lib/onboarding-session":{},"@/lib/platform-billing-checkout":{},"@/lib/stripe":{getStripeClient:()=>stripe},"@/utils/supabase/admin":{}};
+  const imports:Record<string,unknown>={"@/lib/signup-billing-security":{},"server-only":{},"@/lib/cliste-plans":{},"@/lib/account-access":{},"@/lib/account-billing":{patchAccountAndLocations:async()=>{writes.push("database");}},"@/lib/onboarding-session":{},"@/lib/platform-billing-checkout":{},"@/lib/stripe":{getStripeClient:()=>stripe},"@/utils/supabase/admin":{}};
   const source=readFileSync(new URL("./platform-billing-elements.ts",import.meta.url),"utf8");
   const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
   const mod={exports:{}};

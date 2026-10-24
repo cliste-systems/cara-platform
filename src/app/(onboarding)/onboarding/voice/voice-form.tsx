@@ -10,6 +10,8 @@ import {
 } from "react";
 import { ArrowRight, ChevronDown, Loader2, Lock, Pause, Pencil, Play } from "lucide-react";
 
+import Link from "next/link";
+import { SignupVoiceCard } from "@/components/onboarding/signup-voice-card";
 import {AuthFormAlert} from "@/components/auth/auth-form-alert";
 import { OnboardingEnter } from "@/components/onboarding/onboarding-enter";
 import {
@@ -90,6 +92,7 @@ export function VoiceForm({ businessName, defaultGreeting, visualPreview=false, 
   const [greetingIntro, setGreetingIntro] = useState(parsed.intro);
   const [greetingClosing, setGreetingClosing] = useState(parsed.closing);
   const [playing, setPlaying] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -122,7 +125,7 @@ export function VoiceForm({ businessName, defaultGreeting, visualPreview=false, 
   const continuePending = reviewing || pending;
 
   useEffect(() => {
-    return () => stopVoicePreview();
+    return () => { playRequestRef.current += 1; stopVoicePreview(); };
   }, []);
 
   useEffect(() => {
@@ -185,6 +188,7 @@ export function VoiceForm({ businessName, defaultGreeting, visualPreview=false, 
     const requestId = ++playRequestRef.current;
     setPreviewError(null);
     setPreviewLoading(true);
+    setElapsed(0);
 
     try {
       const check = await validateVoiceGreetingPreviewStep(payload);
@@ -201,7 +205,7 @@ export function VoiceForm({ businessName, defaultGreeting, visualPreview=false, 
         return;
       }
 
-      const result = await speakVoicePreview(previewLine, payload, { onEnded: () => setPlaying(false) });
+      const result = await speakVoicePreview(previewLine, payload, { onEnded: () => setPlaying(false), onTimeUpdate: setElapsed });
       if (requestId !== playRequestRef.current) return;
 
       setPreviewLoading(false);
@@ -317,11 +321,11 @@ export function VoiceForm({ businessName, defaultGreeting, visualPreview=false, 
         onSubmit={handleSubmit}
         error={formLevelError}
         footer={
-          <OnboardingPrimaryButton
+          visualPreview && !allowEditing ? <Link href="/preview/signup/plans" className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#292929] text-sm font-medium text-white hover:bg-[#151515]">Continue to plans <ArrowRight size={16} aria-hidden /></Link> : <OnboardingPrimaryButton
             type="submit"
             pending={continuePending}
             disabled={visualPreview}
-            className={cn("w-full", !allowEditing && "lg:max-w-[260px]")}
+            className={cn("w-full", !allowEditing && "max-w-none bg-[#292929] shadow-none hover:bg-[#151515]")}
           >
             {pending ? "Saving…" : reviewing ? "Checking…" : continueLabel}
             {!continuePending ? (
@@ -334,32 +338,12 @@ export function VoiceForm({ businessName, defaultGreeting, visualPreview=false, 
       >
         <OnboardingEnter tone="profile">
           {!allowEditing ? (
-            <section aria-label="Your personalised greeting" className="text-center">
-              <div className="rounded-xl border border-slate-200 bg-white px-6 py-7 sm:px-8 md:grid md:grid-cols-2 md:items-center md:gap-6 md:py-9 lg:grid-cols-1 lg:gap-7 lg:px-10 lg:py-9">
-                <div className="md:text-left lg:text-center">
-                <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-slate-500">Your callers’ first hello</p>
-                <p className="mt-5 text-xl leading-8 tracking-[-0.02em] text-slate-800">
-                  “{highlightBusinessName((greetingIntro.trim() || defaultIntro).replace(/\s*[—–-]\s*$/, ""), businessName)}.”
-                </p>
-                </div>
-                <div className="lg:pb-1">
-                <div className="mt-7 flex items-center justify-center gap-4 md:mt-0 lg:gap-7">
-                  <div aria-hidden="true" className="flex h-10 items-center gap-1">
-                    {[10, 20, 30, 18, 36, 24, 12].map((height, index) => <span key={index} style={{ height }} className="w-[3px] rounded-full bg-slate-300" />)}
-                  </div>
-                  <button type="button" onClick={() => void handlePlayToggle()} disabled={previewLoading || visualPreview || continuePending} aria-label={previewLoading ? "Preparing greeting" : playing ? "Stop playback" : "Hear your greeting"} aria-busy={previewLoading} className="flex size-16 shrink-0 items-center justify-center rounded-full bg-[#0b1220] text-white transition-colors hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-600 disabled:opacity-50 lg:size-24 lg:disabled:opacity-100 lg:shadow-[0_0_0_10px_#f1f5f9,0_0_0_11px_#e2e8f0]">
-                    {previewLoading ? <Loader2 className="size-6 animate-spin lg:size-8" aria-hidden /> : playing ? <Pause className="size-6 lg:size-8" aria-hidden /> : <Play className="ml-1 size-6 lg:size-8" aria-hidden />}
-                  </button>
-                  <div aria-hidden="true" className="flex h-10 items-center gap-1">
-                    {[12, 24, 36, 18, 30, 20, 10].map((height, index) => <span key={index} style={{ height }} className="w-[3px] rounded-full bg-slate-300" />)}
-                  </div>
-                </div>
-                <p role="status" className="mt-4 text-sm font-medium text-slate-700 lg:mt-6">{previewLoading ? "Preparing your greeting…" : playing ? "Playing your greeting" : "Hear your greeting"}</p>
-                <p className="mt-2 text-xs leading-5 text-slate-500">This is how Cara will welcome your callers.</p>
-                </div>
-                <AuthFormAlert title="Greeting preview unavailable" message={previewError} className="mt-4 md:col-span-2"/>
-              </div>
-            </section>
+            <SignupVoiceCard
+              greeting={highlightBusinessName(previewLine, businessName)}
+              playing={playing} loading={previewLoading} error={previewError}
+              elapsed={elapsed} onPlay={() => void handlePlayToggle()}
+              sample={visualPreview} disabled={continuePending}
+            />
           ) : <>
           <section aria-label="Your personalised greeting" className="overflow-hidden rounded-2xl border border-slate-200/75 bg-white">
             <div className="px-5 pb-5 pt-5 sm:px-6 sm:pt-6">

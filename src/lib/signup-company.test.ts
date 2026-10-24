@@ -11,7 +11,7 @@ function fixture({duplicate=false,race=false,legalFailure=false}={}) {
   const query={select(){return query;},eq(){return query;},insert(value:Record<string,unknown>){writes.push({table,value});return query;},delete(){deleted.push(table);return query;},maybeSingle:async()=>({data:null,error:null}),single:async()=>race && table==="accounts" ? {data:null,error:{code:"23505",message:"company name already exists"}} : {data:{id:table==="accounts" ? "legal-account" : "trading-business"},error:null},then(resolve:(value:unknown)=>unknown){return Promise.resolve({data:null,error:null}).then(resolve);}};
   return query;
  }};
- const imports:Record<string,unknown>={
+ const imports:Record<string,unknown>={"@/lib/signup-password-security":{},
   "@/lib/public-signup-flow":{signupDetails,PUBLIC_SIGNUP_FLOW},"@/lib/public-signup":{isPublicSignupEnabled:()=>true},
   "next/headers":{headers:async()=>new Headers(),cookies(){}},"next/cache":{revalidatePath:(path:string)=>invalidated.push(path)},
   "@/lib/auth-rate-limit":{rateLimitFingerprint:()=>"fixture",recordRateLimitFailure:async()=>{}},

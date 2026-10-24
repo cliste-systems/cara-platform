@@ -80,7 +80,7 @@ export function OnboardingStepShell({
     .replace(/^\/preview\/signup\/billing$/, "/signup/plan/checkout")
     .replace(/^\/preview\/signup\/[^/]+\/checkout$/, "/signup/plan/checkout")
     .replace(/^\/preview\/signup\/[^/]+\/plan$/, "/signup/plan");
-  const signupStage = signupPath === "/signup/voice" ? "voice" : signupPath.startsWith("/signup/plan/checkout") ? "billing" : signupPath === "/signup/plan" ? "plans" : null;
+  const signupStage = signupPath === "/signup/voice" ? "voice" : signupPath.startsWith("/signup/plan/checkout") ? (signupScene === "setup" ? "setup" : "billing") : signupPath === "/signup/plan" ? "plans" : null;
   if (signupStage) return <SignupBrandFrame backAction={backAction} backDisabled={backDisabled} scene={signupScene} stage={signupStage} title={contentOnly ? undefined : title} description={contentOnly ? undefined : description}>{children}</SignupBrandFrame>;
 
   return (

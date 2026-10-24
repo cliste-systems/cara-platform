@@ -7,5 +7,5 @@ export function AuthFormAlert({ message, title, className }: {
   title?: string;
   className?: string;
 }) {
-  return <FormFeedback message={message} title={title} className={className}/>;
+  return <FormFeedback message={message} title={title} className={className} focusOnError/>;
 }

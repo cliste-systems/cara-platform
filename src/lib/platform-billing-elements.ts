@@ -1,5 +1,6 @@
 import "server-only";
 
+import { finalizeSignupBilling } from "@/lib/signup-billing-security";
 import type Stripe from "stripe";
 
 import { patchAccountAndLocations } from "@/lib/account-billing";
@@ -40,6 +41,7 @@ type ElementsCheckoutInput = {
   devPreview?: boolean;
   signupFlow?: string;
   idempotencyKey?: string;
+  trialEnd?: number;
 };
 
 function subscriptionCustomerId(subscription: Stripe.Subscription): string | null {
@@ -258,7 +260,7 @@ export async function createPlatformElementsCheckout(
     const subscription = await stripe.subscriptions.create({
       customer: customer.id,
       items: lineItems,
-      trial_period_days: PLATFORM_TRIAL_DAYS,
+      ...(input.trialEnd ? { trial_end: input.trialEnd } : { trial_period_days: PLATFORM_TRIAL_DAYS }),
       ...(input.signupFlow ? {trial_settings:{end_behavior:{missing_payment_method:"cancel" as const}}} : {}),
       payment_behavior: "default_incomplete",
       payment_settings: { save_default_payment_method: "on_subscription" },
@@ -451,7 +453,11 @@ export async function persistPlatformElementsSubscription(input: {
     platform_customer_id: customerId,
     updated_at: new Date().toISOString(),
   };
-  await patchAccountAndLocations(accountId, billingPatch);
+  if (subscription.metadata?.cliste_signup_flow === "simple_v1") {
+    await finalizeSignupBilling(accountId, input.organizationId, subscription);
+  } else {
+    await patchAccountAndLocations(accountId, billingPatch);
+  }
 
   return { customerId, signupFlow: subscription.metadata?.cliste_signup_flow };
 }
@@ -494,7 +500,7 @@ export async function activateElementsOnboardingIfReady(input: {
       input.organizationId,
       err,
     );
-    return false;
+    throw err;
   }
 }
 

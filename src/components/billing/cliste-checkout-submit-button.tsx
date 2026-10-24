@@ -32,6 +32,7 @@ export function ClisteCheckoutSubmitButton({
 
   return (
     <motion.button
+      data-signup-primary
       type="submit"
       disabled={disabled || isLoading || isSuccess}
       aria-busy={isLoading}
@@ -40,7 +41,7 @@ export function ClisteCheckoutSubmitButton({
         ONBOARDING_PRIMARY_BUTTON,
         "relative h-12 w-full overflow-hidden px-6 text-[15px]",
         isSuccess &&
-          "border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-700 hover:text-white",
+          "border-[#292929] bg-[#292929] text-white hover:bg-[#292929] hover:text-white",
         className,
       )}
       animate={

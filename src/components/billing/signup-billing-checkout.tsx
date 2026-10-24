@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
+import { Check } from "lucide-react";
 import { PlanCheckoutFlow } from "./plan-checkout-flow";
 import { AuthFormAlert } from "@/components/auth/auth-form-alert";
 import type { PlatformElementsCheckoutSummary } from "@/lib/platform-billing-elements";
@@ -22,20 +23,18 @@ export function SignupBillingCheckout({initialCheckout,onSetupChange,onPersist,p
   const [checkout,setCheckout]=useState(initialCheckout);
   const [pending,startTransition]=useTransition();
   const [error,setError]=useState("");
-  const [coverageOpen, setCoverageOpen] = useState(false);
-  const coverageId = useId();
   const setupOptions: { value: SetupChoice; label: string; price: string; description: string }[] = [
-    { value: "diy", label: "Set up myself", price: "Free", description: "Configure Cara yourself in your dashboard." },
-    { value: "remote", label: "Remote setup", price: "€199 once", description: "An online meeting with our engineer to set up Cara remotely and walk you through your dashboard." },
-    { value: "onsite_dublin", label: "In-person setup", price: "€399 once", description: "Our engineer visits your business to set up Cara and walk you through your dashboard in person." },
+    { value: "diy", label: "Set up myself", price: "Free", description: "Follow our guided setup." },
+    { value: "remote", label: "Remote setup", price: "€199", description: "An engineer fully sets up Cara for your business over a video call." },
+    { value: "onsite_dublin", label: "In-person setup", price: "€399", description: "An engineer visits your business, fully sets up Cara and trains your team to use it." },
   ];
-  const setupControl = <fieldset disabled={pending} aria-busy={pending} className="mt-3 border-t border-slate-200/70 pt-3">
+  const setupControl = <fieldset disabled={pending} aria-busy={pending} className="min-w-0 text-left">
     <legend className="sr-only">Optional setup help</legend>
-    <p aria-hidden="true" className="mb-2 text-xs font-medium text-slate-600">Optional setup help</p>
-    <div className="divide-y divide-slate-200/70 border-y border-slate-200/70">
+    <p aria-hidden="true" className="mb-3 text-sm font-medium text-[#292929]">Optional setup help</p>
+    <div className="space-y-5">
       {setupOptions.map((option) => {
         const selected = (checkout.summary.setupTier ?? "diy") === option.value;
-        return <label key={option.value} className={`relative flex cursor-pointer items-start gap-3 px-3 py-2 transition-colors hover:bg-slate-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-slate-500 ${selected ? "bg-slate-50" : "bg-white"} ${pending ? "cursor-wait opacity-60" : ""}`}>
+        return <label key={option.value} className={`relative flex cursor-pointer items-start gap-3 rounded-[20px] border p-4 sm:p-5 transition-[border-color,box-shadow,background-color] duration-300 motion-reduce:transition-none has-[:focus-visible]:border-[#292929] has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-[#292929] ${selected ? "border-[#292929] ring-1 ring-[#292929]" : "border-[#dedede] hover:border-[#929292]"} bg-white ${pending ? "cursor-wait" : ""}`}>
           <input type="radio" name="billing_setup" value={option.value} checked={selected} onChange={() => {
             setError("");
             startTransition(async () => {
@@ -47,30 +46,21 @@ export function SignupBillingCheckout({initialCheckout,onSetupChange,onPersist,p
                 setError("Setup options could not be updated. Please try again.");
               }
             });
-          }} className="mt-0.5 size-4 shrink-0 appearance-none rounded-full border border-slate-300 bg-white checked:border-[5px] checked:border-[#0b1220] focus:outline-none" />
+          }} className="sr-only" />
+          <span aria-hidden className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors duration-300 motion-reduce:transition-none ${selected ? "border-[#292929] bg-[#292929] text-white" : "border-[#b8b8b8]"}`}><Check size={12} strokeWidth={2.5} className={`transition-[opacity,transform] duration-200 motion-reduce:transition-none ${selected ? "scale-100 opacity-100" : "scale-75 opacity-0"}`} /></span>
           <span className="min-w-0 flex-1">
-            <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs leading-5">
-              <span className="font-medium text-[#0b1220]">{option.label}</span>
-              <span className="shrink-0 text-slate-600">{option.price}</span>
-            </span>
-            <span className="mt-1 block text-xs leading-[1.5] text-slate-500">{option.description}</span>
+            <span className="flex flex-wrap items-center gap-2 text-sm font-medium leading-5 text-[#292929]">{option.label}{option.value === "remote" && <span className="absolute -top-2.5 left-4 rounded-full bg-[#eeeeee] px-2.5 py-0.5 text-[10px] font-medium leading-4 text-[#444444]">Recommended</span>}</span>
+            <span className="mt-1.5 block text-xs leading-5 text-[#626262]">{option.description}</span>
+          </span>
+          <span className="flex min-w-[66px] shrink-0 flex-col items-end gap-1 pl-1">
+            <span className="text-xl font-semibold leading-6 tracking-tight text-[#292929]">{option.price}</span>
+            <span className="text-[11px] text-[#626262]">{option.value === "diy" ? "No setup fee" : "One-off"}</span>
           </span>
         </label>;
       })}
     </div>
-    <div className="mt-3 text-[11px] leading-[1.6] text-slate-500">
-      <button type="button" aria-expanded={coverageOpen} aria-controls={coverageId} onClick={() => setCoverageOpen((open) => !open)} className="inline-flex cursor-pointer items-center gap-1.5 text-slate-600 underline decoration-slate-300 underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-500">
-        View in-person coverage
-        <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" className={`size-3 transition-transform duration-300 motion-reduce:transition-none ${coverageOpen ? "rotate-180" : ""}`}><path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-      </button>
-      <div id={coverageId} aria-hidden={!coverageOpen} className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out motion-reduce:transition-none ${coverageOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
-        <div className="min-h-0 overflow-hidden">
-          <p className="pt-2">Donegal, Sligo, Leitrim, Mayo, Roscommon, Longford, Cavan, Monaghan, Westmeath, Meath, Louth, Dublin and Galway. Your location will be confirmed before your in-person setup booking is finalised.</p>
-        </div>
-      </div>
-    </div>
-    {pending ? <p role="status" className="mt-2 text-xs text-slate-500">Updating billing…</p> : null}
+    {pending ? <p role="status" className="sr-only">Updating billing…</p> : null}
     <AuthFormAlert message={error}/>
   </fieldset>;
-  return <PlanCheckoutFlow key={`${checkout.subscriptionId}-${initialPaymentStep}`} initialPaymentStep={!setupPreviewOnly && preview && initialPaymentStep} {...checkout} continueHref={previewContinueHref??"/dashboard?welcome=1"} onPersist={onPersist} configureAfterCheckout={!preview||Boolean(previewContinueHref)} setupControl={setupControl} setupBusy={pending || setupPreviewOnly} />;
+  return <PlanCheckoutFlow initialPaymentStep={!setupPreviewOnly && preview && initialPaymentStep} {...checkout} continueHref={previewContinueHref??"/dashboard?welcome=1"} onPersist={onPersist} configureAfterCheckout={!preview||Boolean(previewContinueHref)} setupControl={setupControl} setupBusy={pending || setupPreviewOnly} />;
 }

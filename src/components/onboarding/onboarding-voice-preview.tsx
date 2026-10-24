@@ -17,7 +17,7 @@ export function stopVoicePreview() {
 export async function speakVoicePreview(
   line: string,
   parts?: { greetingIntro: string; greetingClosing: string },
-  options?: { onEnded?: () => void },
+  options?: { onEnded?: () => void; onTimeUpdate?: (seconds: number) => void },
 ): Promise<
   | { ok: true }
   | {
@@ -67,6 +67,7 @@ export async function speakVoicePreview(
     const blob = await response.blob();
     activeObjectUrl = URL.createObjectURL(blob);
     activeAudio = new Audio(activeObjectUrl);
+    activeAudio.ontimeupdate = () => options?.onTimeUpdate?.(activeAudio?.currentTime ?? 0);
     activeAudio.onended = () => {
       stopVoicePreview();
       options?.onEnded?.();

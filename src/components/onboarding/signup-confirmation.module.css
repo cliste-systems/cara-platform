@@ -1,0 +1,26 @@
+@keyframes arrive {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes drawCheck {
+  from { stroke-dashoffset: 30; }
+  to { stroke-dashoffset: 0; }
+}
+.graphic { animation: arrive 650ms cubic-bezier(.22,1,.36,1) both; }
+.confirmed { animation: arrive 450ms 180ms cubic-bezier(.22,1,.36,1) both; }
+.check path, .check polyline {
+  stroke-dasharray: 30;
+  animation: drawCheck 450ms 350ms ease-out both;
+}
+.heading { animation: arrive 500ms 280ms cubic-bezier(.22,1,.36,1) both; }
+.description { animation: arrive 500ms 360ms cubic-bezier(.22,1,.36,1) both; }
+.action { animation: arrive 500ms 440ms cubic-bezier(.22,1,.36,1) both; }
+.action svg { transition: transform 180ms ease; }
+.action:hover svg { transform: translateX(3px); }
+.action:active svg { transform: translateX(1px); }
+@media (prefers-reduced-motion: reduce) {
+  .graphic, .confirmed, .heading, .description, .action,
+  .check path, .check polyline { animation: none; }
+  .action svg { transition: none; }
+  .action:hover svg, .action:active svg { transform: none; }
+}

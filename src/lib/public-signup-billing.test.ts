@@ -13,11 +13,11 @@ function fixture(checkout?: Record<string,unknown>,poolFailure=false) {
   const sessions:Record<string,unknown>[]=[];
   let provisioned=0,reserved=0;
   const admin={from(table:string){
-    const query={select(){return query;},eq(){return query;},in(){return query;},update(patch:Record<string,unknown>){mutations.push({table,patch});return query;},maybeSingle:async()=>({data:{platform_subscription_id:"sub_test",platform_customer_id:"cus_test"},error:null}),then(resolve:(v:unknown)=>unknown){return Promise.resolve({data:[],error:null}).then(resolve);}};
+    const query={select(){return query;},eq(){return query;},in(){return query;},update(patch:Record<string,unknown>){mutations.push({table,patch});return query;},maybeSingle:async()=>({data:{platform_subscription_id:"sub_test",platform_customer_id:"cus_test",status:"active"},error:null}),then(resolve:(v:unknown)=>unknown){return Promise.resolve({data:[],error:null}).then(resolve);}};
     return query;
   }};
   const stripe={prices:{list:async(input:{lookup_keys:string[]})=>({data:input.lookup_keys.map(key=>({lookup_key:key,id:"price_"+key}))})},checkout:{sessions:{create:async(payload:Record<string,unknown>)=>{sessions.push(payload);return {url:"https://checkout.stripe.com/test"};},retrieve:async()=>checkout??{status:"complete",payment_status:"no_payment_required",subscription:"sub_test",customer:"cus_test",metadata:{cliste_organization_id:"another-org",cliste_account_id:"another-account"}}}}};
-  const imports:Record<string,unknown>={
+  const imports:Record<string,unknown>={"@/lib/signup-billing-security":{},
     "@/lib/reserve-signup-number":{reserveSignupPoolNumber:async()=>{reserved++;if(poolFailure)throw new Error("pool unavailable");return {ok:true};}},
     "server-only":{},"next/headers":{headers:async()=>new Headers()},"next/cache":{revalidatePath(){}},
     "@/lib/account-billing":{patchAccountAndLocations:async(_id:string,patch:Record<string,unknown>)=>{patches.push(patch);}},
@@ -49,8 +49,8 @@ test("checkout collects a payment method, retains the trial, and tags the simpli
 
 test("paid signup reserves existing inventory without switching Cara live or buying a phone",async()=>{
   const f=fixture();await f.api.activatePlatformSubscriptionGoLive("org-1",{dashboardOnly:true});
-  assert.equal(f.patches[0].status,"active");
-  assert.equal(f.patches[0].launch_status,undefined);
+  assert.equal(f.patches.length,0);
+  assert.equal(f.patches.length,0);
   assert.equal(f.provisioned(),0);
   assert.equal(f.reserved(),1);
   assert.equal(f.mutations.some(m=>m.patch.is_active===true),false);
@@ -74,4 +74,4 @@ test("an unfinished checkout never updates billing",async()=>{
   assert.equal(f.mutations.length,0);
 });
 
-test("pool failure does not undo confirmed billing or activate calls",async()=>{const f=fixture(undefined,true);await f.api.activatePlatformSubscriptionGoLive("org-1",{dashboardOnly:true});assert.equal(f.patches[0].status,"active");assert.equal(f.provisioned(),0);assert.equal(f.mutations.some(m=>m.patch.is_active===true),false);});
+test("pool failure does not undo confirmed billing or activate calls",async()=>{const f=fixture(undefined,true);await f.api.activatePlatformSubscriptionGoLive("org-1",{dashboardOnly:true});assert.equal(f.patches.length,0);assert.equal(f.provisioned(),0);assert.equal(f.mutations.some(m=>m.patch.is_active===true),false);});

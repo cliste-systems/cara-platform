@@ -60,6 +60,7 @@ export function OnboardingPrimaryButton({
   if (reduceMotion) {
     return (
       <button
+        data-signup-primary
         type={type}
         disabled={isDisabled}
         onClick={onClick}
@@ -76,7 +77,8 @@ export function OnboardingPrimaryButton({
 
   return (
     <motion.button
-      type={type}
+      data-signup-primary
+        type={type}
       disabled={isDisabled}
       onClick={onClick}
       form={form}
@@ -84,11 +86,11 @@ export function OnboardingPrimaryButton({
       value={value}
       aria-label={ariaLabel}
       className={cn(ONBOARDING_PRIMARY_BUTTON, className)}
-      whileHover={isDisabled ? undefined : { y: -2, scale: 1.02 }}
-      whileTap={isDisabled ? undefined : { scale: 0.98, y: 0 }}
+      whileHover={isDisabled ? undefined : { y: -1 }}
+      whileTap={isDisabled ? undefined : { scale: 0.995, y: 0 }}
       transition={{ type: "spring", stiffness: 420, damping: 24 }}
     >
-      <PrimaryButtonContent showShimmer={!isDisabled}>
+      <PrimaryButtonContent showShimmer={false}>
         {children}
       </PrimaryButtonContent>
     </motion.button>

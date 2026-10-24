@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import type { TurnstileInstance } from "@marsidev/react-turnstile";
@@ -31,12 +31,6 @@ export function SignupForm({ planTier, billingInterval, skipTurnstile = false }:
   const [pending, setPending] = useState(false);
   const [visible, setVisible] = useState(false);
   const [openingNextStep, setOpeningNextStep] = useState(false);
-  const [slow, setSlow] = useState(false);
-  useEffect(() => {
-    if (!pending) return;
-    const timer = window.setTimeout(() => setSlow(true), 8000);
-    return () => window.clearTimeout(timer);
-  }, [pending]);
   const [error, setError] = useState<string | null>(null);
   const turnstile = useRef<TurnstileInstance | null>(null);
   const siteKey = skipTurnstile ? "" : process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
@@ -46,7 +40,6 @@ export function SignupForm({ planTier, billingInterval, skipTurnstile = false }:
     if (pending || !validation.validate(event.currentTarget)) return;
     const data = new FormData(event.currentTarget);
     setError(null);
-    setSlow(false);
     setOpeningNextStep(false);
     const token = turnstile.current?.getResponse();
     if (siteKey && (!token || turnstile.current?.isExpired())) {
@@ -103,18 +96,16 @@ export function SignupForm({ planTier, billingInterval, skipTurnstile = false }:
           </div>
         {validation.error("password")}</OnboardingFieldBox>
         </div>
-        <LegalAcceptanceCheckbox id="signup-legal" name="acceptLegal" inputProps={validation.props("acceptLegal")} required compact>
-          I’m authorised to accept the <LegalDocLink href="/legal/terms">terms of service</LegalDocLink> and <LegalDocLink href="/legal/dpa">Data Processing Agreement</LegalDocLink> for this business, allowing HelloCara to process callers’ data when we go live. I acknowledge the <LegalDocLink href="/legal/privacy">privacy notice</LegalDocLink>.
+        <LegalAcceptanceCheckbox id="signup-legal" name="acceptLegal" className="shadow-none border-slate-200 bg-white" inputProps={validation.props("acceptLegal")} required compact>
+          I’m authorised to accept the <LegalDocLink href="/legal/terms">Terms of Service</LegalDocLink> and <LegalDocLink href="/legal/dpa">Data Processing Agreement</LegalDocLink> for this business, and acknowledge the <LegalDocLink href="/legal/privacy">Privacy Notice</LegalDocLink>.
+          {validation.error("acceptLegal")}
         </LegalAcceptanceCheckbox>
-        {validation.error("acceptLegal")}
       </fieldset>
-      {validation.summary}
       {siteKey ? <AuthTurnstileField ref={turnstile} siteKey={siteKey} onSuccess={() => setError(null)} onExpire={() => turnstile.current?.reset()} /> : null}
       <AuthFormAlert message={error} />
       <OnboardingPrimaryButton type="submit" pending={pending} disabled={pending||!clientReady} className="w-full max-w-none shadow-none">
         {pending ? openingNextStep ? "Opening the next step…" : "Creating your account…" : "Create account"}<ArrowRight size={16} aria-hidden />
       </OnboardingPrimaryButton>
-      {pending && slow ? <p role="status" className="text-center text-xs leading-5 text-slate-500">{openingNextStep ? "Your account is created. The next page is taking a little longer to load." : "This is taking longer than usual. We’re still waiting for the signup service."}</p> : null}
     </form>
   </OnboardingFieldSurfaceProvider>;
 }

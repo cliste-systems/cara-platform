@@ -30,6 +30,7 @@ export function LegalAcceptanceCheckbox({
 }: Props) {
   return (
     <label
+      data-legal-acceptance
       htmlFor={id}
       className={cn(
         "flex cursor-pointer items-start gap-2.5 text-left text-slate-600 shadow-sm",

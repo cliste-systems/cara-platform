@@ -18,8 +18,7 @@ export default function LocalSignupPlansPreview() {
   return (
     <main className="flex min-h-dvh flex-col bg-white">
       <SignupBrandFrame stage="plans" title="Choose your plan" description={`${PLATFORM_TRIAL_DAYS} days free, then monthly billing. Card required. Cancel anytime.`}>
-        <PlanPicker plans={plans} defaultPlan="pro" defaultInterval="month" checkoutAction={previewCheckout} configureAfterCheckout />
-        <p className="mt-5 text-center text-xs leading-5 text-slate-500">Local preview · Compare and select plans · No checkout or subscription is created</p>
+        <PlanPicker plans={plans} defaultPlan="pro" defaultInterval="month" checkoutAction={previewCheckout} previewCheckoutPath="/preview/signup/billing" configureAfterCheckout />
       </SignupBrandFrame>
     </main>
   );
