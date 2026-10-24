@@ -90,3 +90,6 @@
 .frame [data-feedback-slot] { margin-block:0; }
 .frame [data-feedback-tone] { margin-block:12px; }
 .frame [data-signup-primary] svg { color:inherit; }
+
+/* A background security check must not create an empty row between fields and feedback. */
+.frame [data-signup-form] [data-auth-turnstile] { margin-block:0; }

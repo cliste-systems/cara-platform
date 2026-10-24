@@ -10,6 +10,7 @@ type Props = {
   onSuccess: (token: string) => void;
   onExpire: () => void;
   className?: string;
+  onError?: () => void;
 };
 
 /**
@@ -20,7 +21,7 @@ type Props = {
  */
 export const AuthTurnstileField = forwardRef<TurnstileInstance, Props>(
   function AuthTurnstileField(
-    { siteKey, onSuccess, onExpire, className },
+    { siteKey, onSuccess, onExpire, onError, className },
     ref,
   ) {
     return (
@@ -36,6 +37,9 @@ export const AuthTurnstileField = forwardRef<TurnstileInstance, Props>(
           siteKey={siteKey}
           onSuccess={onSuccess}
           onExpire={onExpire}
+          onError={onError}
+          onUnsupported={onError}
+          onTimeout={onError}
           options={{
             theme: "light",
             size: "flexible",

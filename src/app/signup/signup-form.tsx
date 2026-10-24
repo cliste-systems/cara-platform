@@ -32,6 +32,7 @@ export function SignupForm({ planTier, billingInterval, skipTurnstile = false }:
   const [visible, setVisible] = useState(false);
   const [openingNextStep, setOpeningNextStep] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [securityError, setSecurityError] = useState(false);
   const turnstile = useRef<TurnstileInstance | null>(null);
   const siteKey = skipTurnstile ? "" : process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
 
@@ -43,7 +44,8 @@ export function SignupForm({ planTier, billingInterval, skipTurnstile = false }:
     setOpeningNextStep(false);
     const token = turnstile.current?.getResponse();
     if (siteKey && (!token || turnstile.current?.isExpired())) {
-      setError("Please complete the security check.");
+      setSecurityError(true);
+      setError("The security check hasn’t finished. Please retry the check below.");
       turnstile.current?.reset();
       return;
     }
@@ -101,8 +103,9 @@ export function SignupForm({ planTier, billingInterval, skipTurnstile = false }:
           {validation.error("acceptLegal")}
         </LegalAcceptanceCheckbox>
       </fieldset>
-      {siteKey ? <AuthTurnstileField ref={turnstile} siteKey={siteKey} onSuccess={() => setError(null)} onExpire={() => turnstile.current?.reset()} /> : null}
+      {siteKey ? <AuthTurnstileField ref={turnstile} siteKey={siteKey} onSuccess={() => { setSecurityError(false); setError(null); }} onExpire={() => turnstile.current?.reset()} onError={() => { setSecurityError(true); setError("The security check couldn’t load. Retry it, or refresh this page if the problem continues."); }} /> : null}
       <AuthFormAlert message={error} />
+      {securityError ? <button type="button" className="text-sm font-medium underline underline-offset-4" onClick={() => { setSecurityError(false); setError(null); turnstile.current?.reset(); }}>Retry security check</button> : null}
       <OnboardingPrimaryButton type="submit" pending={pending} disabled={pending||!clientReady} className="w-full max-w-none shadow-none">
         {pending ? openingNextStep ? "Opening the next step…" : "Creating your account…" : "Create account"}<ArrowRight size={16} aria-hidden />
       </OnboardingPrimaryButton>
