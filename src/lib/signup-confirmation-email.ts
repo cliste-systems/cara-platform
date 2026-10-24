@@ -7,7 +7,6 @@ import { PUBLIC_ASSETS } from "@/lib/public-assets";
 import { isResendConfigured, sendTransactionalEmail } from "@/lib/resend-mail";
 import { SIGNUP_EMAIL_OTP_PATTERN } from "@/lib/signup-email-otp";
 import { PRODUCT_NAME } from "@/lib/company-details";
-import { buildTransactionalEmailHtml } from "@/lib/transactional-email-layout";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export function signupConfirmationRedirectOrigin(): string {
@@ -40,23 +39,23 @@ export function buildSignupConfirmationEmailBodies(
     "This code and link expire after a while. If you did not create this account, you can ignore this email.",
   ].join("\n");
 
-  const codeBlock = emailOtp
-    ? `<p style="margin:0 0 8px;font-size:13px;line-height:1.5;color:#64748b;text-align:center;">Enter this code on the verification page:</p>
-                <p style="margin:0 0 24px;font-size:28px;font-weight:700;letter-spacing:0.28em;line-height:1.2;color:#0b1220;text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">${emailOtp}</p>`
-    : "";
-
-  const html = buildTransactionalEmailHtml({
-    subject,
-    logoUrl: signupConfirmationLogoUrl(),
-    headline: "Confirm your email",
-    extraHtml: codeBlock,
-    bodyHtml: emailOtp
-      ? "Or tap the button below to confirm in one click."
-      : "Tap the button below to verify this inbox and continue setting up Cara.",
-    ctaLabel: "Confirm email and continue",
-    ctaHref: actionLink,
-    footerHtml: "If you did not create this account, you can ignore this email.",
-  });
+  const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
+  const codeBlock = emailOtp ? `<div style="margin:24px 0;padding:20px 12px;background:#f5f5f5;border:1px solid #e5e5e5;border-radius:12px;color:#292929;font-size:30px;font-weight:600;letter-spacing:6px;text-align:center;"><span>${escapeHtml(emailOtp)}</span></div>` : "";
+  const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="format-detection" content="telephone=no,date=no,address=no,email=no"><title>Confirm your email — HelloCara</title>
+<style>a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important}</style></head>
+<body style="margin:0;background:#f5f5f5;color:#292929;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:440px;background:#ffffff;border:1px solid #e5e5e5;border-radius:20px;"><tr><td style="padding:32px 24px;">
+<p style="margin:0 0 32px;font-size:20px;font-weight:700;letter-spacing:-.7px;">HelloCara<span style="color:#999;">.</span></p>
+<h1 style="margin:0 0 12px;font-size:28px;line-height:1.2;letter-spacing:-.8px;">You’re nearly in.</h1>
+<p style="margin:0;color:#737373;font-size:15px;line-height:1.6;">${emailOtp ? "Enter this code to confirm your email." : "Confirm your email to get started."}</p>
+${codeBlock}
+<p style="margin:24px 0 12px;font-size:13px;color:#737373;">${emailOtp ? "Or continue with one click:" : ""}</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" bgcolor="#292929" style="border-radius:28px;"><a href="${escapeHtml(actionLink)}" style="display:block;padding:15px 20px;border-radius:28px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">Confirm email &amp; continue →</a></td></tr></table>
+<p style="margin:28px 0 0;padding-top:20px;border-top:1px solid #ededed;font-size:12px;line-height:1.6;color:#737373;">Didn’t sign up for HelloCara? You can ignore this email.</p>
+</td></tr></table></td></tr></table></body></html>`;
 
   return { subject, text, html };
 }

@@ -27,7 +27,7 @@ export function SignupVoiceCard({ greeting, playing, loading, error, elapsed, on
   return (
     <section aria-label="Cara voice preview" className={styles.card}>
       <div className={styles.portrait}>
-        <Image src="/cara-voice-portrait.png" alt="Cara smiling, wearing her headset" fill sizes="(max-width: 767px) 100vw, 280px" priority />
+        <Image src="/cara-voice-portrait.webp" alt="Cara smiling, wearing her headset" fill sizes="(max-width: 767px) 100vw, 280px" preload unoptimized />
       </div>
       <div className={styles.player}>
         <p className={styles.eyebrow}>{sample ? "A hello from Cara" : "Your callers’ first hello"}</p>

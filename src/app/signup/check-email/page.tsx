@@ -4,7 +4,6 @@ import Link from "next/link";
 import { PRODUCT_NAME } from "@/lib/company-details";
 import { AuthMarketingShell } from "@/components/auth/auth-marketing-shell";
 import { OnboardingEnter } from "@/components/onboarding/onboarding-enter";
-import { SIGNUP_EMAIL_OTP_LENGTH } from "@/lib/signup-email-otp";
 import { PUBLIC_ASSETS } from "@/lib/public-assets";
 
 import { VerifyCodeForm } from "./verify-code-form";
@@ -27,18 +26,17 @@ export default async function SignupCheckEmailPage({
   return (
     <AuthMarketingShell
       title={email ? "Enter your code" : "Check your email"}
-      subtitle="Confirm your inbox to continue setting up Cara."
+      subtitle="One quick check, then you’re in."
       pageBackground={PUBLIC_ASSETS.signupScenes.signup}
       compact
     >
-      <div className="space-y-5 text-center">
+      <div className="mx-auto w-full max-w-[400px] space-y-6 text-center">
         <OnboardingEnter tone="profile">
-          <p className="text-[13px] leading-relaxed text-slate-500">
+          <p className="text-[13px] leading-relaxed text-[#737373]">
             {email ? (
               <>
-                We sent a {SIGNUP_EMAIL_OTP_LENGTH}-digit code to{" "}
-                <span className="font-medium text-[#0b1220]">{email}</span>.
-                Enter it below, or use the link in the email.
+                Enter the code sent to
+                <span className="mt-1 block break-all font-medium text-[#292929]">{email}</span>
               </>
             ) : (
               <>Open your confirmation email and follow its link to verify your account.</>
@@ -52,7 +50,7 @@ export default async function SignupCheckEmailPage({
           </OnboardingEnter>
         ) : null}
 
-        <OnboardingEnter tone="profile" className="text-[12px] text-slate-500">
+        <OnboardingEnter tone="profile" className="text-[12px] text-[#737373]">
           Already confirmed?{" "}
           <Link
             href="/authenticate"

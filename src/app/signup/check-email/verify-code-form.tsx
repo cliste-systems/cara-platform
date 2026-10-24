@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { ArrowRight } from "lucide-react";
 
-import { AuthFormAlert } from "@/components/auth/auth-form-alert";
 import {
   OnboardingFieldBox,
   OnboardingFieldSurfaceProvider,
@@ -58,7 +57,7 @@ export function VerifyCodeForm({ email }: { email: string }) {
   }
 
   return (
-    <OnboardingFieldSurfaceProvider surface="profile">
+    <OnboardingFieldSurfaceProvider surface="default">
       <div className="space-y-3">
         <form
           className="space-y-3"
@@ -71,7 +70,7 @@ export function VerifyCodeForm({ email }: { email: string }) {
             label="Verification code"
             htmlFor="verification-code"
             error={error ?? undefined}
-            className="px-3.5 py-2.5"
+            className="border border-[#dedede] bg-white px-4 py-4 shadow-none"
           >
             <input
               id="verification-code"
@@ -98,9 +97,9 @@ export function VerifyCodeForm({ email }: { email: string }) {
             />
           </OnboardingFieldBox>
 
-          <AuthFormAlert message={error} />
+
           {notice ? (
-            <p className="text-[12px] leading-relaxed text-emerald-700">
+            <p className="text-[12px] leading-relaxed text-[#555555]">
               {notice}
             </p>
           ) : null}
@@ -108,7 +107,7 @@ export function VerifyCodeForm({ email }: { email: string }) {
           <OnboardingPrimaryButton
             type="submit"
             pending={pending}
-            disabled={code.length !== SIGNUP_EMAIL_OTP_LENGTH}
+            disabled={code.length !== SIGNUP_EMAIL_OTP_LENGTH || resendPending}
             className="w-full max-w-none"
           >
             {pending ? "Verifying…" : "Verify and continue"}
@@ -116,22 +115,13 @@ export function VerifyCodeForm({ email }: { email: string }) {
           </OnboardingPrimaryButton>
         </form>
 
-        <p className="text-center text-[12px] text-slate-500">
-          Didn&apos;t get it? Check spam.
-        </p>
-
-        <button
-          type="button"
-          onClick={handleResend}
-          disabled={resendPending}
-          className={cn(
-            "w-full cursor-pointer rounded-full border border-slate-200/90 bg-white/90 px-5 py-2.5 text-[13px] font-medium text-[#0b1220] shadow-[0_4px_16px_rgba(15,23,42,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200",
-            "hover:border-slate-300 hover:bg-slate-100 hover:shadow-[0_6px_20px_rgba(15,23,42,0.08)]",
-            "disabled:cursor-not-allowed disabled:opacity-60",
-          )}
-        >
-          {resendPending ? "Sending…" : "Resend email"}
-        </button>
+        <div className="pt-3 text-center text-[13px] text-[#737373]">
+          No email? Check spam or{" "}
+          <button type="button" onClick={handleResend} disabled={resendPending || pending}
+            className="cursor-pointer font-medium text-[#292929] underline underline-offset-4 transition-opacity hover:opacity-70 disabled:opacity-50">
+            {resendPending ? "sending…" : "resend code"}
+          </button>
+        </div>
       </div>
     </OnboardingFieldSurfaceProvider>
   );

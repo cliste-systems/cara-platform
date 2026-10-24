@@ -10,7 +10,7 @@ export default function LocalSignupVoicePreview() {
 
   return (
     <main className="flex min-h-dvh flex-col bg-white">
-      <SignupBrandFrame stage="voice" accountEmail="emma@example.ie" title="Hear Cara" description="Hear how Cara welcomes your callers. You can personalise her greeting during setup.">
+      <SignupBrandFrame stage="voice" accountEmail="emma@example.ie" title="Hear Cara" description="You can personalise her greeting during setup.">
         <VoiceForm businessName="Your business" defaultGreeting="" allowEditing={false} reviewBeforeContinue={false} continueLabel="Continue to plans" visualPreview />
 
       </SignupBrandFrame>

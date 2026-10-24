@@ -107,7 +107,9 @@ export function VoiceForm({ businessName, defaultGreeting, visualPreview=false, 
   const [state, formAction, pending] = useActionState(saveVoiceStep, INITIAL);
   const lastStateRef = useRef(state);
 
-  const previewLine = resolveVoiceGreetingPreview(
+  const previewLine = !allowEditing
+    ? `Hi, you’re through to ${businessName.trim() || "our business"}. I’m Cara, your AI receptionist. How can I help?`
+    : resolveVoiceGreetingPreview(
     greetingIntro,
     assistantDisplayName,
     greetingClosing,

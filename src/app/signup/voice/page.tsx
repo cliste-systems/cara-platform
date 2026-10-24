@@ -6,5 +6,5 @@ export default async function SignupVoicePage() {
   const session=await requirePublicSignupSession();
   const {data:org,error}=await session.supabase.from("organizations").select("name,greeting").eq("id",session.organizationId).single();
   if(error || !org) throw new Error("Your business details could not be loaded.");
-  return <SignupBrandFrame stage="voice" accountEmail={session.user.email} title="Hear Cara" description="Hear how Cara welcomes your callers. You can personalise her greeting during setup."><VoiceForm reviewBeforeContinue={false} allowEditing={false} continueLabel="Continue to plans" businessName={org.name} defaultGreeting={org.greeting?.trim()??""} /></SignupBrandFrame>;
+  return <SignupBrandFrame stage="voice" accountEmail={session.user.email} title="Hear Cara" description="You can personalise her greeting during setup."><VoiceForm reviewBeforeContinue={false} allowEditing={false} continueLabel="Continue to plans" businessName={org.name} defaultGreeting={org.greeting?.trim()??""} /></SignupBrandFrame>;
 }
