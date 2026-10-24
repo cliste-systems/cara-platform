@@ -5,10 +5,10 @@ import test from "node:test";
 import ts from "typescript";
 import * as plans from "./cliste-plans.data";
 
-function fixture(stalePrice = false) {
+function fixture(stalePrice = false, failure?: "configuration" | "prices") {
   const requests: {kind:string; payload:Record<string,unknown>;options?:Record<string,unknown>}[]=[];
   const stripe={
-    prices:{list:async({lookup_keys}:{lookup_keys:string[]})=>({data:lookup_keys.map(key=>({lookup_key:key,id:`test_${key}`,currency:"eur",unit_amount:stalePrice ? 1 : key.includes("setup_") ? (key.includes("remote") ? 19900 : 39900) : key.includes("overage_min") ? 49 : key.includes("overage_sms") ? 15 : key.includes("annual") ? 99000 : 9900}))})},
+    prices:{list:async({lookup_keys}:{lookup_keys:string[]})=>{if(failure==="prices")throw new Error("Provider unavailable");return ({data:lookup_keys.map(key=>({lookup_key:key,id:`test_${key}`,currency:"eur",unit_amount:stalePrice ? 1 : key.includes("setup_") ? (key.includes("remote") ? 19900 : 39900) : key.includes("overage_min") ? 49 : key.includes("overage_sms") ? 15 : key.includes("annual") ? 99000 : 9900}))});}},
     customers:{create:async(payload:Record<string,unknown>,options?:Record<string,unknown>)=>{requests.push({kind:"customer",payload,options});return {id:"cus_fixture"};}},
     subscriptions:{create:async(payload:Record<string,unknown>,options?:Record<string,unknown>)=>{requests.push({kind:"subscription",payload,options});return {id:"sub_fixture",pending_setup_intent:"seti_fixture"};}},
     invoiceItems:{create:async(payload:Record<string,unknown>,options?:Record<string,unknown>)=>{requests.push({kind:"setupFee",payload,options});return {id:"ii_fixture"};}},
@@ -17,7 +17,7 @@ function fixture(stalePrice = false) {
   const imports:Record<string,unknown>={"@/lib/signup-billing-security":{},
     "server-only":{},"@/lib/cliste-plans":plans,
     "@/lib/account-access":{},"@/lib/account-billing":{},"@/lib/onboarding-session":{ONBOARDING_STEPS:{done:6}},
-    "@/lib/platform-billing-checkout":{},"@/lib/stripe":{getStripeClient:()=>stripe},
+    "@/lib/platform-billing-checkout":{},"@/lib/stripe":{getStripeClient:()=>{if(failure==="configuration")throw new Error("STRIPE_SECRET_KEY is not set");return stripe;}},
     "@/utils/supabase/admin":{createAdminClient:()=>({from(){throw new Error("Signup must resolve prices in its Stripe environment, not the shared database.");}})},
   };
   const source=readFileSync(new URL("./platform-billing-elements.ts",import.meta.url),"utf8");
@@ -69,3 +69,13 @@ test("self setup has no setup fee",async()=>{const f=fixture();await f.api.creat
 test("stale Stripe amounts are rejected before creating a customer or subscription",async()=>{const f=fixture(true);const result=await f.api.createPlatformElementsCheckout(input);assert.equal(result.ok,false);assert.equal(f.requests.length,0);});
 
 test("public checkout uses only the agreed base and minute-overage items",async()=>{const f=fixture();await f.api.createPlatformElementsCheckout(input);const items=f.requests.find(r=>r.kind==="subscription")!.payload.items as {price:string}[];assert.deepEqual(Array.from(items,item=>item.price),["test_cliste_plan_starter_monthly","test_cliste_plan_starter_overage_min"]);});
+
+for (const failure of ["configuration", "prices"] as const) {
+  test(`checkout recovers from ${failure} failure without exposing provider details`, async () => {
+    const f = fixture(false, failure);
+    const result = await f.api.createPlatformElementsCheckout(input);
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.message, "Payment setup is temporarily unavailable. Please try again shortly.");
+    assert.equal(f.requests.length, 0);
+  });
+}

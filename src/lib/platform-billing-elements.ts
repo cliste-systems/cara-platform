@@ -226,6 +226,7 @@ export async function createPlatformElementsCheckout(
     return { ok: false, message: "Email is required for billing." };
   }
 
+  try {
   const prices = await loadSubscriptionPriceIds(
     input.planTier,
     input.launchTier,
@@ -244,7 +245,6 @@ export async function createPlatformElementsCheckout(
 
   const stripe = getStripeClient();
 
-  try {
     const customer = await stripe.customers.create({
       email,
       metadata: {
@@ -322,9 +322,8 @@ export async function createPlatformElementsCheckout(
       summary: {...checkoutSummary(input.planTier, input.interval, email), setupTier: input.launchTier === "remote" ? "remote" : input.launchTier === "diy" ? "diy" : "onsite_dublin", ...(prices.setupPriceId ? {setupLabel:`${LAUNCHES[input.launchTier].name} · ${formatEuro(LAUNCHES[input.launchTier].priceCents)} once, on your first invoice after the trial`} : {})},
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Checkout failed.";
     console.error("[platform-billing-elements] checkout failed", err);
-    return { ok: false, message };
+    return { ok: false, message: "Payment setup is temporarily unavailable. Please try again shortly." };
   }
 }
 
