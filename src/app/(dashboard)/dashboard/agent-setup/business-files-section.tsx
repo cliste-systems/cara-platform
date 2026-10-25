@@ -38,7 +38,7 @@ import {
 import {
   extractedContentLooksLikePii,
   sliceFileTextForPrompt,
-} from "@/lib/business-file-prompt";
+} from "@/lib/business-file-preview";
 import {
   fileCouldNotReadMessage,
   fileReadinessLabel,

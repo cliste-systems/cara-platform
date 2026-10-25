@@ -24,8 +24,7 @@ export function voiceWebhookNoSecretResponse() {
   return Response.json(
     {
       ok: false,
-      error:
-        "Set CLISTE_VOICE_WEBHOOK_SECRET in .env.local (same value in your voice worker).",
+      error: "Voice service is temporarily unavailable.",
     },
     { status: 503 },
   );

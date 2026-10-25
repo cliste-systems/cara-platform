@@ -9,6 +9,10 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     await requireAdminPermission("customers");
+  } catch {
+    return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
+  }
+  try {
     const admin = createAdminClient();
     const snapshot = await loadSupervaluOffersSnapshot(admin);
     if (!snapshot) {
@@ -27,7 +31,7 @@ export async function GET() {
     return NextResponse.json(
       {
         ok: false,
-        error: err instanceof Error ? err.message : "Failed to load offers snapshot",
+        error: "Offers snapshot is temporarily unavailable. Please try again shortly.",
       },
       { status: 500 },
     );
