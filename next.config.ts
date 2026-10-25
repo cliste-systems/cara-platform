@@ -150,6 +150,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Public source maps expose original browser source. Keep diagnostics in Sentry.
+  productionBrowserSourceMaps: false,
   outputFileTracingIncludes: { "/*": ["./public/m8x4p2n7.png"] },
   typescript: {
     ignoreBuildErrors: false,
@@ -174,6 +176,10 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      ...["/api/admin/:path*", "/api/dashboard/:path*", "/api/onboarding/:path*", "/api/voice/:path*"].map((source) => ({
+        source,
+        headers: [{ key: "Cache-Control", value: "private, no-store" }],
+      })),
       {
         source: "/:path*",
         headers: securityHeaders,
@@ -239,4 +245,5 @@ const nextConfig: NextConfig = {
 export default withSentryConfig(nextConfig, {
   silent: true,
   disableLogger: true,
+  sourcemaps: { deleteSourcemapsAfterUpload: true },
 });

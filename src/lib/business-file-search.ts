@@ -1,4 +1,4 @@
-import { splitExtractedLines } from "@/lib/business-file-prompt";
+import { splitExtractedLines } from "@/lib/business-file-preview";
 import {
   isBusinessFileKind,
   type BusinessFileKind,

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { voiceServiceError } from "@/lib/voice-service-error";
 
 import { hasAccountOwnerAccess } from "@/lib/account-owner-access";
 import { managedClientSetupRequirement } from "@/lib/managed-onboarding-access";
@@ -205,9 +206,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Voice preview failed.";
-    const status = message.includes("not configured") ? 503 : 502;
-    return NextResponse.json({ error: message }, { status });
+    const failure = voiceServiceError(error);
+    return NextResponse.json({ error: failure.error }, { status: failure.status });
   }
 }
