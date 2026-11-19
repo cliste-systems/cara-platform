@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { Ban, Check, Copy, History, Inbox, Loader2, Phone, PhoneCall, Search, ShieldOff, Store, Trash2 } from "lucide-react";
 
+import { DashboardSelect } from "@/components/dashboard/dashboard-select";
+import { FormFeedback } from "@/components/ui/form-feedback";
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import { CallerDataEraseDialog } from "@/components/dashboard/caller-data-erase-dialog";
 
@@ -26,7 +28,7 @@ import {
   DASHBOARD_CARD_SURFACE,
   DASHBOARD_HOME_LIVE_CALL_ROW_CLASS,
   DASHBOARD_INPUT_CLASS,
-  DASHBOARD_SELECT_CLASS,
+
 } from "@/components/dashboard/dashboard-surface";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { buildCallsPageHref } from "@/lib/calls-page-href";
@@ -153,6 +155,8 @@ export function CallHistoryView({
   const [selectedId, setSelectedId] = useState<string | null>(() =>
     initialSelectedCallId?.trim() || null,
   );
+  const [mobileDetailOpen,setMobileDetailOpen]=useState(Boolean(initialSelectedCallId));
+  const [detailError,setDetailError]=useState<string|null>(null);
   const [copied, setCopied] = useState(false);
   const [detailById, setDetailById] = useState<
     Record<string, { transcriptVerbatim: string; transcriptReview: string | null }>
@@ -210,21 +214,26 @@ export function CallHistoryView({
   const ensureDetailLoaded = useCallback((id: string, engineerTestCall?: boolean) => {
     if (engineerTestCall) return;
     void fetchCallHistoryDetail(id).then((detail) => {
-      if (!detail) return;
+      if (!detail) {setDetailError("We couldn’t load the transcript. Please try again.");return;}
+      setDetailError(null);
       setDetailById((prev) => {
         if (prev[id]) return prev;
         return { ...prev, [id]: detail };
       });
-    });
+    }).catch(()=>setDetailError("We couldn’t load the transcript. Please try again."));
   }, []);
 
-  useEffect(() => {
+  const selectionKey = JSON.stringify([searchParams.toString(), initialSelectedCallId]);
+  const [lastSelectionKey, setLastSelectionKey] = useState<typeof selectionKey | undefined>(undefined);
+  if (lastSelectionKey !== selectionKey) {
+    setLastSelectionKey(selectionKey);
     const callFromUrl =
       searchParams.get("call")?.trim() || initialSelectedCallId?.trim() || null;
     if (callFromUrl) {
       setSelectedId(callFromUrl);
+      setMobileDetailOpen(true);
     }
-  }, [searchParams, initialSelectedCallId]);
+  }
 
   useEffect(() => {
     if (resolvedSelectedId && selectedBase) {
@@ -260,14 +269,15 @@ export function CallHistoryView({
         DASHBOARD_CARD_SURFACE,
         "flex min-h-0 flex-1 flex-col overflow-hidden",
         className,
+        !selected && !showIncomingPlaceholder && "flex-none max-h-[min(460px,70dvh)]",
       )}
     >
-      <ListDetailLayout
-        className="min-h-0 flex-1 gap-0 max-xl:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(240px,300px)_minmax(0,1fr)]"
+      <ListDetailLayout hideDetail={!selected && !showIncomingPlaceholder} mobileDetailOpen={mobileDetailOpen} onMobileBack={()=>setMobileDetailOpen(false)}
+        className="min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)]"
         list={
           <div className="flex h-full min-h-0 flex-col overflow-hidden border-[#dfe7e2] bg-[#fbfcfb] max-xl:border-b max-xl:border-[#dfe7e2] xl:border-r xl:border-r-[#dfe7e2]">
             <div className="shrink-0 border-b border-inherit px-4 py-3 sm:px-5">
-              <p className="text-[14px] font-semibold text-[#11181d]">Call log</p>
+              <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-[14px] font-semibold text-[#11181d]">Call log</p>{copy.vertical.id!=="retail"&&<Link className="inline-flex min-h-11 items-center rounded-lg border border-[#d9e2dd] bg-white px-3 text-xs font-medium transition-colors hover:bg-[#f0f4f1]" href="/dashboard/calls?filter=follow_up">Follow-ups</Link>}</div>
               <div className="mt-2 flex flex-col gap-2">
                 <div className="relative">
                   <Search
@@ -283,20 +293,7 @@ export function CallHistoryView({
                     className="h-10 w-full border-[#b9c8c1] bg-white py-1 pl-8 text-[14px] placeholder:text-slate-400"
                   />
                 </div>
-                <select
-                  value={outcomeFilter}
-                  onChange={(e) =>
-                    setOutcomeFilter(e.target.value as OutcomeFilterValue)
-                  }
-                  aria-label="Filter by outcome"
-                  className={cn(DASHBOARD_SELECT_CLASS, "h-10 w-full shrink-0")}
-                >
-                  {OUTCOME_FILTER_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+                <DashboardSelect value={outcomeFilter} onValueChange={setOutcomeFilter} aria-label="Filter by outcome" options={OUTCOME_FILTER_OPTIONS} />
               </div>
             </div>
             <div
@@ -310,8 +307,8 @@ export function CallHistoryView({
               {filtered.length === 0 && !showIncomingPlaceholder ? (
                 <EmptyState
                   icon={Phone}
-                  title="No calls yet"
-                  description={copy.calls.emptyDescription}
+                  title={search || outcomeFilter !== "all" ? "No matching calls" : "No calls yet"}
+                  description={search || outcomeFilter !== "all" ? "Try another search or outcome filter." : copy.calls.emptyDescription}
                   className="w-full py-10"
                 />
               ) : (
@@ -326,6 +323,8 @@ export function CallHistoryView({
                       selected={row.id === resolvedSelectedId}
                       onSelect={() => {
                         setSelectedId(row.id);
+                        setMobileDetailOpen(true);
+                        setDetailError(null);
                         ensureDetailLoaded(row.id);
                       }}
                     />
@@ -342,7 +341,7 @@ export function CallHistoryView({
             ) : null}
           </div>
         }
-        detail={
+        detail={<><FormFeedback message={detailError}/>{detailError && selected && <button className="min-h-11 text-sm no-underline" onClick={()=>ensureDetailLoaded(selected.id)}>Retry transcript</button>}{
           showIncomingPlaceholder && incomingPlaceholder && !selected ? (
             <CallIncomingDetailPlaceholder placeholder={incomingPlaceholder} />
           ) : (
@@ -356,7 +355,7 @@ export function CallHistoryView({
               onRefresh={() => router.refresh()}
             />
           )
-        }
+        }</>}
       />
     </section>
   );
@@ -883,8 +882,8 @@ function CallDetailPanelContent({
 
       {!engineerTestCall ? (
       <DetailPanelFooter>
-        <div className="flex w-full flex-wrap items-center gap-2">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center [&_button]:min-w-0 [&_button]:px-2 [&_svg]:shrink-0">
+          <div className="contents sm:flex sm:min-w-0 sm:flex-1 sm:flex-wrap sm:items-center sm:gap-2">
             {canManageBlock ? (
               isBlocked ? (
                 <DetailActionButton
@@ -936,7 +935,7 @@ function CallDetailPanelContent({
           </div>
 
           {!callerDataErased ? (
-            <div className="flex shrink-0 items-center gap-3">
+            <div className="contents sm:flex sm:shrink-0 sm:items-center sm:gap-3">
               {canDeleteCallerData ? (
                 <DetailActionButton
                   type="button"

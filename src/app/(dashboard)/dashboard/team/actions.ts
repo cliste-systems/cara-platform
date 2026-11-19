@@ -6,7 +6,7 @@ import { headers } from "next/headers";
 import { requireDashboardAdmin } from "@/lib/dashboard-admin";
 import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
-import { sendInviteEmail } from "@/lib/invite-email";
+import { prepareInviteEmail, sendPreparedInviteEmail } from "@/lib/invite-email";
 import { resolveOrganizationDisplayName } from "@/lib/organization-display-name";
 import {
   parseOrganizationNiche,
@@ -76,20 +76,21 @@ export async function inviteTeamMember(
   const niche = parseOrganizationNiche(orgRow?.niche);
   const productName = PRODUCT_NAME_BY_NICHE[niche];
 
-  const { data: existingAuthUsers } = await admin.auth.admin.listUsers({
-    page: 1,
-    perPage: 200,
-  });
-  const existingAuthUser = existingAuthUsers?.users?.find(
-    (user) => user.email?.trim().toLowerCase() === email,
-  );
+  let existingAuthUser: { id: string; email?: string } | undefined;
+  for (let page = 1; ; page++) {
+    const {data, error} = await admin.auth.admin.listUsers({page, perPage:200});
+    if (error) return {ok:false,message:"Could not check this invitation. Please retry."};
+    existingAuthUser = data.users.find(user => user.email?.trim().toLowerCase() === email);
+    if (existingAuthUser || data.users.length < 200) break;
+  }
   if (existingAuthUser?.id) {
-    const { data: existingProfile } = await admin
+    const { data: existingProfile, error: existingProfileError } = await admin
       .from("profiles")
       .select("account_id")
       .eq("id", existingAuthUser.id)
       .maybeSingle();
 
+    if (existingProfileError) return {ok:false,message:"Could not verify existing team access. Please retry."};
     if (
       existingProfile?.account_id &&
       existingProfile.account_id !== session.accountId
@@ -101,7 +102,8 @@ export async function inviteTeamMember(
     }
   }
 
-  const inviteResult = await sendInviteEmail({
+  const inviteResult = await prepareInviteEmail({
+    existingUserId: existingAuthUser?.id,
     email,
     recipientName: name || undefined,
     businessName,
@@ -119,12 +121,13 @@ export async function inviteTeamMember(
 
   const userId = inviteResult.userId;
 
-  const { data: existing } = await admin
+  const { data: existing, error: existingError } = await admin
     .from("profiles")
     .select("account_id")
     .eq("id", userId)
     .maybeSingle();
 
+  if (existingError) return {ok:false,message:"Could not verify existing team access. Please retry."};
   if (existing?.account_id && existing.account_id !== session.accountId) {
     return {
       ok: false,
@@ -145,7 +148,7 @@ export async function inviteTeamMember(
   );
 
   if (!profileError) {
-    await admin.from("account_memberships").upsert(
+    const { error: membershipError } = await admin.from("account_memberships").upsert(
       {
         user_id: userId,
         account_id: session.accountId,
@@ -153,11 +156,15 @@ export async function inviteTeamMember(
       },
       { onConflict: "user_id,account_id" },
     );
+    if (membershipError) return { ok: false, message: "Could not save team access. Please retry the invitation." };
   }
 
   if (profileError) {
     return { ok: false, message: profileError.message };
   }
+
+  const delivery = await sendPreparedInviteEmail(inviteResult.prepared);
+  if (!delivery.ok) return delivery;
 
   const ctx = buildSecurityEventContext(await headers());
   await logSecurityEvent(ctx, {

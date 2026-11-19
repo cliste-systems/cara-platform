@@ -38,7 +38,7 @@ import {
 import {
   extractedContentLooksLikePii,
   sliceFileTextForPrompt,
-} from "@/lib/business-file-prompt";
+} from "@/lib/business-file-preview";
 import {
   fileCouldNotReadMessage,
   fileReadinessLabel,
@@ -130,9 +130,11 @@ export function BusinessFilesSection({
   const inputRef = useRef<HTMLInputElement>(null);
   const onboarding = variant === "onboarding";
 
-  useEffect(() => {
+  const [previousFiles, setPreviousFiles] = useState(initialFiles);
+  if (previousFiles !== initialFiles) {
+    setPreviousFiles(initialFiles);
     setFiles(initialFiles);
-  }, [initialFiles]);
+  }
 
   function runUpload(file: File, options?: { skipReplaceCheck?: boolean }) {
     setMessage(null);

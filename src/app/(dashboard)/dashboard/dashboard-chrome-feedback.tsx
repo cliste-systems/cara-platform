@@ -1,4 +1,5 @@
 "use client";
+import { FormFeedback } from "@/components/ui/form-feedback";
 
 import { Popover } from "@base-ui/react/popover";
 import { usePathname } from "next/navigation";
@@ -90,9 +91,7 @@ export function DashboardChromeFeedback() {
               </button>
             </div>
             {message ? (
-              <p className="mt-2 text-[11px] text-red-600" role="alert">
-                {message}
-              </p>
+              <FormFeedback message={message} />
             ) : null}
           </Popover.Popup>
         </Popover.Positioner>

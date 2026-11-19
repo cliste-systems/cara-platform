@@ -1,17 +1,19 @@
 "use client";
 
-import {useCallback, useEffect, useId, useState} from 'react';
-import {ArrowLeft, ArrowRight, Check, ChevronRight, Pencil, Search} from 'lucide-react';
+import {useCallback, useEffect, useId, useState, type ReactNode} from 'react';
+import {ArrowLeft, ArrowRight, Check, ChevronRight, Pencil, Search, Hammer, House, Scissors, Car, BriefcaseBusiness, HeartPulse, Dumbbell, Utensils, GraduationCap, PawPrint, Camera, Monitor, Truck, Sprout, Users} from 'lucide-react';
 import {SETUP_BUSINESS_CATEGORIES as BUSINESS_CATEGORIES, classificationLabels, type BusinessClassification} from '@/lib/business-classification';
 import {SetupSectionTransition} from './setup-section-transition';
 import {AuthFormAlert} from '@/components/auth/auth-form-alert';
 
+const industryIcons:Record<string,typeof Hammer>={trades:Hammer,home_services:House,beauty:Scissors,health:HeartPulse,fitness:Dumbbell,hospitality:Utensils,automotive:Car,professional:BriefcaseBusiness,property:House,education:GraduationCap,pets:PawPrint,events:Camera,technology:Monitor,transport:Truck,agriculture:Sprout,community:Users};
 const PAGE_SIZE = 4;
 const focusStyle = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#353D42]';
 
 export type IndustryNavigation = {back: () => void; label?:string} | null;
 
-export function BusinessClassificationPicker({value, onChange, error, onIndustryNavigation}: {
+export function BusinessClassificationPicker({value, onChange, error, onIndustryNavigation, action}: {
+ action?: ReactNode;
  onIndustryNavigation?: (navigation: IndustryNavigation) => void;
  value: BusinessClassification | null;
  onChange: (value: BusinessClassification | null) => void;
@@ -20,6 +22,7 @@ export function BusinessClassificationPicker({value, onChange, error, onIndustry
  const [editing, setEditing] = useState(false);
  const [categoryId, setCategoryId] = useState(value?.categoryId ?? '');
  const [query, setQuery] = useState('');
+ const [pendingCategory,setPendingCategory]=useState('');
  const [page, setPage] = useState(0);
  const id = useId();
  const category = BUSINESS_CATEGORIES.find(c => c.id === categoryId);
@@ -31,8 +34,8 @@ export function BusinessClassificationPicker({value, onChange, error, onIndustry
  }, [page,categoryId,previousChoices,resetIndustry,onIndustryNavigation]);
  const match = (text: string) => text.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
  const showChoices = !value || editing;
- const industries = BUSINESS_CATEGORIES.filter(c => match(`${c.label} ${c.specialties.map(s => s.label).join(' ')}`));
- const specialties = category?.specialties.filter(s => match(s.label)) ?? [];
+ const industries = BUSINESS_CATEGORIES.filter(c => match(`${c.label} ${c.specialties.map(s => `${s.label} ${s.id.replaceAll('_',' ')}`).join(' ')}`));
+ const specialties = category?.specialties.filter(s => match(`${s.label} ${s.id.replaceAll('_',' ')}`)) ?? [];
  const count = category ? specialties.length : industries.length;
  const pageCount = Math.max(1, Math.ceil(count / PAGE_SIZE));
  const currentPage = Math.min(page, pageCount - 1);
@@ -49,7 +52,7 @@ export function BusinessClassificationPicker({value, onChange, error, onIndustry
  }
 
  return <div className="space-y-3 text-left" aria-describedby={error ? `${id}-error` : undefined}>
-  <SetupSectionTransition screenKey={showChoices ? `choose-${categoryId || "industry"}` : "summary"}>
+  <SetupSectionTransition animateHeight screenKey={showChoices ? `choose-${categoryId || "industry"}` : "summary"}>
   <div className="space-y-3">
   {showChoices && <div data-setup-choice-heading className="flex flex-wrap items-center justify-between gap-2">
    <p className="text-sm font-medium text-[#353D42]">{category ? 'Choose your specialities' : 'Choose your industry'}</p>
@@ -60,8 +63,9 @@ export function BusinessClassificationPicker({value, onChange, error, onIndustry
    <label data-setup-search className="flex min-h-11 items-center gap-3 rounded-xl border border-[#d9e2dd] bg-white px-3 focus-within:ring-2 focus-within:ring-[#b9c8c1]">
     <Search size={16} className="shrink-0 text-[#63756c]" aria-hidden="true"/>
     <span className="sr-only">{category ? 'Search specialities' : 'Search industries or specialities'}</span>
-    <input value={query} onChange={e => {setQuery(e.target.value); setPage(0);}} placeholder={category ? 'Find your speciality' : 'Find your industry, e.g. electrician'} className="min-w-0 flex-1 bg-transparent py-3 text-sm text-[#11181d] outline-none"/>
+    <input value={query} onChange={e => {setQuery(e.target.value); setPage(0);}} placeholder={category ? 'Find your speciality' : 'Find your industry, e.g. electrical'} className="min-w-0 flex-1 bg-transparent py-3 text-sm text-[#11181d] outline-none"/>
    </label>
+   <div className={category ? "min-h-[256px] sm:min-h-[128px]" : "min-h-[448px] sm:min-h-[296px]"}>
    <SetupSectionTransition screenKey={`${categoryId || 'categories'}-${currentPage}`}>
     <div className="grid grid-cols-1 gap-2 p-1 sm:grid-cols-2" role="group" aria-label={category ? 'Business specialities' : 'Business industries'}>
      {category ? specialties.slice(start, start + PAGE_SIZE).map(s => {
@@ -69,20 +73,23 @@ export function BusinessClassificationPicker({value, onChange, error, onIndustry
       return <button data-setup-option key={s.id} type="button" aria-pressed={checked} disabled={!checked && (value?.specialtyIds.length ?? 0) >= 8} onClick={() => toggle(s.id)} className={`flex min-h-14 items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${focusStyle} ${checked ? 'border-[#353D42] bg-[#f3f6f4] font-medium text-[#11181d]' : 'border-[#d9e2dd] bg-white text-[#353D42] hover:border-[#84938c] hover:bg-[#f7f9f8]'}`}>
        <span>{s.label}</span><span className={`flex size-6 shrink-0 items-center justify-center rounded-full border ${checked ? 'border-[#353D42] bg-[#353D42] text-white' : 'border-[#d9e2dd]'}`}>{checked && <Check size={14} aria-hidden="true"/>}</span>
       </button>;
-     }) : industries.slice(start, start + PAGE_SIZE).map(c => <button data-setup-option key={c.id} type="button" onClick={() => {setEditing(true);setCategoryId(c.id); setQuery(''); setPage(0); onChange(null);}} className={`group flex min-h-20 items-center justify-between gap-3 rounded-2xl border border-[#d9e2dd] bg-white px-4 py-3 text-left transition-colors hover:border-[#84938c] hover:bg-[#f7f9f8] ${focusStyle}`}>
-      <span><span className="block text-sm font-medium leading-5 text-[#11181d]">{c.label}</span><span className="mt-1 block text-xs leading-5 text-[#5b6b65]">{c.specialties.slice(0, 2).map(s => s.label).join(' · ')}</span></span>
+     }) : industries.slice(start, start + PAGE_SIZE).map(c => {const Icon=industryIcons[c.id]??BriefcaseBusiness;return <button data-setup-option key={c.id} type="button" aria-pressed={pendingCategory===c.id} onClick={() => setPendingCategory(c.id)} className={`group flex h-[104px] sm:h-[140px] items-center justify-between gap-3 rounded-2xl border border-[#d9e2dd] bg-white px-4 py-3 text-left transition-colors hover:border-[#84938c] hover:bg-[#f7f9f8] ${focusStyle}`}>
+      <Icon data-industry-icon size={26} strokeWidth={1.5} className="shrink-0" aria-hidden/><span className="min-w-0 flex-1 text-left"><span className="block text-sm font-medium leading-5 text-[#11181d]">{c.label}</span><span className="mt-1 block text-xs leading-5 text-[#5b6b65]">{c.specialties.slice(0, 2).map(s => s.label).join(' · ')}</span></span>
       <ChevronRight size={16} className="shrink-0 text-[#63756c] transition-transform group-hover:translate-x-0.5" aria-hidden="true"/>
-     </button>)}
+     </button>;})}
      {!count && <p className="col-span-full px-3 py-6 text-center text-sm text-[#5b6b65]">No matches. Try another search or use Setup help.</p>}
     </div>
    </SetupSectionTransition>
+   </div>
+
    {pageCount > 1 && <nav aria-label={category ? 'Speciality pages' : 'Industry pages'} className="flex items-center justify-between gap-3 px-1 pt-1">
-    {!onIndustryNavigation && currentPage>0 && <button type="button" aria-label="Previous choices" onClick={()=>setPage(currentPage-1)} className={`inline-flex size-10 items-center justify-center rounded-full border border-[#d9e2dd] text-[#353D42] hover:bg-[#f3f6f4] ${focusStyle}`}><ArrowLeft size={16}/></button>}
+    <button type="button" aria-label="Previous choices" disabled={currentPage === 0} onClick={()=>setPage(currentPage-1)} className={`inline-flex size-10 items-center justify-center rounded-full border border-[#d9e2dd] text-[#353D42] hover:bg-[#f3f6f4] disabled:cursor-not-allowed disabled:opacity-30 ${focusStyle}`}><ArrowLeft size={16}/></button>
     <span aria-live="polite" className="text-xs text-[#5b6b65]">{start + 1}–{Math.min(start + PAGE_SIZE, count)} of {count} <span className="sr-only">choices</span></span>
     <button type="button" aria-label="Next choices" disabled={currentPage === pageCount - 1} onClick={() => setPage(currentPage + 1)} className={`inline-flex size-10 items-center justify-center rounded-full border border-[#d9e2dd] text-[#353D42] hover:bg-[#f3f6f4] disabled:opacity-30 ${focusStyle}`}><ArrowRight size={16}/></button>
    </nav>}
+   {!category&&<button type="button" disabled={!pendingCategory} onClick={()=>{setEditing(true);setCategoryId(pendingCategory);setQuery('');setPage(0);onChange(null);}} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[#292929] px-5 text-sm font-medium text-white transition-colors hover:bg-[#404040] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none">Continue to specialities<ArrowRight size={16}/></button>}
   </>}
-  {category && showChoices && <p className="text-center text-xs leading-5 text-[#5b6b65]">{`${value?.specialtyIds.length ?? 0} of 8 selected · Choose all that apply, then save below.`}</p>}
+  {category && showChoices && <p className="min-h-10 text-center text-xs leading-5 tabular-nums text-[#5b6b65]">{`${value?.specialtyIds.length ?? 0} of 8 selected · Choose at least one.`}</p>}
   {value && !showChoices && <section aria-label="Your selected business" aria-live="polite" className="overflow-hidden rounded-2xl border border-[#d9e2dd] bg-white text-center shadow-[0_2px_8px_rgba(53,61,66,0.04)]">
    <div className="space-y-3 border-b border-[#e3e9e5] p-4">
     <div className="min-w-0"><p className="text-xs text-[#5b6b65]">Industry</p><p className="mt-1 text-sm font-medium leading-6 text-[#11181d]">{classificationLabels(value).category.label}</p></div>
@@ -93,6 +100,7 @@ export function BusinessClassificationPicker({value, onChange, error, onIndustry
     <button type="button" aria-label="Edit specialities" onClick={()=>{setEditing(true);setQuery('');setPage(0);}} className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-[#d9e2dd] bg-white px-4 text-xs font-medium text-[#353D42] transition-colors hover:border-[#84938c] hover:bg-[#f3f6f4] ${focusStyle}`}><Pencil size={13} aria-hidden="true"/>Edit specialities</button>
    </div>
   </section>}
+  {category && action}
   </div>
   </SetupSectionTransition>
   {error && <div id={`${id}-error`}><AuthFormAlert message={error}/></div>}

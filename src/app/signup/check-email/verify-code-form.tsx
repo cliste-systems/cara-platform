@@ -20,7 +20,7 @@ import {
 import { resendSignupConfirmationEmail } from "../resend-confirmation";
 import { verifySignupCode } from "../verify-code";
 
-export function VerifyCodeForm({ email }: { email: string }) {
+export function VerifyCodeForm({ email,allowLocalCode=false }: { email: string;allowLocalCode?:boolean }) {
   const router = useRouter();
   const codeInput = useRef<HTMLInputElement>(null);
   const [code, setCode] = useState("");
@@ -41,7 +41,7 @@ export function VerifyCodeForm({ email }: { email: string }) {
     startTransition(async () => {
       const result = await verifySignupCode(email, code).catch(() => ({ ok: false as const, message: "We couldn’t verify your code. Please try again." }));
       if (result.ok) {
-        router.replace("/auth/post-login");
+        router.replace("/signup/voice");
         router.refresh();
         return;
       }
@@ -116,7 +116,7 @@ export function VerifyCodeForm({ email }: { email: string }) {
           <OnboardingPrimaryButton
             type="submit"
             pending={pending}
-            disabled={code.length !== SIGNUP_EMAIL_OTP_LENGTH || resendPending}
+            disabled={(allowLocalCode?code.length===0:code.length !== SIGNUP_EMAIL_OTP_LENGTH) || resendPending}
             className="w-full max-w-none"
           >
             {pending ? "Verifying…" : "Verify and continue"}

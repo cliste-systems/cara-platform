@@ -35,7 +35,7 @@ export function isCallMediaRetentionExpired(
 export function formatCallMediaRetentionExpiredMessage(createdAt: string): string {
   const expiresAt = callMediaRetentionExpiresAt(createdAt);
   const dateLabel = expiresAt ? formatExpiryDate(expiresAt) : "30 days after the call";
-  return `Recording and transcript were automatically deleted on ${dateLabel} (30-day retention).`;
+  return `Recording and transcript access expired on ${dateLabel} (30-day retention).`;
 }
 
 function formatRemainingLabel(remainingMs: number): string {

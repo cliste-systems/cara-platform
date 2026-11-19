@@ -64,7 +64,7 @@ function PlanCheckoutFlowFallback() {
       variant="checkout"
       centered
       title="Set up billing"
-      description={`Add your payment details to start your ${PLATFORM_TRIAL_DAYS}-day free trial.`}
+      description={`Save your payment details. Your ${PLATFORM_TRIAL_DAYS}-day trial starts when your number is connected.`}
     >
       <div className="h-[28rem] w-full" aria-hidden />
     </OnboardingStepShell>
@@ -128,7 +128,7 @@ function PlanCheckoutFlowInner({
       description={
         activated
           ? undefined
-          : choosingSetup ? "Choose how you’d like to set up Cara, then continue to billing." : `Add your payment details to start your ${PLATFORM_TRIAL_DAYS}-day free trial.`
+          : choosingSetup ? "Choose how you’d like to set up Cara, then continue to billing." : `Save your payment details. Your ${PLATFORM_TRIAL_DAYS}-day trial starts when your number is connected.`
       }
     >
       <AnimatePresence mode="wait" initial={false}>
@@ -174,6 +174,7 @@ function PlanCheckoutFlowInner({
             transition={{ duration: 0.42, ease: ONBOARDING_EASE }}
           >
             <ClisteCheckoutSuccess
+              trialStartsOnConnection={summary.trialStartsOnConnection}
               trialDays={summary.trialDays}
               continueHref={continueHref}
               continueLabel={continueLabel}

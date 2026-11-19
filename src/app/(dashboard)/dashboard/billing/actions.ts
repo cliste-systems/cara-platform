@@ -17,7 +17,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 
 export type BillingPortalResult =
   | { ok: true; url: string }
-  | { ok: false; message: string };
+  | { ok: false; message: string; connectionPending?:boolean };
 
 export type EmbeddedBillingCheckoutResult =
   | { ok: true; clientSecret: string }
@@ -98,7 +98,7 @@ export async function finaliseBillingCheckout(
  * Mints a Stripe Billing Portal session so operators can update their
  * payment method, invoices, and subscription without leaving Cliste.
  */
-export async function openBillingPortal(): Promise<BillingPortalResult> {
+export async function openBillingPortal(paymentDetailsOnly=false): Promise<BillingPortalResult> {
   if (!stripeIsConfigured()) {
     return {
       ok: false,
@@ -106,7 +106,7 @@ export async function openBillingPortal(): Promise<BillingPortalResult> {
     };
   }
 
-  const { supabase, organizationId } = await requireDashboardAdmin();
+  const { supabase, organizationId,accountId } = await requireDashboardAdmin();
 
   const { data: org } = await supabase
     .from("organizations")
@@ -135,9 +135,15 @@ export async function openBillingPortal(): Promise<BillingPortalResult> {
   const returnBase = resolveAppSiteOrigin().origin;
 
   try {
+    const {data:billingAccount}=await supabase.from('accounts').select('platform_subscription_id').eq('id',accountId).single();
+    const subscriptionId=billingAccount?.platform_subscription_id??org?.platform_subscription_id;
+    const subscription=subscriptionId?await stripe.subscriptions.retrieve(subscriptionId):null;
+    const pendingConnection=subscription?.metadata.cliste_trial_activation==='forwarded_call'&&!subscription.metadata.cliste_connection_verified_at;
+    if(pendingConnection&&!paymentDetailsOnly)return {ok:false,connectionPending:true,message:'Your trial is waiting for your phone connection. You can update your payment method or cancel setup here.'};
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: `${returnBase}/dashboard/usage`,
+      ...(pendingConnection?{flow_data:{type:'payment_method_update' as const,after_completion:{type:'redirect' as const,redirect:{return_url:`${returnBase}/dashboard/usage`}}}}:{}),
     });
     if (!session.url) {
       return { ok: false, message: "Stripe did not return a billing portal URL." };
@@ -189,4 +195,15 @@ async function resolvePlatformCustomerId(
     .eq("id", organizationId);
 
   return customerId;
+}
+
+/** Cancellation remains available while the ordinary subscription portal is withheld. */
+export async function cancelPendingConnectionSetup():Promise<{ok:boolean;message:string}>{
+ const {supabase,accountId,organizationId}=await requireDashboardAdmin();
+ const {data:account}=await supabase.from('accounts').select('platform_subscription_id').eq('id',accountId).single();
+ if(!account?.platform_subscription_id)return {ok:false,message:'No subscription was found.'};
+ const stripe=getStripeClient(),sub=await stripe.subscriptions.retrieve(account.platform_subscription_id);
+ if(sub.metadata.cliste_account_id!==accountId||sub.metadata.cliste_organization_id!==organizationId||sub.metadata.cliste_trial_activation!=='forwarded_call'||sub.metadata.cliste_connection_verified_at)return {ok:false,message:'Your billing state changed. Refresh before continuing.'};
+ if(sub.status!=='canceled')await stripe.subscriptions.cancel(sub.id,{invoice_now:false,prorate:false});
+ revalidatePath('/dashboard');return {ok:true,message:'Setup cancelled. Your trial will not start.'};
 }

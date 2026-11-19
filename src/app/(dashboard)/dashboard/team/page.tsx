@@ -1,4 +1,4 @@
-import { canManageDashboardConfig } from "@/lib/team-roles";
+import {hasAccountOwnerAccess} from "@/lib/account-owner-access";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -30,7 +30,7 @@ export default async function TeamPage() {
     <TeamView
       members={members}
       currentUserId={session.user.id}
-      canManage={canManageDashboardConfig(session.profile.role)}
+      canManage={await hasAccountOwnerAccess(session.supabase,{userId:session.user.id,accountId:session.accountId,profileRole:session.profile.role})}
     />
   );
 }

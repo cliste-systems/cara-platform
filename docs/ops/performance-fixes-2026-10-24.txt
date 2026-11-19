@@ -1,0 +1,29 @@
+Performance fixes — 24 October 2026
+
+Applied to Supabase:
+- Scheduler store-history, retention, queue-batch and completed-run indexes.
+- Four RLS policies use per-query auth initplans; permissions unchanged.
+- 39 foreign-key lookup indexes. Advisor now reports no unindexed foreign keys or auth initplan warnings.
+- dashboard_home_rollups uses invoker rights and existing tenant RLS. Returns aggregate counts/minutes, grouped outcomes and weighted summaries; no PostgREST row-cap truncation.
+- Publisher gets scoped 16 MB work_mem; campaign source CTE permits filter/join pushdown. Existing coverage gates, publication lock and atomic transaction unchanged.
+- Catalogue importer v15 deployed: upsert-returning removes two subsequent lookups per batch. Existing freshness writes remain necessary for coverage evidence.
+
+Local application changes (not production-deployed):
+- All five signup stages centre on desktop when content fits; oversized forms grow and scroll. Confirmation already centred.
+- Dashboard uses the aggregate RPC and parallelises account/scope loads.
+- Fallback polling now 30 seconds in development and production; home layout refresh throttled to 30 seconds while snapshot events remain immediate.
+
+Verification:
+- Previously measured scheduler lookup 62,132 ms; after index 0.744 ms (warm cache). Full recent scheduler runs 0.15–0.59 seconds.
+- Latest publisher cron completed in 2.83 seconds; one sample is not a sustained performance guarantee.
+- 15 recent importer requests returned HTTP 200 after deployment.
+- 24 catalogue/topic regression tests passed; TypeScript and targeted ESLint passed.
+- Aggregate actual call count matched direct SQL; authenticated role with no tenant identity returned zero even when given all organization IDs.
+- Desktop billing/account/voice/plans measured equal top/bottom gaps. Small-screen account form remained accessible with natural overflow and no horizontal overflow.
+
+Remaining:
+- Auth percentage-based connection allocation cannot be changed with the rejected Management API credential. SQL MCP does not expose it.
+- 30-day operational cron history cleanup was explicitly approved and applied. Hourly cleanup deletes at most 10,000 completed records older than 30 days; running jobs and customer data are excluded.
+- Existing unused-index notices retained: low usage alone is insufficient evidence to remove security/billing or newly created indexes.
+- pg_net already expires HTTP response records after six hours; no new retention policy was imposed on these records.
+- No customer data was deleted, no paid infrastructure upgrade, no production website deployment.

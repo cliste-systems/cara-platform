@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -108,34 +108,23 @@ export function DemoRetailRegressionPanel({ line }: { line: AdminDemoCallLine })
   const [copied, setCopied] = useState(false);
   const stopRequested = useRef(false);
 
-  const loadSuite = async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const res = await fetch(
+  const loadSuite = useCallback(() =>
+    fetch(
         `${API_PATH}?calledNumber=${encodeURIComponent(line.e164)}`,
         { cache: "no-store" },
-      );
+      ).then(async (res) => {
       const data = (await res.json()) as SuiteResponse;
       if (!res.ok) throw new Error(data.error ?? "Failed to load regression suite.");
       setSuite(data);
-    } catch (error) {
+    }).catch((error: unknown) => {
       setLoadError(
         error instanceof Error ? error.message : "Failed to load regression suite.",
       );
-    } finally {
-      setLoading(false);
-    }
-  };
+    }).finally(() => setLoading(false)), [line.e164]);
 
   useEffect(() => {
-    setResults(new Map());
-    setRunId(null);
-    setRunStartedAt(null);
-    setRunCompletedAt(null);
     void loadSuite();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [line.e164]);
+  }, [loadSuite]);
 
   const categories = useMemo(() => {
     const values = new Set(suite?.scenarios.map((scenario) => scenario.category) ?? []);
@@ -318,6 +307,8 @@ export function DemoRetailRegressionPanel({ line }: { line: AdminDemoCallLine })
       });
 
       setRunCompletedAt(new Date().toISOString());
+      setLoading(true);
+      setLoadError(null);
       await loadSuite();
     } catch (error) {
       setLoadError(
@@ -384,7 +375,7 @@ export function DemoRetailRegressionPanel({ line }: { line: AdminDemoCallLine })
           <p className="text-sm text-red-700">{loadError}</p>
           <button
             type="button"
-            onClick={() => void loadSuite()}
+            onClick={() => { setLoading(true); setLoadError(null); void loadSuite(); }}
             className={adminSecondaryButtonClass}
           >
             <RefreshCcw className="size-3.5" aria-hidden />

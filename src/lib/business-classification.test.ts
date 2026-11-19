@@ -22,16 +22,16 @@ test('self-service classification uses the general workspace while multiple trad
 test('selecting electrician saves classification without inventing confirmed services or requiring prose',()=>{
  const result=firstCallConfigPatch('profile',{businessClassification:JSON.stringify(electrician),description:''},'Example');assert.ok(result.ok);
  assert.equal(result.patch.niche,'other');assert.deepEqual(result.patch.business_classification,electrician);
- assert.equal(result.patch.agent_business_type,'Electrician');assert.equal(result.patch.raw_business_description,null);
+ assert.equal(result.patch.agent_business_type,'Electrical');assert.equal(result.patch.raw_business_description,null);
  assert.equal(result.patch.agent_services_departments,undefined);assert.equal(result.patch.is_active,undefined);
  assert.ok(classificationServiceSuggestions(electrician).includes('Rewiring'));
 });
 test('contradictory confirmed service selections are rejected',()=>assert.equal(firstCallConfigPatch('services',{services:'Rewiring',notOffered:'rewiring'},'Example').ok,false));
 test('saved classification reaches the compiled live prompt with boundaries and explicit-service precedence',()=>{
- const input=buildCaraSetupPromptInputFromOrg({name:'Example',business_classification: electrician,agent_business_type:'Electrician',agent_services_departments:'Electrical repairs'});
+ const input=buildCaraSetupPromptInputFromOrg({name:'Example',business_classification: electrician,agent_business_type:'Electrical',agent_services_departments:'Electrical repairs'});
  assert.equal(input.businessScope,businessScopeGuidance(electrician));
  const prompt=compileCaraPrompt(input);
- assert.match(prompt,/BUSINESS SCOPE.*Trades & construction → Electrician/);
+ assert.match(prompt,/BUSINESS SCOPE.*Trades & construction → Electrical/);
  assert.match(prompt,/clearly unrelated work unless the business explicitly lists it as offered/);
  assert.match(prompt,/plausible but unconfirmed service/);
  assert.match(prompt,/Never infer prices, qualifications, certification, availability, emergency cover/);

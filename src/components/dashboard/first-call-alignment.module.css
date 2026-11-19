@@ -126,7 +126,7 @@
 }
 @media (max-width:899px) {
  .flow[data-full-setup-scene] [data-first-call-body] { padding-top:clamp(110px,17dvh,150px); }
- .flow[data-full-setup-scene] [data-setup-content] { min-height:0; margin-top:0; margin-bottom:auto; }
+ .flow[data-full-setup-scene] [data-setup-content] { min-height:0; margin-block:auto; }
  .flow[data-full-setup-scene] [data-setup-content] > header img { height:24px; margin-bottom:.25rem; }
  .flow[data-full-setup-scene] [data-setup-content] > header h2 { font-size:25px; }
  .flow[data-full-setup-scene] [data-setup-content] > div { padding-top:1rem; }
@@ -295,3 +295,9 @@
   padding-inline:32px; border-top:0; background:transparent;
  }
 }
+
+/* Shared desktop interaction affordances across the journey. */
+.flow :is(button, [role="button"], a[href], summary, select, input[type="checkbox"], input[type="radio"]) { cursor:pointer; }
+.flow :is(button:disabled, [aria-disabled="true"], fieldset:disabled button) { cursor:not-allowed; }
+.flow button { transition:background-color 200ms ease,color 200ms ease,border-color 200ms ease; }
+@media(prefers-reduced-motion:reduce) { .flow button { transition:none; } }

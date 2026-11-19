@@ -53,6 +53,7 @@ const CANONICAL_QUESTION_PATTERNS: {
     setupLabel: "Services",
     setupHref: DASHBOARD_ROUTES.businessServices,
     patterns: [
+      /\b(?:how much|what (?:is|are) (?:the |your )?(?:price|cost)|how long (?:does|will).*(?:take))\b/i,
       /\bwhat\s+(?:services|do\s+you\s+(?:offer|do)|can\s+you\s+do)\b/i,
       /\b(?:services|work)\s+(?:do\s+you|you)\s+(?:offer|do|provide)\b/i,
       /\bwhat\s+(?:type|kind)s?\s+of\s+(?:work|jobs?)\b/i,
@@ -60,7 +61,7 @@ const CANONICAL_QUESTION_PATTERNS: {
   },
   {
     category: "hours",
-    setupLabel: "Profile",
+    setupLabel: "Your business",
     setupHref: DASHBOARD_ROUTES.businessProfile,
     patterns: [
       /\b(?:what\s+(?:are\s+)?(?:your\s+)?(?:opening\s+)?hours|when\s+are\s+you\s+open)\b/i,
@@ -71,7 +72,7 @@ const CANONICAL_QUESTION_PATTERNS: {
   },
   {
     category: "location",
-    setupLabel: "Profile",
+    setupLabel: "Your business",
     setupHref: DASHBOARD_ROUTES.businessProfile,
     patterns: [
       /\bwhere\s+(?:are\s+you|is\s+(?:the\s+)?(?:business|shop|salon|office))\b/i,
@@ -81,7 +82,7 @@ const CANONICAL_QUESTION_PATTERNS: {
   },
   {
     category: "areas",
-    setupLabel: "Profile",
+    setupLabel: "Your business",
     setupHref: DASHBOARD_ROUTES.businessProfile,
     patterns: [
       /\bwhat\s+areas\b/i,

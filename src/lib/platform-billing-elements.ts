@@ -1,3 +1,4 @@
+import { recordApplicationEvent } from "@/lib/application-monitoring";
 import "server-only";
 
 import { finalizeSignupBilling } from "@/lib/signup-billing-security";
@@ -13,11 +14,14 @@ import { getStripeClient } from "@/lib/stripe";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export type PlatformElementsCheckoutSummary = {
+  trialStartsOnConnection?: boolean;
   planName: string;
   setupLabel?: string;
   setupTier?: "diy" | "remote" | "onsite_dublin";
   trialDays: number;
   amountLabel: string;
+  recurringAmountCents?: number;
+  setupAmountCents?: number;
   intervalLabel: string;
   email: string;
 };
@@ -209,6 +213,7 @@ function checkoutSummary(
     planName: plan.name,
     trialDays: PLATFORM_TRIAL_DAYS,
     amountLabel: formatEuro(monthlyCents),
+    recurringAmountCents: monthlyCents,
     intervalLabel: interval === "year" ? "year" : "month",
     email,
   };
@@ -221,6 +226,7 @@ function checkoutSummary(
 export async function createPlatformElementsCheckout(
   input: ElementsCheckoutInput,
 ): Promise<PlatformElementsCheckoutResult> {
+  const startedAt = Date.now();
   const email = input.userEmail.trim();
   if (!email) {
     return { ok: false, message: "Email is required for billing." };
@@ -233,7 +239,10 @@ export async function createPlatformElementsCheckout(
     input.interval,
     input.signupFlow,
   );
-  if (!prices.ok) return prices;
+  if (!prices.ok) {
+    await recordApplicationEvent({kind:"error",operation:"billing/prepare",code:"pricing_unavailable",organizationId:input.organizationId});
+    return prices;
+  }
 
   const lineItems: Array<{ price: string; quantity?: number }> = [
     { price: prices.planPriceId, quantity: 1 },
@@ -244,6 +253,8 @@ export async function createPlatformElementsCheckout(
   }
 
   const stripe = getStripeClient();
+  const setupHoldExpires=input.signupFlow?(input.trialEnd ? input.trialEnd + (30-PLATFORM_TRIAL_DAYS)*86400 : !input.idempotencyKey ? Math.floor(Date.now()/1000)+30*86400 : null):null;
+  if(input.signupFlow && (!Number.isSafeInteger(setupHoldExpires) || setupHoldExpires! <= Math.floor(Date.now()/1000))) throw new Error("A valid stable signup billing expiry is required.");
 
     const customer = await stripe.customers.create({
       email,
@@ -260,8 +271,10 @@ export async function createPlatformElementsCheckout(
     const subscription = await stripe.subscriptions.create({
       customer: customer.id,
       items: lineItems,
-      ...(input.trialEnd ? { trial_end: input.trialEnd } : { trial_period_days: PLATFORM_TRIAL_DAYS }),
-      ...(input.signupFlow ? {trial_settings:{end_behavior:{missing_payment_method:"cancel" as const}}} : {}),
+      // A no-collection setup hold, not the customer's seven-day trial. Even if
+      // the 30-day setup hold expires, voided collection prevents a charge.
+      ...(input.signupFlow ? {trial_period_days:30} : input.trialEnd ? {trial_end:input.trialEnd} : {trial_period_days:PLATFORM_TRIAL_DAYS}),
+      ...(input.signupFlow ? {trial_settings:{end_behavior:{missing_payment_method:"cancel" as const}},cancel_at:setupHoldExpires!} : {}),
       payment_behavior: "default_incomplete",
       payment_settings: { save_default_payment_method: "on_subscription" },
       expand: ["pending_setup_intent"],
@@ -273,9 +286,17 @@ export async function createPlatformElementsCheckout(
           : {}),
         ...(input.accountId ? { cliste_account_id: input.accountId } : {}),
         ...(input.devPreview ? { cliste_dev_preview: "true" } : {}),
-        ...(input.signupFlow ? { cliste_signup_flow: input.signupFlow } : {}),
+        ...(input.signupFlow ? { cliste_signup_flow: input.signupFlow, cliste_trial_activation:"forwarded_call",cliste_setup_hold_expires:String(setupHoldExpires) } : {}),
       },
     }, input.idempotencyKey ? {idempotencyKey:`${input.idempotencyKey}-subscription`} : undefined);
+
+    if (subscription.status === "canceled" || subscription.status === "incomplete_expired") {
+      throw new Error("This checkout has expired.");
+    }
+    if(input.signupFlow){
+      try {await stripe.subscriptions.update(subscription.id,{pause_collection:{behavior:"void"}}, {idempotencyKey:`connection-hold-${subscription.id}`});}
+      catch(error){await stripe.subscriptions.cancel(subscription.id,{invoice_now:false,prorate:false});throw error;}
+    }
 
     const setupIntentRef = subscription.pending_setup_intent;
     const setupIntentId =
@@ -311,7 +332,7 @@ export async function createPlatformElementsCheckout(
       };
     }
 
-    if (prices.setupPriceId) {
+    if (prices.setupPriceId && !input.signupFlow) {
       // Created after the trial subscription's initial invoice: charged once at trial end.
       await stripe.invoiceItems.create({customer:customer.id,subscription:subscription.id,pricing:{price:prices.setupPriceId},quantity:1,metadata:{cliste_subscription_id:subscription.id,cliste_launch_tier:input.launchTier}}, {idempotencyKey:`setup-fee-${subscription.id}`});
     }
@@ -319,11 +340,16 @@ export async function createPlatformElementsCheckout(
       ok: true,
       clientSecret,
       subscriptionId: subscription.id,
-      summary: {...checkoutSummary(input.planTier, input.interval, email), setupTier: input.launchTier === "remote" ? "remote" : input.launchTier === "diy" ? "diy" : "onsite_dublin", ...(prices.setupPriceId ? {setupLabel:`${LAUNCHES[input.launchTier].name} · ${formatEuro(LAUNCHES[input.launchTier].priceCents)} once, on your first invoice after the trial`} : {})},
+      summary: {...checkoutSummary(input.planTier, input.interval, email),trialStartsOnConnection:Boolean(input.signupFlow), setupAmountCents: prices.setupPriceId ? LAUNCHES[input.launchTier].priceCents : 0, setupTier: input.launchTier === "remote" ? "remote" : input.launchTier === "diy" ? "diy" : "onsite_dublin", ...(prices.setupPriceId ? {setupLabel:`${LAUNCHES[input.launchTier].name} · ${formatEuro(LAUNCHES[input.launchTier].priceCents)} once, on your first invoice after the trial`} : {})},
     };
   } catch (err) {
-    console.error("[platform-billing-elements] checkout failed", err);
+    await recordApplicationEvent({kind:"error",operation:"billing/prepare",code:"checkout_preparation_failed",organizationId:input.organizationId});
+    const failure = err as {type?:string;code?:string;statusCode?:number};
+    console.error("[platform-billing-elements] checkout failed", {type:failure?.type??"unknown",code:failure?.code,status:failure?.statusCode});
     return { ok: false, message: "Payment setup is temporarily unavailable. Please try again shortly." };
+  } finally {
+    const durationMs = Date.now() - startedAt;
+    if (durationMs >= 3000) await recordApplicationEvent({kind:"slow",operation:"billing/prepare",code:"over_3_seconds",organizationId:input.organizationId,durationMs});
   }
 }
 

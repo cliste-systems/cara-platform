@@ -17,7 +17,7 @@ type Props = {
 };
 
 const timeClass =
-  "h-9 min-w-0 flex-1 rounded-lg border border-slate-200/90 bg-white px-2 text-[13px] text-[#0b1220] shadow-sm outline-none focus-visible:border-[#0b1220]/30 focus-visible:ring-2 focus-visible:ring-[#0b1220]/10";
+  "h-11 w-0 min-w-0 flex-1 rounded-lg border border-slate-200/90 bg-white px-2 text-[13px] text-[#0b1220] shadow-sm outline-none focus-visible:border-[#0b1220]/30 focus-visible:ring-2 focus-visible:ring-[#0b1220]/10";
 
 const MODE_OPTIONS: { id: BankHolidayMode; label: string }[] = [
   { id: "not_set", label: "Not set" },
@@ -96,7 +96,7 @@ export function BankHolidaysEditor({
         )}
       >
         <div
-          className="flex flex-wrap gap-1.5"
+          className="grid grid-cols-2 gap-1.5 sm:grid-cols-4"
           role="tablist"
           aria-label="Bank and public holiday rule"
         >
@@ -110,7 +110,7 @@ export function BankHolidaysEditor({
                 aria-selected={active}
                 onClick={() => setMode(option.id)}
                 className={cn(
-                  "cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors",
+                  "min-h-11 cursor-pointer rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors",
                   active
                     ? "bg-[#0b1220] text-white"
                     : "border border-slate-200 bg-white text-[#0b1220]",
@@ -122,7 +122,7 @@ export function BankHolidaysEditor({
           })}
         </div>
 
-        <div className="relative mt-3 min-h-12">
+        <div className="relative mt-3">
           {mode === "not_set" ? (
             <p className="animate-in text-[12.5px] text-slate-500 fade-in duration-200 motion-reduce:animate-none">
               Cara won&apos;t mention bank holidays unless callers ask — choose
@@ -138,7 +138,7 @@ export function BankHolidaysEditor({
           ) : null}
 
           {mode === "open" ? (
-            <div className="animate-in flex flex-nowrap items-center gap-3 fade-in duration-200 motion-reduce:animate-none">
+            <div className="animate-in flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3 fade-in duration-200 motion-reduce:animate-none">
               <span className="text-[13px] text-[#0b1220]">Open hours</span>
               <div className="flex min-w-0 flex-1 items-center gap-1.5">
                 <input

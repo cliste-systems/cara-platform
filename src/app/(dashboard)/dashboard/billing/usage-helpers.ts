@@ -9,6 +9,9 @@ export type UsageLocationBreakdown = {
 };
 
 export type UsagePageData = {
+  billingDetails?:import("@/lib/dashboard-billing-details").DashboardBillingDetails|null;
+  setupChoice?:string;
+  loadError?:string|null;
   planName: string;
   plan: PlanDefinition | null;
   usedMinutes: number;
@@ -30,6 +33,7 @@ export type UsagePageData = {
   hasSubscription: boolean;
   /** Show Manage billing (portal or heal customer from subscription). */
   canManageBilling: boolean;
+  canSetUpBilling?: boolean;
   suspended: boolean;
   suspendedReason: string | null;
   usedSms: number;

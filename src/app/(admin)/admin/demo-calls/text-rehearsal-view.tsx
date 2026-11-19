@@ -267,7 +267,7 @@ export function TextRehearsalView({ lines }: TextRehearsalViewProps) {
             onSelectedE164Change={setSelectedE164}
             disabled={false}
           />
-          <DemoRetailRegressionPanel line={selectedLine} />
+          <DemoRetailRegressionPanel key={selectedLine.e164} line={selectedLine} />
         </div>
       ) : null}
 

@@ -1,4 +1,8 @@
 "use client";
+import { FaqEditor } from "./faq-editor";
+import { useDashboardVertical } from "../dashboard-vertical-context";
+import { FormFeedback } from "@/components/ui/form-feedback";
+import type { AgentFaq } from "../agent-setup/agent-faqs";
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -173,6 +177,7 @@ function formatKnowledgeDate(iso: string | null | undefined): string | null {
 }
 
 export function CaraKnowledgePageView({
+  faqs=[],version="",
   index,
   folders: folderData,
   trainingItems,
@@ -190,6 +195,7 @@ export function CaraKnowledgePageView({
   businessHours = null,
   openingHoursText = null,
 }: {
+  faqs?:AgentFaq[];version?:string;
   index: CaraKnowledgeIndex;
   folders: CaraKnowledgeFolderPageData;
   trainingItems: CaraTrainingListItem[];
@@ -207,6 +213,8 @@ export function CaraKnowledgePageView({
   businessHours?: unknown;
   openingHoursText?: string | null;
 }) {
+  const {copy}=useDashboardVertical();
+  const general=copy.vertical.id!=="retail";
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<CaraKnowledgeTab>(initialTab);
@@ -294,7 +302,10 @@ export function CaraKnowledgePageView({
     [query, router, searchParams, tab],
   );
 
-  useEffect(() => {
+  const navigationQuery = searchParams.toString();
+  const [lastNavigationQuery, setLastNavigationQuery] = useState<typeof navigationQuery | undefined>(undefined);
+  if (lastNavigationQuery !== navigationQuery) {
+    setLastNavigationQuery(navigationQuery);
     setTab(parseTab(searchParams.get("tab")));
     const item = searchParams.get("item");
     if (item && parseTab(searchParams.get("tab")) === "needs-input") {
@@ -307,13 +318,11 @@ export function CaraKnowledgePageView({
       setQuery(q);
       setTeachText(q);
     }
-  }, [searchParams]);
+  }
 
-  useEffect(() => {
-    if (tab === "history") setHistoryMounted(true);
-    if (tab === "needs-input") setTrainingMounted(true);
-    if (tab === "temporary") setTemporaryMounted(true);
-  }, [tab]);
+  if (tab === "history" && !historyMounted) setHistoryMounted(true);
+  if (tab === "needs-input" && !trainingMounted) setTrainingMounted(true);
+  if (tab === "temporary" && !temporaryMounted) setTemporaryMounted(true);
 
   const selectTab = (nextTab: CaraKnowledgeTab) => {
     setTab(nextTab);
@@ -540,38 +549,35 @@ export function CaraKnowledgePageView({
       <ClistePageHeader
         tone="knowledge"
         icon={BookOpen}
-        title="Cara's Knowledge"
+        title={general ? "Cara’s knowledge" : "Cara's Knowledge"}
         description="Everything Cara knows about your business."
         className="shrink-0"
         actions={
           canManage ? (
-            <Button
+            <div className="flex flex-wrap gap-2">{general&&<FaqEditor initialFaqs={faqs} initialVersion={version}/>}<Button
               type="button"
               onClick={() => openTeach()}
               className={cn(DASHBOARD_PRIMARY_BUTTON_CLASS, "gap-1.5")}
             >
               <Plus className="size-4" aria-hidden />
               Teach Cara
-            </Button>
+            </Button></div>
           ) : null
         }
       />
 
-      {loadError ? (
-        <p className="shrink-0 text-[13px] text-red-700">
-          Could not load knowledge: {loadError}
-        </p>
-      ) : null}
+      <FormFeedback message={loadError?"We couldn’t load Cara’s knowledge. Please refresh and try again.":null}/>
+
 
       <section
         className={cn(
           DASHBOARD_CARD_SURFACE,
-          "flex min-h-0 flex-1 flex-col overflow-hidden",
+          "flex min-h-0 flex-col overflow-hidden",
         )}
       >
         <div className="flex shrink-0 flex-col gap-3 border-b border-[#dfe7e2] px-4 py-3 sm:px-5">
           <div
-            className="inline-flex w-full rounded-lg border border-[#d9e2dd] bg-[#f6faf7] p-0.5"
+            className="grid grid-cols-2 gap-1 sm:flex w-full rounded-lg border border-[#d9e2dd] bg-[#f6faf7] p-0.5"
             role="tablist"
             aria-label="Cara knowledge sections"
           >
@@ -591,20 +597,20 @@ export function CaraKnowledgePageView({
                   aria-selected={active}
                   onClick={() => selectTab(item.id)}
                   className={cn(
-                    "inline-flex min-w-0 flex-1 items-center justify-center rounded-md px-2 py-2 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#11181d] focus-visible:ring-offset-2 sm:px-3 sm:text-[13px]",
+                    "inline-flex min-h-11 min-w-0 flex-1 items-center justify-center rounded-md px-2 py-2 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#11181d] focus-visible:ring-offset-2 sm:px-3 sm:text-[13px]",
                     active
                       ? "bg-[#11181d] text-white shadow-sm"
                       : "text-[#5b6b65] hover:bg-white hover:text-[#11181d]",
                   )}
                 >
-                  <span className="whitespace-nowrap">{item.label}</span>
+                  <span>{general?({knows:"Knowledge", "needs-input":"Needs answers",temporary:"Temporary updates",history:"History"}[item.id]):item.label}</span>
                   {badge ? (
                     <span
                       className={cn(
                         "ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums",
-                        active
-                          ? "bg-white/15 text-white"
-                          : "bg-[#11181d]/8 text-[#11181d]",
+                        general && item.id === "needs-input"
+                          ? active ? "bg-[#a8b4e0]/15 text-[#a8b4e0]" : "bg-[#a8b4e0]/15 text-[#56638c]"
+                          : active ? "bg-white/15 text-white" : "bg-[#11181d]/8 text-[#11181d]",
                       )}
                     >
                       {badge}
@@ -714,7 +720,7 @@ export function CaraKnowledgePageView({
           closeTeach();
         }}
       >
-        <DialogContent className="max-w-lg gap-0 overflow-hidden border-[#cfd9d3] bg-white p-0 shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] max-w-lg flex-col gap-0 overflow-hidden border-[#cfd9d3] bg-white p-0 shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
           <div className="border-b border-[#dfe7e2] bg-white px-6 pb-5 pt-6">
             <DialogHeader className="text-left">
               <DialogTitle className="text-[20px] tracking-tight text-[#0b1220]">
@@ -749,7 +755,7 @@ export function CaraKnowledgePageView({
             ) : null}
           </div>
 
-          <div className="space-y-4 px-6 py-5">
+          <div className="min-h-0 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6">
             {teachStep === "content" ? (
               <div className="rounded-xl border border-[#dfe7e2] bg-[#f8fafb] p-4">
                 <label
@@ -898,11 +904,11 @@ export function CaraKnowledgePageView({
             ) : null}
 
             {teachError ? (
-              <p className="text-[12px] text-red-700">{teachError}</p>
+              <FormFeedback message={teachError} />
             ) : null}
           </div>
 
-          <DialogFooter className="mx-0 mb-0 mt-0 flex-row rounded-none border-t border-[#dfe7e2] bg-white px-6 pb-6 pt-4 sm:justify-between">
+          <DialogFooter className="mx-0 mb-0 mt-0 shrink-0 flex-row justify-between rounded-none border-t border-[#dfe7e2] bg-white px-6 pb-6 pt-4 sm:justify-between">
             {teachStep === "success" ? (
               <>
                 <Button
@@ -1006,7 +1012,7 @@ export function CaraKnowledgePageView({
         }}
       >
         {selectedEntry ? (
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-lg overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{selectedEntry.title}</DialogTitle>
               <DialogDescription className="sr-only">
@@ -1117,7 +1123,7 @@ export function CaraKnowledgePageView({
               </DialogDescription>
             </DialogHeader>
             {actionError ? (
-              <p className="text-[12px] text-red-700">{actionError}</p>
+              <FormFeedback message={actionError} />
             ) : null}
             <DialogFooter>
               <Button

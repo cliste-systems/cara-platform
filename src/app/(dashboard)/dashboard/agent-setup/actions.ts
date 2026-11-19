@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { dashboardHoursError } from "@/lib/dashboard-hours-validation";
 
 import { compactEircode, normalizeIrelandLocationQuery } from "@/lib/geocode-ireland";
 import { requireDashboardAdmin } from "@/lib/dashboard-admin";
@@ -54,6 +55,7 @@ import { parseDetailsCollectMode } from "@/lib/details-collect-mode";
 import { cleanAgentFaqs, type AgentFaq } from "./agent-faqs";
 
 export type AgentSetupPayload = {
+  version?: string;
   assistantDisplayName: string;
   greetingIntro: string;
   greetingClosing: string;
@@ -79,7 +81,7 @@ export type AgentSetupPayload = {
   rawBusinessDescription?: string;
 };
 
-type SaveResult = { ok: true } | { ok: false; message: string };
+type SaveResult = { ok: true; version: string } | { ok: false; message: string };
 
 const MAX_GREETING = 500;
 const MAX_ASSISTANT_NAME = 64;
@@ -97,7 +99,6 @@ import { recordCaraKnowledgeEvent } from "@/lib/cara-knowledge-events";
 import {
   AGENT_CONFIG_REVALIDATE_PATHS,
   CARA_KNOWLEDGE_REVALIDATE_PATHS,
-  DASHBOARD_ROUTES,
 } from "@/lib/dashboard-routes";
 
 function revalidateCaraSetup() {
@@ -118,11 +119,13 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
 
   const { data: orgRow } = await supabase
     .from("organizations")
-    .select("name, assistant_display_name")
+    .select("name, assistant_display_name, updated_at")
     .eq("id", organizationId)
-    .maybeSingle<{ name: string; assistant_display_name: string | null }>();
+    .maybeSingle<{ name: string; assistant_display_name: string | null; updated_at: string }>();
 
-  const businessName = orgRow?.name ?? "";
+  if (!orgRow) return {ok:false,message:"We couldn’t load your business details. Please try again."};
+  if (payload.version && payload.version !== orgRow.updated_at) return {ok:false,message:"Business details changed in another tab. Reload before saving. Your draft is still here."};
+  const businessName = orgRow.name;
   const assistantDisplayName = assistantNameLabel(
     String(orgRow?.assistant_display_name ?? "").trim() ||
       VOICE_ASSISTANT_DEFAULT_NAME,
@@ -173,7 +176,8 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
   const businessHours = payload.businessHours;
   const open24_7 = payload.open24_7 === true;
   const hoursNote = String(payload?.hoursNote ?? "").trim().slice(0, 120);
-  const bankHolidays = payload.bankHolidays;
+  const hoursError = dashboardHoursError(businessHours, open24_7, payload.bankHolidays);
+  if (hoursError) return { ok: false, message: hoursError };
   const openingHours = open24_7
     ? "Open 24 hours, 7 days a week"
     : weekScheduleHasOpenDay(businessHours)
@@ -276,7 +280,7 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
   const niche = String(orgMeta?.niche ?? "");
   const useCatalog = verticalPackForNiche(niche).capabilities.usesServiceCatalog;
   const serviceCatalog = useCatalog
-    ? await listServicesForOrg(supabase, organizationId)
+    ? (await listServicesForOrg(supabase, organizationId)).filter(s => s.details?.status !== "archived")
     : [];
 
   const pricingConflict = lintCatalogPricingVsRules(
@@ -347,6 +351,12 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
     clearOnboardingRawParagraphs: true,
   });
   if (!knowledgePatch.ok) return knowledgePatch;
+  // The service editor owns the catalogue and its names. Saving hours, greeting
+  // or business details must not round-trip names through a comma-delimited list.
+  if (useCatalog) {
+    delete knowledgePatch.update.agent_services_departments;
+    delete knowledgePatch.update.agent_services_departments_raw;
+  }
 
   const update: Record<string, unknown> = {
     assistant_display_name: assistantDisplayName,
@@ -362,10 +372,12 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
     ...knowledgePatch.update,
   };
 
-  const { error } = await supabase
+  const compiled = await regenerateCaraCustomPrompt(supabase, organizationId, {dryRun:true, orgPatch:update});
+  if (!compiled.ok || !compiled.prompt) return {ok:false,message:compiled.ok ? "We couldn’t update Cara. Please try again." : compiled.message};
+  const { data: saved, error } = await supabase
     .from("organizations")
-    .update(update)
-    .eq("id", organizationId);
+    .update({...update,custom_prompt:compiled.prompt,prompt_compile_warnings:compiled.warnings,updated_at:new Date().toISOString()})
+    .eq("id", organizationId).eq("updated_at",orgRow.updated_at).select("updated_at").maybeSingle();
 
   if (error) {
     if (
@@ -377,10 +389,10 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
         message: databaseUpdateRequiredMessage("agent_cara_conduct"),
       };
     }
-    return { ok: false, message: error.message };
+    return { ok: false, message: "We couldn’t save your business details. Your draft is still here. Please try again." };
   }
 
-  await regenerateCaraCustomPrompt(supabase, organizationId);
+  if (!saved) return {ok:false,message:"Business details changed while saving. Reload before trying again. Your draft is still here."};
 
   await recordCaraKnowledgeEvent(supabase, {
     organizationId,
@@ -395,5 +407,5 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
   });
 
   revalidateCaraSetup();
-  return { ok: true };
+  return { ok: true, version: saved.updated_at };
 }

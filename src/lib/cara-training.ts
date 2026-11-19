@@ -443,6 +443,14 @@ export async function createTrainingItem(
     }
   }
 
+  if (input.callLogId) {
+    const { data: previous, error: previousError } = await admin.from("cara_training_items")
+      .select("id").eq("organization_id", input.organizationId).eq("call_log_id", input.callLogId)
+      .eq("cara_question", caraQuestion).limit(1).maybeSingle();
+    if (previousError) return { ok: false, message: "Could not check the existing knowledge question." };
+    if (previous) return { ok: true, itemId: String(previous.id) };
+  }
+
   const normalizedTopic = trainingQuestionDedupeKey({
     gapSummary,
     caraQuestion,
@@ -496,6 +504,7 @@ export async function createTrainingItem(
     .insert({
       organization_id: input.organizationId,
       status: "awaiting_answer",
+      notify_owner: input.notify !== false,
       source: input.source,
       gap_summary: gapSummary,
       caller_context: input.callerContext?.trim() || null,

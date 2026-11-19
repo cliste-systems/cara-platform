@@ -44,7 +44,16 @@ export function campaignListingUrl(storeId: string, reference: string): string {
 }
 
 /** Validate source pagination. The gateway advances skip while page may remain 1. */
-export function campaignListingPage(payload: any, input: {
+type ListingPayload = {
+  listingId?: string;
+  name?: unknown;
+  count?: unknown;
+  total?: unknown;
+  items?: { sku?: unknown }[];
+  pagination?: { _links?: { next?: { href?: string; queryPart?: string } } };
+};
+
+export function campaignListingPage(payload: ListingPayload | null, input: {
   storeId: string; reference: string; url: string; skip: number;
 }) {
   // The public gateway explicitly represents retired CMS widgets with this sentinel.
@@ -58,7 +67,7 @@ export function campaignListingPage(payload: any, input: {
   if (!Array.isArray(payload?.items) || !clean(payload?.name)) throw new Error("Campaign listing items or name missing");
   const total = Number(payload.total);
   if (!Number.isInteger(total) || total < 0 || total > 10000) throw new Error("Campaign listing total invalid or exceeds bounded import");
-  const skus = payload.items.map((item: any) => clean(item?.sku));
+  const skus = payload.items.map((item) => clean(item?.sku));
   if (skus.some((sku: string) => !sku) || new Set(skus).size !== skus.length) throw new Error("Campaign listing SKU identities missing or duplicated");
   if (payload.count != null && Number(payload.count) !== skus.length) throw new Error("Campaign listing page count mismatch");
   if (input.skip + skus.length > total || (input.skip < total && skus.length === 0)) throw new Error("Campaign listing page incomplete");

@@ -172,9 +172,11 @@ function ActiveCallPanel({
     };
   }, [room]);
 
+  const waitingForWorker = !agentJoined && connectionState === ConnectionState.Connected && microphoneReady;
+  if (!waitingForWorker && workerMissing) setWorkerMissing(false);
+
   useEffect(() => {
-    if (agentJoined || connectionState !== ConnectionState.Connected || !microphoneReady) {
-      setWorkerMissing(false);
+    if (!waitingForWorker) {
       return;
     }
     const timer = window.setTimeout(() => {
@@ -189,7 +191,7 @@ function ActiveCallPanel({
       }
     }, 8_000);
     return () => window.clearTimeout(timer);
-  }, [agentJoined, connectionState, microphoneReady]);
+  }, [waitingForWorker]);
 
   useEffect(() => {
     if (connectionState !== ConnectionState.Connected) return;
@@ -359,7 +361,7 @@ function ActiveCallPanel({
     if (!agentJoined) return "Waiting for Cara…";
     if (!microphoneReady) return "Publishing microphone…";
     return "In call";
-  }, [agentJoined, connectionState, microphoneReady]);
+  }, [waitingForWorker]);
 
   return (
     <div className="space-y-4">
@@ -489,7 +491,8 @@ export function DemoCallsView({ lines }: DemoCallsViewProps) {
       phase === "ended",
   });
 
-  const [connectingElapsedMs, setConnectingElapsedMs] = useState(0);
+  const [lastConnectingTick, setLastConnectingTick] = useState(0);
+  const connectingElapsedMs = sessionStartedAt ? Math.max(0, lastConnectingTick - sessionStartedAt) : 0;
 
   const frozenSessionElapsedMs =
     sessionStartedAt != null && sessionEndedAt != null
@@ -498,11 +501,9 @@ export function DemoCallsView({ lines }: DemoCallsViewProps) {
 
   useEffect(() => {
     if (phase !== "connecting" || !sessionStartedAt) {
-      setConnectingElapsedMs(0);
       return;
     }
-    const tick = () => setConnectingElapsedMs(Date.now() - sessionStartedAt);
-    tick();
+    const tick = () => setLastConnectingTick(Date.now());
     const timer = setInterval(tick, 250);
     return () => clearInterval(timer);
   }, [phase, sessionStartedAt]);

@@ -78,9 +78,11 @@ export function ServiceCatalogEditor({
   const [reviewBookingUrl, setReviewBookingUrl] = useState("");
   const [reviewMergedCount, setReviewMergedCount] = useState(0);
 
-  useEffect(() => {
+  const [previousServices, setPreviousServices] = useState(initialServices);
+  if (previousServices !== initialServices) {
+    setPreviousServices(initialServices);
     setServices(initialServices);
-  }, [initialServices]);
+  }
 
   const updateServices = useCallback(
     (next: ServiceCatalogItem[]) => {

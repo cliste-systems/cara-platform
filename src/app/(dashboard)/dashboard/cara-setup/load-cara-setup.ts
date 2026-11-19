@@ -42,13 +42,15 @@ export type CaraSetupPageData = {
 export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
   const { supabase, organizationId } = await requireDashboardSession();
 
-  const { data: org } = await supabase
+  const { data: org, error: orgError } = await supabase
     .from("organizations")
     .select(
-      "name, address, storefront_eircode, niche, phone_number, quote_prices_on_calls, assistant_display_name, greeting, custom_prompt, business_classification, agent_business_type, agent_faqs, agent_opening_hours, agent_service_area, agent_service_area_exclusions, agent_base_town, agent_services_departments, agent_services_not_offered, agent_service_catalog_supplement, agent_details_to_collect, agent_details_collect_mode, agent_capture_fields, agent_business_rules, agent_cara_rules, agent_cara_conduct, agent_location_address, agent_location_eircode, agent_location_county, business_hours, business_knowledge_summary, raw_business_description, cara_goal, routing_links, fallback_number, call_routing_mode, prompt_compile_warnings",
+      "updated_at, name, address, storefront_eircode, niche, phone_number, quote_prices_on_calls, assistant_display_name, greeting, business_classification, agent_business_type, agent_faqs, agent_opening_hours, agent_service_area, agent_service_area_exclusions, agent_base_town, agent_services_departments, agent_services_not_offered, agent_service_catalog_supplement, agent_details_to_collect, agent_details_collect_mode, agent_capture_fields, agent_business_rules, agent_cara_rules, agent_cara_conduct, agent_location_address, agent_location_eircode, agent_location_county, business_hours, business_knowledge_summary, raw_business_description, cara_goal, routing_links, fallback_number, call_routing_mode, prompt_compile_warnings",
     )
     .eq("id", organizationId)
     .maybeSingle();
+
+  if (orgError || !org) throw new Error("We couldn’t load your business details. Please try again.");
 
   const assistant = assistantNameLabel(
     String(org?.assistant_display_name ?? "").trim() ||
@@ -90,7 +92,7 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
   const promptFromOrg = buildCaraSetupPromptInputFromOrg(org);
 
   const verticalId = verticalIdForNiche(niche);
-  const serviceCatalog = await listServicesForOrg(supabase, organizationId);
+  const serviceCatalog = (await listServicesForOrg(supabase, organizationId)).filter(s => s.details?.status !== "archived");
   const serviceCatalogSupplement = parseStoredServiceCatalogSupplement(
     org?.agent_service_catalog_supplement,
   );
@@ -106,6 +108,7 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
       transferNumber: promptFromOrg.transferNumber,
     },
     initial: {
+      version: org.updated_at,
       businessName: (org?.name as string | null) ?? "",
       assistantDisplayName: assistant,
       greeting: (org?.greeting as string | null) ?? "",

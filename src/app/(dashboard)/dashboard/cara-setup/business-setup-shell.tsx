@@ -1,5 +1,7 @@
 "use client";
 
+import { WorkspaceSectionNav } from "@/components/dashboard/workspace-section-nav";
+import { FormFeedback } from "@/components/ui/form-feedback";
 import { usePathname } from "next/navigation";
 import { Briefcase } from "lucide-react";
 
@@ -10,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { useDashboardHashScroll } from "@/hooks/use-dashboard-hash-scroll";
 import { businessNavChildLabel } from "@/lib/dashboard-business-nav";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
-import { cn } from "@/lib/utils";
 
 import { CaraSetupUnsavedGuard } from "./cara-setup-unsaved-guard";
 import { useCaraSetupForm } from "./cara-setup-form-context";
@@ -19,7 +20,7 @@ export function BusinessSetupShell({ children }: { children: React.ReactNode }) 
   const form = useCaraSetupForm();
   const pathname = usePathname();
   useDashboardHashScroll(pathname);
-  const sectionTitle = businessNavChildLabel(pathname) ?? "Business";
+  const sectionTitle = pathname === DASHBOARD_ROUTES.businessProfile && form.niche !== "retail" ? "Your business" : businessNavChildLabel(pathname) ?? "Business";
   const showFileCount = pathname.startsWith(DASHBOARD_ROUTES.businessFiles);
 
   return (
@@ -45,7 +46,7 @@ export function BusinessSetupShell({ children }: { children: React.ReactNode }) 
               <Button
                 type="button"
                 onClick={form.save}
-                disabled={form.pending}
+                disabled={form.pending || !form.canManage || !form.isDirty}
                 className={DASHBOARD_PRIMARY_BUTTON_CLASS}
               >
                 {form.pending ? "Saving…" : "Save changes"}
@@ -55,27 +56,17 @@ export function BusinessSetupShell({ children }: { children: React.ReactNode }) 
                   Unsaved changes
                 </p>
               ) : null}
-              {form.status ? (
-                <p
-                  className={cn(
-                    "text-[13px]",
-                    form.status.kind === "ok"
-                      ? "text-slate-600"
-                      : "text-red-600",
-                  )}
-                >
-                  {form.status.message}
-                </p>
-              ) : null}
             </div>
           }
         />
+        <FormFeedback message={form.status?.kind === "error" ? form.status.message : null} />
 
+        {form.niche !== "retail" && <WorkspaceSectionNav group="business"/>}
         <DashboardFormScrollRegion
           className="min-h-0 flex-1"
           scrollClassName="divide-y divide-[#dfe7e2] bg-[#fbfcfb]"
         >
-          {children}
+          <fieldset disabled={!form.canManage || form.pending} className="min-w-0">{children}</fieldset>
         </DashboardFormScrollRegion>
       </div>
     </CaraSetupUnsavedGuard>

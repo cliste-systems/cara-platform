@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { voiceServiceError } from "@/lib/voice-service-error";
 
 import { hasAccountOwnerAccess } from "@/lib/account-owner-access";
 import { managedClientSetupRequirement } from "@/lib/managed-onboarding-access";
@@ -21,7 +22,7 @@ import {
   sanitizeGreetingLine,
   sanitizeVoiceGreetingPayload,
 } from "@/lib/voice-greeting-security";
-import { DEFAULT_GREETING_CLOSING } from "@/lib/voice-greeting";
+import { buildFullVoiceGreeting,DEFAULT_GREETING_CLOSING } from "@/lib/voice-greeting";
 import { prepareVoicePreviewTtsText } from "@/lib/voice-preview-tts-text";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
@@ -102,7 +103,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  const text = sanitizeGreetingLine(String(body.text ?? ""));
+  if(!body||typeof body!=='object'||typeof body.text!=='string'||body.text.length>500||('greetingIntro' in body&&typeof body.greetingIntro!=='string')||('greetingClosing' in body&&typeof body.greetingClosing!=='string')){
+    return NextResponse.json({error:"Use a short, plain-text greeting."},{status:400});
+  }
+  let text = sanitizeGreetingLine(body.text);
   if (!text) {
     return NextResponse.json({ error: "Nothing to preview." }, { status: 400 });
   }
@@ -110,8 +114,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Preview text is too long." }, { status: 400 });
   }
 
-  const introRaw = String(body.greetingIntro ?? "").trim();
-  const closingRaw = String(body.greetingClosing ?? "").trim();
+  const introRaw = String(body.greetingIntro ?? "");
+  const closingRaw = String(body.greetingClosing ?? "");
   if (introRaw || closingRaw) {
     const sanitized = sanitizeVoiceGreetingPayload({
       greetingIntro: introRaw,
@@ -161,6 +165,9 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    // Speak only the validated parts and the server-owned disclosure, never unrelated body.text.
+    text=buildFullVoiceGreeting(sanitized.greetingIntro,'Cara',sanitized.greetingClosing);
+    if(greetingScriptTooLong(text))return NextResponse.json({error:"Keep your greeting shorter."},{status:400});
   } else if (greetingLineIsInappropriate(text)) {
     if (organizationId) {
       await auditVoiceGreetingSecurityEvent({
@@ -205,9 +212,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Voice preview failed.";
-    const status = message.includes("not configured") ? 503 : 502;
-    return NextResponse.json({ error: message }, { status });
+    const failure = voiceServiceError(error);
+    return NextResponse.json({ error: failure.error }, { status: failure.status });
   }
 }

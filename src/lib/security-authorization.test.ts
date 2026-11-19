@@ -314,7 +314,7 @@ test("staff without customer profiles can verify a divert and are recorded in th
   let actor: string | null = null;
   const profile = { select: () => profile, eq: () => profile, maybeSingle: async () => ({ data: null }) };
   imports["@/lib/admin-session"] = adminGuards("aal2", undefined, { role: "member", permissions: ["customers"] });
-  imports["@/utils/supabase/admin"] = { createAdminClient: () => ({ from: (table: string) => table === "profiles" ? profile : {
+  imports["@/utils/supabase/admin"] = { createAdminClient: () => ({ from: (table: string) => ["profiles","customer_phone_connections"].includes(table) ? profile : {
     update: (value: Record<string, unknown>) => { updated = value; return { eq: async () => ({ error: null }) }; },
   } }) };
   imports["@/lib/security-events"] = { buildSecurityEventContext: () => ({}), logSecurityEvent: async (_context: unknown, entry: { actorUserId: string }) => { actor = entry.actorUserId; } };

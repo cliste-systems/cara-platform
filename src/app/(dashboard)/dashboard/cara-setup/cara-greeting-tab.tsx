@@ -1,4 +1,6 @@
 "use client";
+import {CaptureFieldsChipEditor} from "@/components/agent-knowledge/capture-fields-chip-editor";
+import {FormFeedback} from "@/components/ui/form-feedback";
 
 import { useState } from "react";
 import { Loader2, Pause, PhoneCall, Play } from "lucide-react";
@@ -132,6 +134,7 @@ export function CaraGreetingTab() {
           onPlayToggle={() => void handlePlayToggle()}
         />
       </SectionCard>
+      {form.niche!=="retail"&&<SectionCard flat title="Details to capture" description="Choose what Cara should ask when taking an enquiry. She asks only for details relevant to the call."><CaptureFieldsChipEditor captureFields={form.captureFields} onCaptureFieldsChange={form.setCaptureFields} businessType={form.businessType} niche={form.niche} disabled={!form.canManage||form.pending}/></SectionCard>}
     </DashboardAnimatedGroup>
   );
 }
@@ -175,11 +178,7 @@ function GreetingPreviewRow({
         )}
       </button>
       </div>
-      {error ? (
-        <p className="text-[12.5px] leading-relaxed text-red-600" role="alert">
-          {error}
-        </p>
-      ) : null}
+      <FormFeedback message={error}/>
     </div>
   );
 }

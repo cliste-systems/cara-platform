@@ -18,7 +18,7 @@ export function SignupCheckoutWelcome({ continueHref = "/dashboard?welcome=1" }:
         </picture>
       </div>
       <h1 id="signup-welcome-title" className="mt-3 text-[36px] font-semibold leading-[1.08] tracking-[-0.04em] sm:text-[46px]">Welcome to HelloCara.</h1>
-      <p className="mt-4 max-w-sm text-[15px] leading-6 text-slate-500">Your {PLATFORM_TRIAL_DAYS}-day free trial has started. Set up your business in the dashboard and get Cara ready to answer calls.</p>
+      <p className="mt-4 max-w-sm text-[15px] leading-6 text-slate-500">Set up Cara and connect your business number. Your {PLATFORM_TRIAL_DAYS}-day free trial starts once your connection is confirmed.</p>
       <Link href={continueHref} className="mt-6 inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-[#0b1220] px-8 text-sm font-medium text-white transition hover:bg-[#182233] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-500">Open your dashboard <ArrowRight size={16} aria-hidden="true" /></Link>
     </motion.section>
   </main>;

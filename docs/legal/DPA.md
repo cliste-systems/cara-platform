@@ -121,7 +121,7 @@ Within 30 days of the termination or expiry of the agreement, Cliste
 will, at the Controller's choice, delete or return all Personal Data
 processed on its behalf, except where retention is required by Union
 or Member State law. Backups are overwritten within the standard backup
-rotation (35 days at the time of writing).
+rotation under the configured backup schedule.
 
 ## 10. Liability
 
@@ -142,7 +142,7 @@ have exclusive jurisdiction.
 | Processor              | Cliste Systems, Ireland                                     |
 | Processor contact      | privacy@hellocara.ie                                    |
 | Frequency              | Continuous, for the duration of the subscription            |
-| Storage location       | EEA — Supabase AWS eu-west-1 (Ireland); Vercel dub1 (Dublin); LiveKit Cloud EU (Frankfurt); see Annex III |
+| Storage location       | EEA — Supabase AWS eu-central-1 (Frankfurt); Vercel dub1 (Dublin); LiveKit Cloud EU (Frankfurt); see Annex III |
 
 ## Annex II — Technical & organisational measures
 
@@ -154,7 +154,7 @@ have exclusive jurisdiction.
   privileged actions (admin actions, refunds, GDPR exports / erasures).
 - **Network** — Production behind Cloudflare WAF + Turnstile bot
   protection on public booking endpoints.
-- **Backup** — Supabase managed point-in-time recovery, 35-day window.
+- **Backup** — Recovery options and retention depend on the configured database backup policy.
 - **Incident response** — See `BREACH-RUNBOOK.md`.
 - **Pen testing / review** — Internal security review on every release;
   external review on request.
@@ -167,7 +167,7 @@ in the customer dashboard (**Legal & privacy → Sub-processors**) and at
 `/legal/sub-processors` (category summary). Snapshot as of the date this DPA
 is signed:
 
-- Supabase — EEA (AWS eu-west-1, Ireland); primary database
+- Supabase — EEA (AWS eu-central-1, Frankfurt); primary database
 - Vercel — EEA (dub1 Dublin); dashboard & APIs
 - LiveKit Cloud (LiveKit, Inc.) — EU (Frankfurt); voice agent runtime, EU SIP for inbound; WebRTC global until protocol pinning; DPF / SCCs
 - Stripe Payments Europe Ltd (Ireland)

@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import {CaraSetupChipEditor} from "@/components/agent-knowledge/cara-setup-chip-editor";
 import {BusinessClassificationEditor} from "@/components/dashboard/business-classification-editor";
 import type {BusinessClassification} from "@/lib/business-classification";
 import { Briefcase, Clock, Sparkles } from "lucide-react";
@@ -67,7 +69,7 @@ export function BusinessProfileTab({classification=null,canManage=false}:{classi
         flat
         icon={Briefcase}
         title={copy.caraSetup.generalBasicsTitle}
-        description="Name, type, location, Eircode, and your Cliste line — the facts callers ask about most."
+        description="Your name, location and contact details — the facts callers ask about most."
         className="scroll-mt-4"
         id="cara-business-basics"
       >
@@ -91,7 +93,7 @@ export function BusinessProfileTab({classification=null,canManage=false}:{classi
         </Field>
         {isRetail?<Field label="Business type" htmlFor="cara-business-type" hint="Your retail setup is managed by our team."><div id="cara-business-type" className="text-sm text-[#11181d]">{businessTypeLabel.trim()||"Retail"}</div></Field>:<div className="space-y-3"><h3 className="text-sm font-medium text-[#353D42]">Business type</h3><BusinessClassificationEditor initial={classification} canManage={canManage}/></div>}
         <Field
-          label="Cliste number"
+          label={isRetail ? "Cliste number" : "Cara number"}
           htmlFor="cara-cliste-number"
           hint={
             clistePhoneDisplay
@@ -175,7 +177,19 @@ export function BusinessProfileTab({classification=null,canManage=false}:{classi
         </div>
       </SectionCard>
 
-      <SectionCard
+      {!isRetail && <SectionCard flat title="Where you work" description="The areas you cover and any locations you don’t serve.">
+        <Field label="Service areas" htmlFor="business-service-areas"><CaraSetupChipEditor inputId="business-service-areas" value={form.serviceAreaItems} onChange={form.setServiceAreaItems} placeholder="Add a town, county or area" maxItems={40} beforeAdd={() => ({outcome:"allow"})}/></Field>
+        <Field label="Areas you don’t cover" htmlFor="business-area-exclusions"><CaraSetupChipEditor inputId="business-area-exclusions" value={form.serviceAreaExclusionItems} onChange={form.setServiceAreaExclusionItems} placeholder="Add an excluded area" maxItems={40} beforeAdd={() => ({outcome:"allow"})}/></Field>
+        <Link href="/dashboard/business/hours" className="inline-flex min-h-11 items-center text-sm no-underline">Edit opening hours →</Link>
+      </SectionCard>}
+      {isRetail && <BusinessHoursTab/>}
+    </DashboardAnimatedStack>
+  );
+}
+
+export function BusinessHoursTab() {
+ const form=useCaraSetupForm();
+ return       <SectionCard
         flat
         icon={Clock}
         title="Opening hours"
@@ -193,7 +207,5 @@ export function BusinessProfileTab({classification=null,canManage=false}:{classi
           hoursNeverConfigured={form.hoursNeverConfigured}
           variant="dashboard"
         />
-      </SectionCard>
-    </DashboardAnimatedStack>
-  );
+      </SectionCard>;
 }

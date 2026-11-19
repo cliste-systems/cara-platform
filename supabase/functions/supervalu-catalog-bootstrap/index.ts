@@ -71,7 +71,7 @@ async function consumeCapability(requestId: string): Promise<Capability> {
   if (!used) throw new Error("capability already consumed");
   return data as Capability;
 }
-async function upsertCards(cards: any[], job: CategoryJob, batchId: string) {
+async function upsertCards(cards: ReturnType<typeof normalizeCards>, job: CategoryJob, batchId: string) {
   if (!cards.length) return { unique: 0, promotions: 0 };
   cards = [...new Map(cards.map(c => [c.sku, c])).values()].sort((a, b) => a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0);
   const now = new Date().toISOString();
@@ -92,15 +92,12 @@ async function upsertCards(cards: any[], job: CategoryJob, batchId: string) {
     last_seen_at: now,
     updated_at: now,
   }));
-  const { error: pe } = await retryCatalogWrite(() => supabase.from("retail_catalog_products")
-    .upsert(productRows, { onConflict: "retail_banner,sku" }));
+  const { data: ids, error: pe } = await retryCatalogWrite(() => supabase.from("retail_catalog_products")
+    .upsert(productRows, { onConflict: "retail_banner,sku" }).select("id,sku"));
   if (pe) throw new Error("product upsert: " + pe.message);
 
   const skus = [...new Set(cards.map((c) => c.sku))];
-  const { data: ids, error: ie } = await supabase.from("retail_catalog_products")
-    .select("id,sku").eq("retail_banner", "supervalu").in("sku", skus);
-  if (ie) throw new Error("product id lookup: " + ie.message);
-  const idBySku = new Map<string, string>((ids ?? []).map((r:any) => [String(r.sku), String(r.id)]));
+  const idBySku = new Map<string, string>((ids ?? []).map((r: {sku: string; id: string}) => [String(r.sku), String(r.id)]));
   if (idBySku.size !== skus.length) throw new Error("Incomplete product ID lookup");
 
   const listings = cards.flatMap((c) => {
@@ -121,18 +118,15 @@ async function upsertCards(cards: any[], job: CategoryJob, batchId: string) {
       updated_at: now,
     }];
   });
-  const { error: le } = await retryCatalogWrite(() => supabase.from("retail_store_products")
-    .upsert(listings.sort((a,b) => a.product_id.localeCompare(b.product_id)), { onConflict: "source_store_id,product_id" }));
+  const { data: storeRows, error: le } = await retryCatalogWrite(() => supabase.from("retail_store_products")
+    .upsert(listings.sort((a,b) => a.product_id.localeCompare(b.product_id)), { onConflict: "source_store_id,product_id" }).select("id,product_id"));
   if (le) throw new Error("listing upsert: " + le.message);
 
-  const productIds = listings.map((x:any) => x.product_id);
-  const { data: storeRows, error: se } = await supabase.from("retail_store_products")
-    .select("id,product_id").eq("source_store_id", job.source_store_id).in("product_id", productIds);
-  if (se) throw new Error("store listing lookup: " + se.message);
-  const spByProduct = new Map<string, string>((storeRows ?? []).map((r:any) => [String(r.product_id), String(r.id)]));
+  const productIds = listings.map((x) => x.product_id);
+  const spByProduct = new Map<string, string>((storeRows ?? []).map((r: {product_id: string; id: string}) => [String(r.product_id), String(r.id)]));
   if (spByProduct.size !== productIds.length) throw new Error("Incomplete store product ID lookup");
   const week = currentOfferWeek();
-  const promotions: any[] = [];
+  const promotions: ReturnType<typeof promoRows> = [];
   for (const card of cards) {
     const productId = idBySku.get(card.sku);
     const storeProductId = productId ? spByProduct.get(productId) : null;
@@ -401,7 +395,7 @@ Deno.serve(async (req) => {
     requestId = clean(body.request_id);
     if (!requestId) return Response.json({ ok: false, error: "request_id required" }, { status: 401 });
     const capability = await consumeCapability(requestId);
-    let result: any;
+    let result: Awaited<ReturnType<typeof discover | typeof work>>;
     if (capability.mode === "discover") {
       result = await discover(capability.source_store_id || DEFAULT_STORE_ID, capability.refresh_kind ?? "full");
     } else {

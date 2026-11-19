@@ -1,0 +1,24 @@
+{
+  "generator": "Built-in image_gen tool",
+  "identity_reference": "public/cara-welcome-mobile-v2.webp",
+  "prompt_set": {
+    "shared_direction": "Photorealistic natural editorial HelloCara banner; preserve the exact face, freckles, loosely tied red hair, cream linen shirt and discreet black headset from cara-welcome-mobile-v2.webp. Ground Cara at a dark desk or reception counter. Landscape 3:2, subject on right, charcoal negative space on left, warm natural light, real skin texture, no text, logos or floating cutouts.",
+    "scenes": {
+      "services": "Cara organising service folders and an appointment notebook at her desk.",
+      "knowledge": "Cara reviewing an open reference book and organised index cards with a pencil.",
+      "business": "Cara standing at reception with a closed folio and checking a laptop.",
+      "settings": "Cara seated in three-quarter view checking a tablet resting on her desk.",
+      "support": "Cara listening attentively with one hand lightly touching her headset earcup.",
+      "billing": "Cara checking a paper statement beside her laptop from a slightly elevated camera angle."
+    }
+  },
+  "assets": {
+    "services": "public/cara-services-workspace-v1.jpg",
+    "knowledge": "public/cara-knowledge-workspace-v1.jpg",
+    "business": "public/cara-business-workspace-v1.jpg",
+    "settings": "public/cara-settings-workspace-v1.jpg",
+    "support": "public/cara-support-workspace-v1.jpg",
+    "billing": "public/cara-billing-workspace-v1.jpg"
+  },
+  "implementation": "Charcoal workspace theme scoped to remaining non-retail pages. Home and Calls retain their approved styling. Existing editors, authenticated server actions, live lists and filters remain connected."
+}

@@ -1,6 +1,9 @@
 "use client";
+import { FormFeedback } from "@/components/ui/form-feedback";
+import { DashboardSelect } from "@/components/dashboard/dashboard-select";
+import {WorkspaceSectionNav} from "@/components/dashboard/workspace-section-nav";
 
-import { useActionState, useMemo } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { Loader2, UserPlus, Users } from "lucide-react";
 
 import { DashboardAnimatedPageSections } from "@/components/dashboard/dashboard-animated-group";
@@ -14,7 +17,6 @@ import {
   DASHBOARD_INPUT_CLASS,
   DASHBOARD_PAGE_SHELL_FILL_WHITE,
   DASHBOARD_PRIMARY_BUTTON_CLASS,
-  DASHBOARD_SELECT_CLASS,
 } from "@/components/dashboard/dashboard-surface";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +58,7 @@ export function TeamView({
     [members],
   );
 
+  const [inviteRole, setInviteRole] = useState("member");
   const fieldClass = cn(DASHBOARD_INPUT_CLASS, "text-[13px] text-[#0b1220]");
 
   return (
@@ -70,13 +73,14 @@ export function TeamView({
           eyebrow="Team"
           title="Team"
           icon={Users}
-          description={copy.team.accessDescription}
+          description={isRetail ? copy.team.accessDescription : "Manage who can view calls and follow-ups, and update your business."}
           descriptionLine2="Owners can configure Cara; view-only members can monitor activity."
           summary={[
-            { value: String(members.length), label: "members" },
-            { value: String(ownerCount), label: "owners" },
+            { value: String(members.length), label: members.length === 1 ? "member" : "members" },
+            { value: String(ownerCount), label: ownerCount === 1 ? "owner" : "owners" },
           ]}
         />
+        <div className="mt-3"><WorkspaceSectionNav group="account"/></div>
         </div>
 
         <DashboardPageScrollBody scrollClassName="flex flex-col gap-4 pt-4">
@@ -84,7 +88,7 @@ export function TeamView({
           <h2 className="text-[15px] font-semibold tracking-tight text-[#0b1220]">
             Team members
           </h2>
-          <ul className="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-200/90">
+          <ul className="mt-3 max-h-[360px] overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-200/90">
             {members.map((member) => (
               <li
                 key={member.id}
@@ -130,7 +134,7 @@ export function TeamView({
             description="They'll get an email to join your workspace."
             className="shrink-0"
           >
-            <form action={formAction} className="space-y-4">
+            <form noValidate action={formAction} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Name" htmlFor="team-invite-name">
                   <Input
@@ -157,15 +161,9 @@ export function TeamView({
                 htmlFor="team-invite-role"
                 hint="Owners can change Cara Setup and settings. View-only members can monitor calls and inbox activity."
               >
-                <select
-                  id="team-invite-role"
-                  name="role"
-                  defaultValue="member"
-                  className={DASHBOARD_SELECT_CLASS}
-                >
-                  <option value="member">View only</option>
-                  <option value="admin">Full access</option>
-                </select>
+                <input type="hidden" name="role" value={inviteRole}/>
+                <DashboardSelect id="team-invite-role" value={inviteRole} onValueChange={setInviteRole} options={[{value:"member",label:"View only"},{value:"admin",label:"Full access"}]}/>
+
               </Field>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                 <Button
@@ -183,7 +181,7 @@ export function TeamView({
                   )}
                 </Button>
                 {!state.ok && state.message ? (
-                  <p className="text-[13px] text-red-600">{state.message}</p>
+                  <FormFeedback message={state.message} focusOnError />
                 ) : null}
                 {state.ok ? (
                   <p className="text-[13px] text-emerald-700">Invite sent.</p>

@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 /** Admin user creation may bypass Auth's public signup password policy. Only a
  * five-character SHA-1 prefix leaves the server; never send or log the password. */
 export async function checkSignupPassword(password: string): Promise<{ok:true}|{ok:false;message:string}> {
+  if(typeof password!=="string"||password.length<8||password.length>128)return {ok:false,message:"Use a password between 8 and 128 characters."};
   const hash = createHash("sha1").update(password).digest("hex").toUpperCase();
   try {
     const response = await fetch(`https://api.pwnedpasswords.com/range/${hash.slice(0,5)}`, {

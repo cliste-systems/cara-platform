@@ -26,6 +26,13 @@ export async function finalizeSignupBilling(accountId: string, organizationId: s
     await cancelSupersededSignupSubscription(accountId, subscription);
     throw new Error("Your checkout could not be completed. Your account may already have billing set up or need review. Contact support for help.");
   }
+  // Use the same expiry as Stripe's automatic cancellation, including checkouts
+  // abandoned before confirmation. No hold can outlive its provider deadline.
+  const expiry=Number(subscription.metadata.cliste_setup_hold_expires);
+  if(Number.isInteger(expiry)&&expiry>0){
+    const {error:expiryError}=await createAdminClient().from('signup_setup_guards').update({expires_at:new Date(expiry*1000).toISOString()}).eq('organization_id',organizationId).eq('subscription_id',subscription.id);
+    if(expiryError)throw new Error('Your setup expiry could not be saved. Please retry.');
+  }
   // Clear other abandoned checkout subscriptions before they can bill.
   for await (const candidate of getStripeClient().subscriptions.list({ customer, status: "all", limit: 100 })) {
     await cancelSupersededSignupSubscription(accountId, candidate);

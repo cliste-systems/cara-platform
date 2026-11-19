@@ -10,6 +10,8 @@ function fixture({state=ready,authorised=true,paid=true,available=true,activated
  const accountQuery={select(){return this;},eq(){return this;},single:async()=>({data:{status:paid?'active':'onboarding',platform_subscription_id:paid?'sub_test':null},error:null})};
  const imports:Record<string,unknown>={
   'next/cache':{revalidatePath(){}},
+  'next/headers':{headers:async()=>new Headers(),cookies:async()=>({set(){throw new Error('Local bypass must stay disabled');}})},
+  '@/lib/onboarding-dev':{isLocalSetupTestEnabled:()=>false},
   '@/lib/dashboard-admin':{requireDashboardAdmin:async()=>{if(!authorised)throw Error('Unauthorised');return {organizationId:'session-org',accountId:'session-account',user:{id:'owner'},supabase:{from:()=>accountQuery}};}},
   '@/lib/first-call-setup':setup,
   '@/lib/load-first-call-setup':{loadFirstCallSetup:async()=>state},
@@ -17,7 +19,7 @@ function fixture({state=ready,authorised=true,paid=true,available=true,activated
   '@/utils/supabase/admin':{createAdminClient:()=>({rpc:async(name:string,args:unknown)=>{activations.push({name,args});return {data:activated,error:rpcError?{message:'failed'}:null};}})},
  };
  const mod={exports:{}};
- vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../app/(dashboard)/dashboard/first-call-actions.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module:mod,exports:mod.exports,require:(name:string)=>{if(!imports[name])throw Error('Unexpected import '+name);return imports[name];}});
+ vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../app/(dashboard)/dashboard/first-call-actions.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module:mod,exports:mod.exports,require:(name:string)=>{if(!imports[name])throw Error('Unexpected import '+name);return imports[name];},Headers});
  return {reservations,activations,...mod.exports as {retryFirstCallNumber:()=>Promise<{ok:boolean;message:string}>}};
 }
 test('pending review prepares and activates only the authenticated owner’s line',async()=>{

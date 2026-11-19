@@ -1,4 +1,5 @@
 "use client";
+import { FormFeedback } from "@/components/ui/form-feedback";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { CheckCircle2, Loader2, MessageSquare, Sparkles } from "lucide-react";
@@ -71,16 +72,20 @@ export function CallerTextBackDialog({
     [callerName, businessName, middle, storePhoneE164],
   );
 
-  useEffect(() => {
-    if (!open) return;
-    setMiddle("");
-    setDraftMiddle("");
-    setSuggestedMiddle(null);
-    setUsedAiReview(false);
-    setStep("draft");
-    const eligibility = callerSmsEligibility(callerNumber);
-    setError(eligibility.canText ? null : eligibility.reason);
-  }, [open, callerNumber, ticketId]);
+  const draftKey = JSON.stringify([open, callerNumber, ticketId]);
+  const [lastDraftKey, setLastDraftKey] = useState<typeof draftKey | undefined>(undefined);
+  if (lastDraftKey !== draftKey) {
+    setLastDraftKey(draftKey);
+    if (open) {
+      setMiddle("");
+      setDraftMiddle("");
+      setSuggestedMiddle(null);
+      setUsedAiReview(false);
+      setStep("draft");
+      const eligibility = callerSmsEligibility(callerNumber);
+      setError(eligibility.canText ? null : eligibility.reason);
+    }
+  }
 
   useEffect(() => {
     if (step !== "sent") return;
@@ -324,7 +329,7 @@ export function CallerTextBackDialog({
                   </div>
                 ) : null}
 
-                {error ? <p className="text-[13px] text-red-600">{error}</p> : null}
+                {error ? <FormFeedback message={error} /> : null}
               </div>
             </DialogHeader>
 

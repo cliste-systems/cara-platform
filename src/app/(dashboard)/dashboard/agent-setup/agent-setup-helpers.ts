@@ -9,6 +9,7 @@ import type { CaraConduct } from "@/lib/agent-cara-conduct";
 import { assistantNameLabel, businessNameLabel } from "@/lib/voice-greeting";
 
 export type AgentSetupInitial = {
+  version?: string;
   businessName: string;
   assistantDisplayName: string;
   greeting: string;

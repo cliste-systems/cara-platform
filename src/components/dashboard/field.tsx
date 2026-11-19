@@ -24,7 +24,7 @@ export function Field({
   className,
 }: FieldProps) {
   return (
-    <div className={cn("space-y-1.5", className)}>
+    <div className={cn("min-w-0 space-y-1.5", className)}>
       <Label htmlFor={htmlFor} className="text-[13px] font-medium text-slate-800">
         {label}
       </Label>

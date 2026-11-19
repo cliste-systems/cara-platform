@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 
-import { isSignupOnboardingDevRelaxed } from "@/lib/onboarding-dev";
+import { isLocalSignupCodePreview, isSignupOnboardingDevRelaxed } from "@/lib/onboarding-dev";
 import {
   getRateLimitStatus,
   hashRateLimitIdentifier,
@@ -35,14 +35,15 @@ export async function verifySignupCode(
   if (!email || !EMAIL_RE.test(email)) {
     return { ok: false, message: "Enter a valid email address." };
   }
-  if (!SIGNUP_EMAIL_OTP_PATTERN.test(code)) {
+  const h = await headers();
+  const localPreview=isLocalSignupCodePreview(h);
+  if (!(localPreview?/^\d{1,8}$/.test(code):SIGNUP_EMAIL_OTP_PATTERN.test(code))) {
     return {
       ok: false,
       message: `Enter the ${SIGNUP_EMAIL_OTP_LENGTH}-digit code from the email.`,
     };
   }
 
-  const h = await headers();
   const fpOrigin = rateLimitFingerprint(h, "signup-verify");
   const fpEmail = hashRateLimitIdentifier(`signup-verify-email:${email}`);
   if (!isSignupOnboardingDevRelaxed()) {
@@ -59,6 +60,14 @@ export async function verifySignupCode(
   }
 
   const supabase = await createClient();
+
+  if(localPreview){
+    // Never confirm another email or mint a session from a dummy code. Local
+    // signup already created this confirmed test user and signed them in.
+    const {data:{user},error}=await supabase.auth.getUser();
+    if(!error&&user?.email_confirmed_at&&user.email?.toLowerCase()===email&&user.app_metadata?.cliste_signup_source==='self_serve')return {ok:true};
+    return {ok:false,message:"Create your local test account in this browser first, then enter any numeric code."};
+  }
 
   // First signup emails carry a "signup" token; resent emails carry
   // "magiclink". A wrong-type lookup fails without consuming the token.

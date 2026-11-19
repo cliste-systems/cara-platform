@@ -1,4 +1,5 @@
 "use client";
+import { FormFeedback } from "@/components/ui/form-feedback";
 
 import { useCallback, useState } from "react";
 import Cropper, { type Area } from "react-easy-crop";
@@ -113,7 +114,7 @@ export function ProfileAvatarCropDialog({
             />
           </label>
           {error ? (
-            <p className="text-[12px] text-red-600">{error}</p>
+            <FormFeedback message={error} />
           ) : null}
 
           <div className="flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">

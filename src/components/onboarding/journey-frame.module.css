@@ -1,0 +1,31 @@
+/* Frame rules are viewport-based, independent of the active form's height. */
+.frame {
+ display:flex;
+ flex-direction:column;
+ height:100dvh;
+ min-height:0;
+ box-sizing:border-box;
+ padding-block:24px;
+ overflow:hidden;
+}
+.panel {
+ display:flex;
+ flex-direction:column;
+ flex:1;
+ min-height:0;
+ margin-block:0;
+}
+.nav { flex-shrink:0; min-height:49px; box-sizing:border-box; }
+.content {
+ display:flex;
+ flex-direction:column;
+ flex:1;
+ min-height:0;
+ overflow-y:auto;
+ overscroll-behavior:contain;
+ overflow-anchor:none;
+ scrollbar-width:thin;
+ scrollbar-gutter:stable both-edges;
+}
+.inner { flex-shrink:0; width:100%; margin-block:auto; }
+@media(min-width:640px) { .frame { padding-block:40px; } }

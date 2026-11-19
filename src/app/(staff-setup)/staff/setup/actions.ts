@@ -1,5 +1,7 @@
 "use server";
 
+import {checkSignupPassword} from "@/lib/signup-password-security";
+
 import { redirect } from "next/navigation";
 import { validateInvitePassword } from "@/lib/invite-onboarding";
 import { requireStaffPasswordSetup } from "./session";
@@ -11,6 +13,8 @@ export async function setStaffPassword(_previous: StaffPasswordState, form: Form
   const password = form.get("password");
   const validation = validateInvitePassword(password, form.get("confirmation"));
   if (validation) return { error: validation };
+  const passwordCheck=await checkSignupPassword(password as string);
+  if(!passwordCheck.ok)return {error:passwordCheck.message};
   const { error: passwordError } = await supabase.auth.updateUser({ password: password as string });
   if (passwordError) return { error: passwordError.message };
   const { data: current, error: lookupError } = await admin.auth.admin.getUserById(user.id);

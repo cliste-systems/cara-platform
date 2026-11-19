@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Search, Sparkles } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
@@ -48,20 +48,20 @@ export function CaraKnowledgeKnowsPanel({
   const saved = useMemo(
     () =>
       sortKnowledgeEntries(
-        knowledgeEntriesForBrowse([...results.knows, ...results.related]),
+        knowledgeEntriesForBrowse(trimmed ? [...results.knows, ...results.related] : index.entries),
       ),
-    [results.knows, results.related],
+    [results.knows, results.related, trimmed, index.entries],
   );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-        {!trimmed ? (
+        {!trimmed && saved.length === 0 ? (
           <div className="flex h-full min-h-[240px] items-center justify-center px-4 py-10 sm:px-5">
             <EmptyState
               icon={Sparkles}
-              title="Find what Cara knows"
-              description="Use the search box above. Matching answers appear here so you can review, edit, or unlearn them."
+              title="Build Cara’s knowledge"
+              description="Add FAQs or teach Cara an answer. Your saved knowledge will appear here."
               className="max-w-md py-8"
             />
           </div>
@@ -78,7 +78,7 @@ export function CaraKnowledgeKnowsPanel({
                 <button
                   type="button"
                   onClick={() => onTeachSuggestion(trimmed)}
-                  className="text-[13px] font-medium text-[#11181d] underline-offset-2 hover:underline"
+                  className="min-h-11 cursor-pointer rounded-lg border border-[#d9e2dd] bg-white px-4 text-[13px] font-medium text-[#11181d] hover:bg-[#f0f4f1]"
                 >
                   Teach Cara about this
                 </button>
@@ -87,6 +87,7 @@ export function CaraKnowledgeKnowsPanel({
           </div>
         ) : (
           <KnowsSearchResults
+            key={trimmed}
             saved={saved}
             canManage={canManage}
             onOpenEntry={onOpenEntry}
@@ -113,6 +114,9 @@ function KnowsSearchResults({
   onOpenLinkedTemporal?: (updateId: string) => void;
 }) {
   const reduceMotion = useReducedMotion();
+  const [page, setPage] = useState(1);
+  const pages = Math.max(1, Math.ceil(saved.length / 10));
+  const currentPage = Math.min(page, pages);
   const SavedList = reduceMotion ? "ul" : motion.ul;
   const SavedItem = reduceMotion ? "li" : motion.li;
   const listMotion = reduceMotion
@@ -135,7 +139,7 @@ function KnowsSearchResults({
         What Cara knows
       </p>
       <SavedList className="divide-y divide-[#e3e9e5]" {...listMotion}>
-        {saved.map((entry) => (
+        {saved.slice((currentPage - 1) * 10, currentPage * 10).map((entry) => (
           <SavedItem key={entry.id} {...itemMotion}>
             <KnowledgeEntryRow
               entry={entry}
@@ -147,6 +151,11 @@ function KnowsSearchResults({
           </SavedItem>
         ))}
       </SavedList>
+      {pages > 1 && <nav aria-label="Knowledge pages" className="flex items-center justify-between gap-2 border-t border-[#d9e2dd] p-4 text-sm">
+        <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="min-h-11 rounded-lg border border-[#d9e2dd] bg-white px-3 disabled:opacity-40">Previous</button>
+        <span>{currentPage} / {pages}</span>
+        <button type="button" disabled={currentPage === pages} onClick={() => setPage(currentPage + 1)} className="min-h-11 rounded-lg border border-[#d9e2dd] bg-white px-3 disabled:opacity-40">Next</button>
+      </nav>}
     </section>
   );
 }

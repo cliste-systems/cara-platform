@@ -131,11 +131,6 @@ export function homeKnowledgeGapRowSubtitle(): string {
   return HOME_NEEDS_INPUT_ROW_SUBTITLE;
 }
 
-function summaryPreview(summary: string | null | undefined): string {
-  const trimmed = String(summary ?? "").replace(/\s+/g, " ").trim();
-  return trimmed || "Enquiry captured";
-}
-
 export function buildHomeTodaysRequestRows(input: {
   tickets: HomeRequestTicketRow[];
   formatTime: (iso: string) => string;
@@ -284,11 +279,12 @@ export type HomeCaraTrainingRow = {
   title: string;
   description: string;
   time: string;
-  departmentSlug: RetailDepartmentSlug;
+  departmentSlug?: RetailDepartmentSlug;
 };
 
 export function buildHomeCaraTrainingRows(input: {
   items: HomeCaraTrainingItemRow[];
+  isRetail?: boolean;
   formatTime: (iso: string) => string;
   limit?: number;
 }): HomeCaraTrainingRow[] {
@@ -303,9 +299,9 @@ export function buildHomeCaraTrainingRows(input: {
     .map((item) => ({
       id: item.id,
       href: DASHBOARD_ROUTES.caraKnowledgeNeedsInputItem(item.id),
-      title: homeKnowledgeGapRowTitle(item),
+      title: input.isRetail === false ? item.gap_summary?.trim() || "Question needs an answer" : homeKnowledgeGapRowTitle(item),
       description: homeKnowledgeGapRowSubtitle(),
       time: input.formatTime(item.updated_at),
-      departmentSlug: homeKnowledgeGapDepartmentSlug(item),
+      departmentSlug: input.isRetail === false ? undefined : homeKnowledgeGapDepartmentSlug(item),
     }));
 }

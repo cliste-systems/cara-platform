@@ -44,6 +44,7 @@ export default async function CaraKnowledgePage({
         <DashboardAnimatedPageSections>
           <Suspense fallback={null}>
             <CaraKnowledgePageView
+              faqs={data.faqs} version={data.version}
               folders={data.folders}
               index={data.index}
               trainingItems={data.trainingItems}

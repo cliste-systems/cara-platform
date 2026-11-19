@@ -445,11 +445,9 @@ export function DemoCallRoomTelemetry({
 
   useEffect(() => {
     if (sessionEndedAt != null) {
-      setElapsedMs(Math.max(0, sessionEndedAt - sessionStartedAt));
       return;
     }
     const tick = () => setElapsedMs(Date.now() - sessionStartedAt);
-    tick();
     const timer = setInterval(tick, 250);
     return () => clearInterval(timer);
   }, [sessionEndedAt, sessionStartedAt]);
@@ -688,7 +686,7 @@ export function DemoCallRoomTelemetry({
       entries={log.entries}
       metrics={log.metrics}
       connectionState={connectionState}
-      elapsedMs={elapsedMs}
+      elapsedMs={sessionEndedAt == null ? elapsedMs : Math.max(0, sessionEndedAt - sessionStartedAt)}
       sessionEndedAt={sessionEndedAt}
       live={sessionEndedAt == null}
     />

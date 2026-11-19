@@ -1,4 +1,5 @@
 "use client";
+import { FormFeedback } from "@/components/ui/form-feedback";
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
@@ -126,15 +127,7 @@ function EmailChangeForm({
         email addresses.
       </p>
       {message ? (
-        <p
-          className={cn(
-            "text-[13px]",
-            isSuccess ? "text-slate-600" : "text-red-600",
-          )}
-          role="status"
-        >
-          {message}
-        </p>
+        <FormFeedback message={message} tone={isSuccess ? "success" : "error"} title={isSuccess ? "Updated" : "Please check this"} />
       ) : null}
       <Button
         type="button"
@@ -229,15 +222,7 @@ function PasswordChangeForm({ fieldClass }: { fieldClass: string }) {
         </div>
       </div>
       {message ? (
-        <p
-          className={cn(
-            "text-[13px]",
-            isSuccess ? "text-slate-600" : "text-red-600",
-          )}
-          role="status"
-        >
-          {message}
-        </p>
+        <FormFeedback message={message} tone={isSuccess ? "success" : "error"} title={isSuccess ? "Updated" : "Please check this"} />
       ) : null}
       <Button
         type="button"

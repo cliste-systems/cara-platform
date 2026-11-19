@@ -2,7 +2,7 @@ import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import type { VerticalId } from "@/lib/verticals";
 
 export function dashboardFollowUpHubHref(_verticalId: VerticalId): string {
-  return DASHBOARD_ROUTES.calls;
+  return _verticalId === "retail" ? DASHBOARD_ROUTES.calls : `${DASHBOARD_ROUTES.calls}?filter=follow_up`;
 }
 
 export function dashboardFollowUpHubLabel(_verticalId: VerticalId): string {
@@ -15,5 +15,5 @@ export function dashboardFollowUpTicketHref(_input: {
   departmentSlug?: string | null;
   summary?: string | null;
 }): string {
-  return DASHBOARD_ROUTES.calls;
+  return _input.verticalId === "retail" ? DASHBOARD_ROUTES.calls : `${DASHBOARD_ROUTES.calls}?filter=follow_up&followUp=${encodeURIComponent(_input.ticketId)}`;
 }

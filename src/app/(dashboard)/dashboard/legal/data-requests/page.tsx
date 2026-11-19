@@ -15,7 +15,7 @@ export const metadata = {
 export default async function LegalDataRequestsPage() {
   const org = await getCachedDashboardOrganizationRow();
   const includesAppointments = verticalPackForNiche(org?.niche ?? "").capabilities
-    .usesServiceCatalog;
+    .autoEnsureBookingRoute;
 
   return (
     <DashboardAnimatedStack embedded>

@@ -1,9 +1,13 @@
 "use client";
 
+import { createContext, useContext } from "react";
+import { useServiceTheme } from "./service-theme-context";
 import { motion, useReducedMotion } from "motion/react";
 
-import { onboardingPageTransition } from "@/components/onboarding/onboarding-motion";
+import styles from "./dashboard-page-transition.module.css";
 import { cn } from "@/lib/utils";
+
+const TransitionDepth = createContext(0);
 
 type DashboardPageTransitionProps = {
   children: React.ReactNode;
@@ -18,20 +22,22 @@ export function DashboardPageTransition({
   className,
 }: DashboardPageTransitionProps) {
   const reduceMotion = useReducedMotion();
+  const serviceTheme = useServiceTheme();
+  const depth = useContext(TransitionDepth);
 
-  if (reduceMotion) {
+  if (reduceMotion || (serviceTheme && depth > 0)) {
     return <div className={cn("w-full min-w-0", className)}>{children}</div>;
   }
 
   return (
-    <motion.div
+    <TransitionDepth.Provider value={depth + 1}><motion.div
       key={animateKey}
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0.96, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={onboardingPageTransition}
-      className={cn("w-full min-w-0", className)}
+      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      className={cn("w-full min-w-0", styles.frame, className)}
     >
       {children}
-    </motion.div>
+    </motion.div></TransitionDepth.Provider>
   );
 }

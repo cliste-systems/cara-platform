@@ -98,9 +98,9 @@ async function run(request: Request) {
     const cutoff = iso(30 * 24 * 60 * 60 * 1000);
     const { data, error } = await admin
       .from("call_logs")
-      .update({ transcript: null, transcript_review: null })
+      .update({ transcript: null, transcript_review: null, pending_knowledge_gaps: null })
       .lt("created_at", cutoff)
-      .not("transcript", "is", null)
+      .or("transcript.not.is.null,transcript_review.not.is.null,pending_knowledge_gaps.not.is.null")
       .select("id");
     return { count: data?.length ?? 0, error: error?.message };
   });
@@ -241,8 +241,8 @@ async function run(request: Request) {
   });
 
   return NextResponse.json({
-    ok: true,
+    ok: !steps.some(step => step.error),
     runAt: new Date(now).toISOString(),
     steps,
-  });
+  }, { status: steps.some(step => step.error) ? 500 : 200 });
 }

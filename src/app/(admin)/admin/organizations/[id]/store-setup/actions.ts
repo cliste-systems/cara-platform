@@ -157,6 +157,9 @@ export async function markDivertVerified(
   const user = await requireAdminPermission("customers");
   const admin = await adminClient();
 
+  const {data:connection}=await admin.from('customer_phone_connections').select('organization_id').eq('organization_id',organizationId).maybeSingle();
+  if(connection?.organization_id===organizationId)return {ok:false,message:'Use the assisted connection review with call evidence for this setup.'};
+
   const { data: profile } = await admin
     .from("profiles")
     .select("id")
@@ -654,3 +657,29 @@ export async function loadSupervaluWeeklyOffersAdminMeta(): Promise<{
 }
 
 export { parseAdminGreetingParts };
+
+/** Human attestation is required only when the carrier omits forwardedFrom. */
+export async function reviewAssistedConnection(organizationId:string,input:{callSid:string;reason:string;confirmed:boolean}):Promise<{ok:boolean;message:string}>{
+ const actor=await requireAdminPermission('customers');
+ if(!UUID_RE.test(organizationId)||!/^CA[a-f0-9]{32}$/i.test(input.callSid)||input.confirmed!==true||typeof input.reason!=='string'||input.reason.trim().length<20||input.reason.length>1000)return {ok:false,message:'Provide the call SID, a review note and confirmation of the forwarded call.'};
+ const admin=await adminClient();
+ const [{data:connection},{data:org},{data:record}]=await Promise.all([
+  admin.from('customer_phone_connections').select('*').eq('organization_id',organizationId).single(),
+  admin.from('organizations').select('phone_number,is_active').eq('id',organizationId).single(),
+  admin.from('call_logs').select('id,engineer_test_call').eq('organization_id',organizationId).eq('call_sid',input.callSid).maybeSingle(),
+ ]);
+ if(!connection||!org?.is_active||!record||record.engineer_test_call===true)return {ok:false,message:'An active customer line and matching customer call are required.'};
+ if(connection.verified_at)return {ok:false,message:'This connection already has verified evidence. Use billing recovery if activation is pending.'};
+ const {default:twilio}=await import('twilio');
+ const sid=process.env.TWILIO_ACCOUNT_SID,token=process.env.TWILIO_AUTH_TOKEN;
+ if(!sid||!token)return {ok:false,message:'Call evidence is unavailable. Retry when Twilio is connected.'};
+ const call=await twilio(sid,token,{timeout:7000,maxRetries:0}).calls(input.callSid).fetch().catch(()=>null);
+ const {normalizeConnectionNumber}=await import('@/lib/phone-connection');
+ if(!call||call.direction!=='inbound'||call.status!=='completed'||Number(call.duration)<=10||!call.startTime||!call.endTime||call.startTime.getTime()<Date.parse(connection.requested_at)||normalizeConnectionNumber(call.to)!==normalizeConnectionNumber(org.phone_number)|| (call.forwardedFrom&&normalizeConnectionNumber(call.forwardedFrom)!==connection.business_number))return {ok:false,message:'This call does not match the current connection request.'};
+ const {error}=await admin.from('customer_phone_connections').update({verified_at:call.endTime.toISOString(),verified_call_sid:call.sid,assisted_by:actor.id,assisted_reason:input.reason.trim(),activation_next_attempt_at:new Date().toISOString()}).eq('organization_id',organizationId).eq('business_number',connection.business_number).eq('requested_at',connection.requested_at).is('verified_at',null).select('organization_id').single();
+ if(error)return {ok:false,message:'The connection changed during review. Refresh before trying again.'};
+ await logSecurityEvent(buildSecurityEventContext(await headers()),{eventType:'admin_store_divert_verified',outcome:'success',actorUserId:actor.id,actorEmail:actor.email,metadata:{organization_id:organizationId,call_sid:call.sid,assisted:true,reason:input.reason.trim()}});
+ const {checkPhoneConnection}=await import('@/lib/phone-connection-server');
+ try{await checkPhoneConnection(organizationId);}catch{revalidateOrg(organizationId);return {ok:true,message:'Forwarding verified. Billing activation is queued for recovery.'};}
+ revalidateOrg(organizationId);return {ok:true,message:'Forwarding verified and billing activation checked.'};
+}

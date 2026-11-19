@@ -1,0 +1,4 @@
+.popup{display:flex!important;flex-direction:column;gap:10px!important;padding:26px 24px 24px!important;overflow:visible!important}
+.popup>[data-slot=dialog-description]{margin-bottom:14px;max-width:85%}
+.popup>section{min-height:100px}
+@media(max-width:600px){.popup{padding:24px 20px 20px!important}}

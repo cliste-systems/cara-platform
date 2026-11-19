@@ -258,6 +258,8 @@ async function loadPreviewProfileForOrg(
   return previewSessionFromProfile(admin, profile);
 }
 
+export class PreviewWorkspaceUnavailable extends Error {}
+
 async function resolveLocalPreviewDashboardAuth(): Promise<DashboardSession | null> {
   if (!isLocalDashboardPreviewEnabled()) return null;
 
@@ -275,11 +277,14 @@ async function resolveLocalPreviewDashboardAuth(): Promise<DashboardSession | nu
         const session = previewSessionFromProfile(admin, profile);
         if (session) return session;
       }
+      throw new Error("The selected preview profile could not be loaded.");
     }
 
     if (preferredOrgId) {
-      const session = await loadPreviewProfileForOrg(admin, preferredOrgId);
+      const session = await loadPreviewProfileForOrg(admin, preferredOrgId)
+        ?? await loadPreviewProfileForOrg(admin, preferredOrgId);
       if (session) return session;
+      throw new Error("The selected preview business could not be loaded.");
     }
 
     const { data: activeOrgs } = await admin
@@ -323,7 +328,8 @@ async function resolveLocalPreviewDashboardAuth(): Promise<DashboardSession | nu
     return previewSessionFromProfile(admin, profile);
   } catch (error) {
     console.warn("[dashboard] local preview session unavailable", error);
-    return null;
+    // A configured preview must never fall through to a different customer's session.
+    throw new PreviewWorkspaceUnavailable("Your preview workspace is temporarily unavailable. Please try again shortly.");
   }
 }
 

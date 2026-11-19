@@ -29,7 +29,7 @@ export function DashboardSignOutButton() {
       variant="ghost"
       disabled={pending}
       onClick={() => void handleSignOut()}
-      className="group h-9 w-full justify-start gap-2.5 rounded-[10px] px-3 text-[13px] font-normal text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#0f172a]"
+      className="group min-h-11 w-full justify-start gap-2.5 rounded-[10px] px-3 text-[13px] font-normal text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#0f172a]"
     >
       <LogOut
         className="size-[18px] shrink-0 text-[#94a3b8] group-hover:text-[#64748b]"

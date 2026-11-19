@@ -24,6 +24,7 @@ const ACCOUNT_SECTION = "Account";
 
 /** Workspace nav pages — longest prefix wins when matching. */
 const WORKSPACE_PAGES: { prefix: string; label: string }[] = [
+  { prefix: "/dashboard/services", label: "Services" },
   { prefix: DASHBOARD_ROUTES.caraKnowledge, label: "Cara's Knowledge" },
   { prefix: DASHBOARD_ROUTES.activity, label: "Activity" },
   { prefix: DASHBOARD_ROUTES.actionInbox, label: "Action Inbox" },
@@ -78,6 +79,7 @@ function accountPageLabel(pathname: string): string {
 
 export function dashboardBreadcrumbs(pathname: string): DashboardBreadcrumb[] {
   const path = normalizePathname(pathname);
+  if (path === DASHBOARD_ROUTES.phoneSetup) return sectionPage(BUSINESS_SECTION, DASHBOARD_ROUTES.businessProfile, "Phone connection");
 
   if (path.startsWith(DASHBOARD_ROUTES.caraKnowledge)) {
     return [

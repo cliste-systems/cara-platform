@@ -1,6 +1,9 @@
 "use client";
+import { FormFeedback } from "@/components/ui/form-feedback";
+import {detectCanonicalQuestion} from "@/lib/answers-boundary";
 
 import { useRouter } from "next/navigation";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
@@ -121,6 +124,7 @@ function nextSelectionId(
   return remaining[Math.min(Math.max(index, 0), remaining.length - 1)]?.id ?? null;
 }
 
+
 export function CaraTrainingView({
   items,
   canManage,
@@ -158,10 +162,7 @@ export function CaraTrainingView({
   const [teachText, setTeachText] = useState("");
   const [teachOpen, setTeachOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [draftSafetyIssues, setDraftSafetyIssues] = useState<
-    TrainingSafetyIssue[]
-  >([]);
-  const [draftSafetyChecking, setDraftSafetyChecking] = useState(false);
+  const [checkedDraft, setCheckedDraft] = useState<{ key: string; issues: TrainingSafetyIssue[] } | null>(null);
   const [celebrateAnswer, setCelebrateAnswer] = useState<{
     itemId: string;
     choice: TrainingAnswerCelebrateChoice;
@@ -174,11 +175,13 @@ export function CaraTrainingView({
   const previousSelectionRef = useRef<string | null>(null);
   const reduceMotion = useReducedMotion();
 
-  useEffect(() => {
+  const hydrated = useHydrated();
+  const [restoredOverrides, setRestoredOverrides] = useState(false);
+  if (hydrated && !restoredOverrides) {
+    setRestoredOverrides(true);
     const stored = readDemoTrainingItemOverrides();
-    if (Object.keys(stored).length === 0) return;
-    setLocalItemOverrides((current) => ({ ...stored, ...current }));
-  }, []);
+    if (Object.keys(stored).length) setLocalItemOverrides(current => ({ ...stored, ...current }));
+  }
 
   const displayItems = useMemo(
     () => items.map((item) => localItemOverrides[item.id] ?? item),
@@ -210,7 +213,9 @@ export function CaraTrainingView({
     [persistDemoOverrides],
   );
 
-  useEffect(() => {
+  const [previousItems, setPreviousItems] = useState(items);
+  if (items !== previousItems) {
+    setPreviousItems(items);
     setLocalItemOverrides((current) => {
       let changed = false;
       const next = { ...current };
@@ -223,7 +228,7 @@ export function CaraTrainingView({
       }
       return changed ? next : current;
     });
-  }, [items]);
+  }
 
   const openItems = useMemo(
     () =>
@@ -272,39 +277,19 @@ export function CaraTrainingView({
     [displayItems, resolvedSelectedId],
   );
 
+  const draftId = selected?.status === "draft_ready" && !isDemoTrainingItemId(selected.id) ? selected.id : null;
+  const draftKey = JSON.stringify([draftId, selected?.updated_at, selected?.proposed_patch]);
+  const draftSafetyChecking = Boolean(draftId) && checkedDraft?.key !== draftKey;
+  const draftSafetyIssues = checkedDraft?.key === draftKey ? checkedDraft.issues : [];
+
   useEffect(() => {
-    const item =
-      displayItems.find((entry) => entry.id === resolvedSelectedId) ?? null;
-
-    if (
-      !item ||
-      item.status !== "draft_ready" ||
-      isDemoTrainingItemId(item.id)
-    ) {
-      setDraftSafetyIssues([]);
-      setDraftSafetyChecking(false);
-      return;
-    }
-
+    if (!draftId) return;
     let cancelled = false;
-    setDraftSafetyChecking(true);
-    void checkTrainingDraftSafetyAction(item.id).then((result) => {
-      if (cancelled) return;
-      setDraftSafetyChecking(false);
-      setDraftSafetyIssues(result.ok ? [] : result.issues);
+    void checkTrainingDraftSafetyAction(draftId).then(result => {
+      if (!cancelled) setCheckedDraft({ key: draftKey, issues: result.ok ? [] : result.issues });
     });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    resolvedSelectedId,
-    displayItems,
-    selected?.id,
-    selected?.status,
-    selected?.updated_at,
-    selected?.proposed_patch,
-  ]);
+    return () => { cancelled = true; };
+  }, [draftId, draftKey]);
 
   useEffect(() => {
     const item =
@@ -383,6 +368,7 @@ export function CaraTrainingView({
   );
 
   const selectItem = (id: string) => {
+    setMobileDetailOpen(true);
     setSelectedId(id);
     setMobileDetailOpen(true);
   };
@@ -586,7 +572,7 @@ export function CaraTrainingView({
     <div
       className={cn(
         "flex h-full min-h-0 flex-col overflow-hidden border-[#e2e8e4] bg-[#f8f9fa] max-xl:border-b xl:border-r",
-        mobileDetailOpen && "max-xl:hidden",
+        mobileDetailOpen && "max-lg:hidden",
       )}
     >
       {!embedded ? (
@@ -686,7 +672,7 @@ export function CaraTrainingView({
     <div
       className={cn(
         "flex h-full min-h-0 flex-col overflow-hidden bg-white",
-        !mobileDetailOpen && "max-xl:hidden",
+        !mobileDetailOpen && "max-lg:hidden",
       )}
     >
       <TrainingDetailWorkspace
@@ -715,7 +701,7 @@ export function CaraTrainingView({
   );
 
   const queuePanel = (
-    <ListDetailLayout
+    <ListDetailLayout hideDetail={!selected} mobileDetailOpen={mobileDetailOpen}
       className="min-h-0 flex-1 gap-0 xl:grid-cols-[minmax(300px,340px)_minmax(0,1fr)]"
       list={listPanel}
       detail={detailPanel}
@@ -893,9 +879,7 @@ function TrainingAnswerActionsFooter({
   return (
     <div className="shrink-0 border-t border-[#e2e8e4] bg-white px-4 py-3 sm:px-6">
       {error ? (
-        <p className="mb-2 text-[13px] text-red-600" role="alert">
-          {error}
-        </p>
+        <FormFeedback message={error} />
       ) : null}
       <div className="flex w-full flex-col gap-2">
         <Button
@@ -1049,6 +1033,7 @@ function TrainingDetailWorkspace({
   const isAwaiting = item.status === "awaiting_answer";
   const excerpt = trainingSourceExcerpt(item);
   const question = trainingDisplayQuestion(item);
+  const canonical = detectCanonicalQuestion(question);
   const deferred = trainingItemIsDeferred(item);
   const callViewHref = trainingItemCallHref(item.call_log_id);
 
@@ -1113,6 +1098,8 @@ function TrainingDetailWorkspace({
           />
         ) : null}
 
+        {canonical && (isAwaiting || isDraft) ? <a href={canonical.setupHref} className="mb-3 block shrink-0 rounded-xl border border-[#d9e2dd] bg-white p-4 text-sm leading-6">Keep this answer consistent with your saved business details. <span className="font-semibold no-underline">Update {canonical.setupLabel} →</span></a> : null}
+
         {isApplied && previewPatch ? (
           <CaraTrainingPatchPreview lines={patchPreviewLines(previewPatch)} applied />
         ) : null}
@@ -1150,9 +1137,7 @@ function TrainingDetailWorkspace({
         ) : null}
 
         {error && !(isAwaiting && canManage) ? (
-          <p className="text-[13px] text-red-600" role="alert">
-            {error}
-          </p>
+          <FormFeedback message={error} />
         ) : null}
 
         {!canManage ? (

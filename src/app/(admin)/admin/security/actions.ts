@@ -1,5 +1,7 @@
 "use server";
 
+import {checkSignupPassword} from "@/lib/signup-password-security";
+
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -54,6 +56,8 @@ export async function changeAdminPassword(_previous: AdminSecurityState, form: F
   const password = form.get("password");
   const validation = validateInvitePassword(password, form.get("confirmation"));
   if (validation) return { error: validation };
+  const passwordCheck=await checkSignupPassword(password as string);
+  if(!passwordCheck.ok)return {error:passwordCheck.message};
   // A verified MFA session updates only its own password through Supabase Auth.
   const { error } = await supabase.auth.updateUser({ password: password as string });
   if (error) {

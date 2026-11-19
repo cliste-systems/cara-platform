@@ -25,7 +25,7 @@ export function HoursTimeReveal({
   className,
 }: HoursTimeRevealProps) {
   return (
-    <div className={cn("relative h-9 min-w-0 flex-1", className)}>
+    <div className={cn("relative h-11 min-h-11 min-w-0 flex-none sm:flex-1", className)}>
       <div
         className={cn(
           "absolute inset-0 flex min-w-0 items-center gap-1.5 motion-reduce:transition-none",
@@ -36,6 +36,7 @@ export function HoursTimeReveal({
             : "pointer-events-none z-0 opacity-0",
         )}
         aria-hidden={!open}
+        inert={!open}
       >
         {children}
       </div>
@@ -69,21 +70,22 @@ export function HoursPanelReveal({
   show,
   children,
   className,
-  maxHeightClass = "max-h-12",
+  maxHeightClass: _maxHeightClass,
 }: HoursPanelRevealProps) {
   return (
     <div
       className={cn(
-        "overflow-hidden motion-reduce:transition-none",
+        "grid motion-reduce:transition-none",
         REVEAL_MS,
-        "transition-[max-height,opacity]",
-        show ? cn(maxHeightClass, "opacity-100") : "max-h-0 opacity-0",
+        "transition-[grid-template-rows,opacity]",
+        show ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0 !m-0",
         className,
       )}
       style={{ transitionTimingFunction: REVEAL_EASE }}
       aria-hidden={!show}
+      inert={!show}
     >
-      {children}
+      <div className="min-h-0 overflow-hidden">{children}</div>
     </div>
   );
 }

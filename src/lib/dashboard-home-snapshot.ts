@@ -1,3 +1,4 @@
+import { serviceFollowUpFilters, SERVICE_FOLLOW_UP_COLUMNS, type ServiceFollowUpRow } from "./service-follow-ups";
 import type { TimelineFeedRow } from "@/components/dashboard/dashboard-timeline-feed";
 import type { HomeCallReviewRow } from "@/lib/dashboard-home-calls-to-review";
 import {
@@ -14,7 +15,6 @@ import type {
 import { formatMinutes } from "@/app/(dashboard)/dashboard/billing/usage-helpers";
 import { loadAccountBilling } from "@/lib/account-session";
 import { buildHomeLiveActivityFeed } from "@/lib/dashboard-activity-feed";
-import { sumBillableMinutesFromDurations } from "@/lib/billable-minutes";
 import { PLANS } from "@/lib/cliste-plans";
 import { buildCaraLastCallSnapshot } from "@/lib/cara-last-call";
 import { buildCaraStatus } from "@/lib/cara-status";
@@ -24,6 +24,7 @@ import { dashboardTimeGreeting } from "@/lib/dashboard-greeting";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { formatDashboardFeedRelativeTime } from "@/lib/dashboard-feed-time";
 import { buildHomeUsageSnapshot } from "@/lib/dashboard-home-analytics";
+import { buildDashboardCallAnalytics, type AnalyticsRollup, type DashboardCallAnalytics } from "@/lib/dashboard-call-analytics";
 import { buildHomeCallTimesBuckets } from "@/lib/dashboard-home-call-times";
 import {
   buildHomeCaraTrainingRows,
@@ -51,7 +52,6 @@ import {
   customerCallFilters,
   customerTicketFilters,
   customerTrainingFilters,
-  customerUsageFilters,
   CUSTOMER_TRAINING_JOINS,
   isCustomerCallRow,
 } from "@/lib/dashboard-customer-data";
@@ -78,9 +78,15 @@ export type DashboardHomeStat = {
 };
 
 export type DashboardHomeSnapshot = {
+  designSample?: boolean;
   greeting: string;
+  error?: string | null;
+  caraStatus?: ReturnType<typeof buildCaraStatus>;
   subheading: string;
   stats: DashboardHomeStat[];
+  callMinutes?: number;
+  averageCallSeconds?: number | null;
+  metricPeriod?: string;
   activity: TimelineFeedRow[];
   needsAttention: HomeRequestRow[];
   openActions: number;
@@ -90,6 +96,8 @@ export type DashboardHomeSnapshot = {
   callsToReview: HomeCallReviewRow[];
   callsToReviewCount: number;
   callTimes: HomeCallTimesBucket[];
+  callAnalytics?: DashboardCallAnalytics | null;
+  recentCallDurations?: { id: string; seconds: number }[];
 };
 
 function countExact(res: {
@@ -136,51 +144,47 @@ export async function loadDashboardHomeSnapshot(input: {
   agentBusinessType: string | null | undefined;
   organizationSlug?: string | null;
 }): Promise<DashboardHomeSnapshot> {
-  const { session, metricRange, viewAllLocations, niche, agentBusinessType, organizationSlug } = input;
+  const { session, metricRange, viewAllLocations, niche, agentBusinessType } = input;
   const { supabase, organizationId, profile, accountId } = session;
-  const scope = await resolveDashboardOrganizationScope(session, viewAllLocations);
+  const isRetail = niche === "retail";
+  const [scope, accountBilling] = await Promise.all([
+    resolveDashboardOrganizationScope(session, viewAllLocations),
+    loadAccountBilling(accountId),
+  ]);
   const scopedOrgIds = scope.organizationIds;
   const panelPeriodPhrase = dashboardMetricRangePeriodPhrase(metricRange);
   const metricRangeStartIso = getDashboardMetricRangeLowerBoundIso(metricRange);
   const metricRangeEndExclusiveIso = getDashboardMetricRangeUpperExclusiveIso(metricRange);
-  const accountBilling = await loadAccountBilling(accountId);
   const planTier = accountBilling?.planTier ?? "pro";
   const plan = PLANS[planTier];
   const billingPeriodStart = accountBilling?.billingPeriodStart ?? defaultPeriodStart();
 
   const [
-    callsInMetricRangeRes,
+    rollupsRes,
     actionsInMetricRangeRes,
     openActionsRes,
-    callsForMetricRollupsRes,
     callsForPanelsRes,
     openTicketsRes,
     orgRes,
     latestCallRes,
-    usageRecordsRes,
     trainingItemsRes,
     openTrainingCountRes,
   ] = await Promise.all([
+    supabase.rpc("dashboard_home_rollups", {
+      p_organization_ids: scopedOrgIds,
+      p_start: metricRangeStartIso,
+      p_end: metricRangeEndExclusiveIso,
+      p_billing_start: billingPeriodStart,
+    }),
     applyRangeEnd(applyOrganizationScope(
-      customerCallFilters(supabase.from("call_logs").select("id", { count: "exact", head: true }))
-        .gte("created_at", metricRangeStartIso),
-      scopedOrgIds,
-    ), metricRangeEndExclusiveIso),
-    applyRangeEnd(applyOrganizationScope(
-      customerTicketFilters(supabase.from("action_tickets").select("id", { count: "exact", head: true }))
+      (isRetail ? customerTicketFilters(supabase.from("action_tickets").select("id", {count:"exact",head:true})) : serviceFollowUpFilters(supabase.from("call_logs").select("id",{count:"exact",head:true})))
         .gte("created_at", metricRangeStartIso),
       scopedOrgIds,
     ), metricRangeEndExclusiveIso),
     applyOrganizationScope(
-      customerTicketFilters(supabase.from("action_tickets").select("id", { count: "exact", head: true }))
-        .eq("status", "open").gte("created_at", metricRangeStartIso),
+      isRetail ? customerTicketFilters(supabase.from("action_tickets").select("id", {count:"exact",head:true})).eq("status","open") : serviceFollowUpFilters(supabase.from("call_logs").select("id",{count:"exact",head:true}),"open"),
       scopedOrgIds,
     ),
-    applyRangeEnd(applyOrganizationScope(
-      customerCallFilters(supabase.from("call_logs").select("outcome, duration_seconds, ai_summary, transfer_connected"))
-        .gte("created_at", metricRangeStartIso),
-      scopedOrgIds,
-    ), metricRangeEndExclusiveIso),
     applyRangeEnd(applyOrganizationScope(
       customerCallFilters(supabase.from("call_logs").select(
         "id, created_at, outcome, caller_number, caller_name, duration_seconds, ai_summary, post_call_status, call_resolution, engineer_test_call, is_test_call, room_name",
@@ -191,10 +195,9 @@ export async function loadDashboardHomeSnapshot(input: {
       scopedOrgIds,
     ), metricRangeEndExclusiveIso),
     applyOrganizationScope(
-      customerTicketFilters(supabase.from("action_tickets").select(
+      (isRetail ? customerTicketFilters(supabase.from("action_tickets").select(
         "id, summary, created_at, status, caller_name, caller_number, department_slug, brief_summary",
-      ))
-        .eq("status", "open").gte("created_at", metricRangeStartIso)
+      )).eq("status", "open") : serviceFollowUpFilters(supabase.from("call_logs").select(SERVICE_FOLLOW_UP_COLUMNS),"open"))
         .order("created_at", { ascending: false }).limit(DASHBOARD_HOME_ATTENTION_ROW_LIMIT),
       scopedOrgIds,
     ),
@@ -204,11 +207,6 @@ export async function loadDashboardHomeSnapshot(input: {
     customerCallFilters(supabase.from("call_logs").select("id, created_at, caller_number, caller_name, outcome"))
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: false }).limit(1).maybeSingle(),
-    applyOrganizationScope(
-      customerUsageFilters(supabase.from("usage_records").select("minutes_billable"))
-        .gte("billing_period_start", billingPeriodStart),
-      scopedOrgIds.length > 0 ? scopedOrgIds : [organizationId],
-    ),
     applyOrganizationScope(
       customerTrainingFilters(supabase.from("cara_training_items").select(
         `id, gap_summary, status, updated_at, knowledge_folder_id, knowledge_topic_labels, ${CUSTOMER_TRAINING_JOINS}`,
@@ -225,23 +223,25 @@ export async function loadDashboardHomeSnapshot(input: {
     ),
   ]);
 
+  const loadFailed = [rollupsRes, actionsInMetricRangeRes, openActionsRes, callsForPanelsRes, openTicketsRes, orgRes, trainingItemsRes, openTrainingCountRes].some(r => r.error);
   const callsForPanels = (callsForPanelsRes.error ? [] : (callsForPanelsRes.data ?? [])) as CallLogRow[];
   const customerCallsForPanels = callsForPanels.filter(isCustomerCallRow);
-  const callsForMetricRollups = callsForMetricRollupsRes.error ? [] : (callsForMetricRollupsRes.data ?? []);
-  const callsAnsweredLive = countExact(callsInMetricRangeRes);
+  const rollups = (rollupsRes.error ? null : rollupsRes.data) as {
+    calls: number; minutes: number; billing_minutes: number; analytics?: AnalyticsRollup;
+    outcomes: { outcome: string | null; count: number }[];
+    summaries: { summary: string; count: number }[];
+  } | null;
+  const callsAnsweredLive = Number(rollups?.calls ?? 0);
   const actionsCreatedLive = countExact(actionsInMetricRangeRes);
   const openActionsLive = countExact(openActionsRes);
-  const routedCountLive = callsForMetricRollups.filter((row) => isRoutedCallOutcome(row.outcome)).length;
-  const callbackCountLive = callsForMetricRollups.filter(
-    (row) => normalizeCallOutcome(String(row.outcome ?? "")) === "callback_requested",
-  ).length;
-  const minutesUsedLive = sumBillableMinutesFromDurations(callsForMetricRollups.map((row) => row.duration_seconds));
-
-  let billingMinutesUsed = 0;
-  for (const row of usageRecordsRes.error ? [] : (usageRecordsRes.data ?? [])) {
-    const value = (row as { minutes_billable: number | null }).minutes_billable;
-    billingMinutesUsed += typeof value === "number" ? value : Number(value) || 0;
-  }
+  const routedCountLive = (rollups?.outcomes ?? []).reduce(
+    (total, row) => total + (isRoutedCallOutcome(row.outcome) ? Number(row.count) : 0), 0,
+  );
+  const callbackCountLive = (rollups?.outcomes ?? []).reduce(
+    (total, row) => total + (normalizeCallOutcome(row.outcome ?? "") === "callback_requested" ? Number(row.count) : 0), 0,
+  );
+  const minutesUsedLive = Number(rollups?.minutes ?? 0);
+  const billingMinutesUsed = Number(rollups?.billing_minutes ?? 0);
   const org = orgRes.error ? null : orgRes.data;
   const lastCall = buildCaraLastCallSnapshot(
     latestCallRes.error || !latestCallRes.data ? null : (latestCallRes.data as CallLogRow),
@@ -254,7 +254,8 @@ export async function loadDashboardHomeSnapshot(input: {
     periodPhrase: panelPeriodPhrase,
     lastCall,
   });
-  const openTicketRows = (openTicketsRes.error ? [] : (openTicketsRes.data ?? [])) as HomeRequestTicketRow[];
+  const openFollowUpRows = (openTicketsRes.error ? [] : (openTicketsRes.data ?? []));
+  const openTicketRows: HomeRequestTicketRow[] = isRetail ? openFollowUpRows as HomeRequestTicketRow[] : (openFollowUpRows as unknown as ServiceFollowUpRow[]).map(row=>({id:row.id,summary:row.ai_summary,created_at:row.created_at,status:row.follow_up_completed_at?"resolved":"open",caller_name:row.caller_name,caller_number:row.caller_number}));
   const needsAttentionLive = mergeHomeNeedsAttentionRows({
     tickets: openTicketRows,
     calls: customerCallsForPanels as HomeAttentionCallRow[],
@@ -264,6 +265,7 @@ export async function loadDashboardHomeSnapshot(input: {
   const trainingItemRows = (trainingItemsRes.error ? [] : (trainingItemsRes.data ?? [])) as HomeCaraTrainingItemRow[];
   const caraTrainingLive = buildHomeCaraTrainingRows({
     items: trainingItemRows,
+    isRetail: niche === "retail",
     formatTime: formatDashboardFeedRelativeTime,
     limit: DASHBOARD_HOME_CARA_TRAINING_ROW_LIMIT,
   });
@@ -274,10 +276,10 @@ export async function loadDashboardHomeSnapshot(input: {
     formatTime: formatDashboardFeedRelativeTime,
     limit: DASHBOARD_HOME_RECENT_ACTIVITY_LIMIT,
   });
-  const callSummariesForTopics = callsForMetricRollups.map((row) => (row as { ai_summary?: string | null }).ai_summary);
   const topTopicsLive = buildHomeTopTopicRows({
     // Customer call-volume signals only, not operational training or tickets.
-    callSummaries: callSummariesForTopics,
+    callSummaries: [],
+    weightedCallSummaries: rollups?.summaries ?? [],
     ticketSummaries: [],
     trainingGaps: [],
   });
@@ -315,10 +317,21 @@ export async function loadDashboardHomeSnapshot(input: {
 
   return {
     greeting,
+    error: loadFailed ? "We couldn’t load all of your call information. Please refresh to try again." : null,
+    caraStatus,
     subheading: homeCopy.home.heroSubheading,
     stats,
+    callMinutes: minutesUsedLive,
+    averageCallSeconds: rollups?.analytics?.average_seconds != null ? Math.round(rollups.analytics.average_seconds) : null,
+    callAnalytics: rollups?.analytics ? buildDashboardCallAnalytics(rollups.analytics, rollups.outcomes, metricRange, metricRangeStartIso) : null,
+    metricPeriod: metricRange === "today" ? "today" : metricRange === "7d" ? "last 7 days" : "last 4 weeks",
     activity: activityLive,
-    needsAttention: needsAttentionLive,
+    needsAttention: niche === "retail" ? needsAttentionLive : openTicketRows.map(t=>({
+      id:t.id,href:`${DASHBOARD_ROUTES.calls}?filter=follow_up&followUp=${encodeURIComponent(t.id)}`,
+      title:t.caller_name?.trim() || t.caller_number || "Caller enquiry",
+      description:t.brief_summary?.trim() || t.summary?.trim() || "Follow-up requested",
+      time:formatDashboardFeedRelativeTime(t.created_at),
+    })),
     openActions: openActionsLive,
     caraTraining: caraTrainingLive,
     openTrainingCount: openTrainingCountLive,
@@ -326,5 +339,6 @@ export async function loadDashboardHomeSnapshot(input: {
     callsToReview: callsToReviewLive,
     callsToReviewCount: callsToReviewCountLive,
     callTimes: callTimesLive,
+    recentCallDurations: customerCallsForPanels.filter(row=>row.duration_seconds!=null).slice(0,8).reverse().map(row=>({id:row.id,seconds:Math.max(0,row.duration_seconds??0)})),
   };
 }

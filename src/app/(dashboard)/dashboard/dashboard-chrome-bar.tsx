@@ -24,7 +24,7 @@ export function DashboardChromeBar({ versionDisplay }: DashboardChromeBarProps) 
   const crumbs = dashboardBreadcrumbs(pathname);
 
   return (
-    <header className="shrink-0 border-b border-[#d9e2dd] bg-[#f3f6f4]">
+    <header className="hidden lg:block shrink-0 border-b border-[#d9e2dd] bg-[#f3f6f4]">
       <div
         className={cn(
           DASHBOARD_CONTENT_COLUMN,

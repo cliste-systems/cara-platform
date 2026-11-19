@@ -10,6 +10,7 @@ import {
 } from "@/components/onboarding/onboarding-motion";
 import { DASHBOARD_FORM_STACK } from "@/components/dashboard/dashboard-surface";
 import { cn } from "@/lib/utils";
+import { useServiceTheme } from "./service-theme-context";
 
 type DashboardAnimatedGroupProps = {
   children: ReactNode;
@@ -31,10 +32,11 @@ export function DashboardAnimatedGroup({
   growLast = false,
 }: DashboardAnimatedGroupProps) {
   const reduceMotion = useReducedMotion();
+  const serviceTheme = useServiceTheme();
   const ready = useOnboardingAnimateIn();
   const items = visibleChildren(children);
 
-  if (reduceMotion) {
+  if (reduceMotion || serviceTheme) {
     return <div className={className}>{children}</div>;
   }
 

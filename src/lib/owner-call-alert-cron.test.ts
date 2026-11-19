@@ -10,6 +10,7 @@ function fixture(env: Record<string, string> = {}, failure = false) {
   const imports: Record<string, unknown> = {
     'next/server': { NextResponse: { json: (body: unknown, options?: ResponseInit) => Response.json(body, options) } },
     '@/lib/timing-safe-equal': { timingSafeEqualUtf8 },
+    '@/lib/knowledge-delivery-retries': { processKnowledgeDeliveries: async () => ({ knowledgeCalls: 0, knowledgeNotifications: 0 }) },
     '@/lib/owner-call-sms-alerts': { processOwnerCallAlerts: async () => {
       processed++;
       if (failure) throw new Error('Private provider details');
@@ -36,7 +37,7 @@ for (const method of ['GET', 'POST'] as const) {
     const f = fixture({ CALL_ANALYSIS_CRON_SECRET: ' scheduler-secret ', CRON_SECRET: 'other-secret' });
     const result = await f.handlers[method](new Request('https://example.com', { method, headers: { authorization: 'Bearer scheduler-secret' } }));
     assert.equal(result.status, 200);
-    assert.deepEqual(await result.json(), { ok: true, processed: 0 });
+    assert.deepEqual(await result.json(), { ok: true, processed: 0, knowledgeCalls: 0, knowledgeNotifications: 0 });
     assert.equal(f.processed(), 1);
   });
 }

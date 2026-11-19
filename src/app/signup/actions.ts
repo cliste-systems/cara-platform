@@ -14,7 +14,7 @@ import { isResendConfigured } from "@/lib/resend-mail";
 import { sendSignupConfirmationEmail } from "@/lib/signup-confirmation-email";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { isPlanTier, type PlanTier } from "@/lib/cliste-plans";
-import { isSignupOnboardingDevRelaxed } from "@/lib/onboarding-dev";
+import { isLocalSignupCodePreview, isSignupOnboardingDevRelaxed } from "@/lib/onboarding-dev";
 import { recordLegalAcceptances } from "@/lib/legal-acceptances";
 import { scoreSignupFraud, shouldRouteToReview } from "@/lib/signup-security";
 import {
@@ -150,7 +150,8 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
   }
 
   const ipFp = rateLimitFingerprint(h, "signup-ip");
-  if (!devRelaxed) {
+  // Repeated loopback rehearsals must not consume the public signup IP bucket.
+  if (!devRelaxed && !isLocalSignupCodePreview(h)) {
     const ipStatus = await recordRateLimitFailure("authenticate", ipFp);
     if (!ipStatus.allowed) {
       return {
@@ -176,10 +177,10 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
   let admin;
   try {
     admin = createAdminClient();
-  } catch (err) {
+  } catch {
     return {
       ok: false,
-      message: err instanceof Error ? err.message : "Backend unavailable.",
+      message: "The signup service is temporarily unavailable. Please try again.",
     };
   }
 
@@ -230,7 +231,7 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
     }
     return {
       ok: false,
-      message: authError?.message ?? "Could not create account.",
+      message: "Could not create your account. Please try again shortly.",
     };
   }
 
@@ -292,7 +293,7 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
     await admin.from("accounts").delete().eq("id", accountId).then(() => undefined);
     return {
       ok: false,
-      message: orgErr?.message ?? "Could not create organisation.",
+      message: "Could not create your organisation. Please try again.",
     };
   }
   const orgId = orgRow.id;
@@ -311,7 +312,7 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
     await admin.from("accounts").delete().eq("id", accountId).then(() => undefined);
     return {
       ok: false,
-      message: `Profile not created: ${profileErr.message}`,
+      message: "Could not complete your account details. Please try again.",
     };
   }
 
@@ -351,16 +352,14 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
       context: securityCtx,
       agreement: { accountId, organisationName: legalCompanyName, signatoryName: ownerName, signatoryRole: "Account owner", authorityConfirmed: true },
     });
-  } catch (err) {
+  } catch {
     await admin.auth.admin.deleteUser(userId).catch(() => undefined);
     await admin.from("organizations").delete().eq("id", orgId).then(() => undefined);
     await admin.from("accounts").delete().eq("id", accountId).then(() => undefined);
     return {
       ok: false,
       message:
-        err instanceof Error
-          ? err.message
-          : "Could not record legal acceptance.",
+        "Could not record your legal acceptance. Please try again.",
     };
   }
 
@@ -408,5 +407,6 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
 
   void cookies;
 
-  return { ok: true, redirectTo: "/signup/voice" };
+  const localCodeScreen=isLocalSignupCodePreview(await headers());
+  return { ok: true, redirectTo: localCodeScreen?`/signup/check-email?email=${encodeURIComponent(email)}`:"/signup/voice" };
 }

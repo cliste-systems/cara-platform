@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useReducer, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import type { TurnstileInstance } from "@marsidev/react-turnstile";
@@ -14,6 +14,8 @@ import type { BillingInterval, PlanTier } from "@/lib/cliste-plans.data";
 import { cn } from "@/lib/utils";
 import { startSignup } from "./actions";
 import { useSetupValidation } from "@/components/dashboard/use-setup-validation";
+
+import { authFeedbackReducer, INITIAL_AUTH_FEEDBACK } from "@/lib/auth-feedback-state";
 
 const subscribeToClientReady=()=>()=>{};
 
@@ -31,8 +33,7 @@ export function SignupForm({ planTier, billingInterval, skipTurnstile = false }:
   const [pending, setPending] = useState(false);
   const [visible, setVisible] = useState(false);
   const [openingNextStep, setOpeningNextStep] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [securityError, setSecurityError] = useState(false);
+  const [{error,securityError}, feedback] = useReducer(authFeedbackReducer, INITIAL_AUTH_FEEDBACK);
   const turnstile = useRef<TurnstileInstance | null>(null);
   const siteKey = skipTurnstile ? "" : process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
 
@@ -40,12 +41,11 @@ export function SignupForm({ planTier, billingInterval, skipTurnstile = false }:
     event.preventDefault();
     if (pending || !validation.validate(event.currentTarget)) return;
     const data = new FormData(event.currentTarget);
-    setError(null);
+    feedback({type:"submit"});
     setOpeningNextStep(false);
     const token = turnstile.current?.getResponse();
     if (siteKey && (!token || turnstile.current?.isExpired())) {
-      setSecurityError(true);
-      setError("The security check hasn’t finished. Please retry the check below.");
+      feedback({type:"security-failed",message:"The security check hasn’t finished. Please retry the check below."});
       turnstile.current?.reset();
       return;
     }
@@ -54,7 +54,7 @@ export function SignupForm({ planTier, billingInterval, skipTurnstile = false }:
     try {
       const result = await startSignup(null, data);
       if (!result.ok) {
-        setError(result.message);
+        feedback({type:"request-failed",message:result.message});
         turnstile.current?.reset();
         setPending(false);
         return;
@@ -62,7 +62,7 @@ export function SignupForm({ planTier, billingInterval, skipTurnstile = false }:
       setOpeningNextStep(true);
       router.push(result.redirectTo);
     } catch {
-      setError("We couldn’t create your account. Please try again.");
+      feedback({type:"request-failed",message:"We couldn’t create your account. Please try again."});
       turnstile.current?.reset();
       setPending(false);
     }
@@ -103,9 +103,9 @@ export function SignupForm({ planTier, billingInterval, skipTurnstile = false }:
           {validation.error("acceptLegal")}
         </LegalAcceptanceCheckbox>
       </fieldset>
-      {siteKey ? <AuthTurnstileField ref={turnstile} siteKey={siteKey} onSuccess={() => { setSecurityError(false); setError(null); }} onExpire={() => turnstile.current?.reset()} onError={() => { setSecurityError(true); setError("The security check couldn’t load. Retry it, or refresh this page if the problem continues."); }} /> : null}
-      <AuthFormAlert message={error} />
-      {securityError ? <button type="button" className="text-sm font-medium underline underline-offset-4" onClick={() => { setSecurityError(false); setError(null); turnstile.current?.reset(); }}>Retry security check</button> : null}
+      {siteKey ? <AuthTurnstileField ref={turnstile} siteKey={siteKey} onSuccess={() => feedback({type:"security-ready"})} onExpire={() => turnstile.current?.reset()} onError={() => feedback({type:"security-failed",message:"The security check couldn’t load. Retry it, or refresh this page if the problem continues."})} /> : null}
+      <AuthFormAlert message={error || securityError} />
+      {securityError ? <button type="button" className="text-sm font-medium underline underline-offset-4" onClick={() => { feedback({type:"security-ready"}); turnstile.current?.reset(); }}>Retry security check</button> : null}
       <OnboardingPrimaryButton type="submit" pending={pending} disabled={pending||!clientReady} className="w-full max-w-none shadow-none">
         {pending ? openingNextStep ? "Opening the next step…" : "Creating your account…" : "Create account"}<ArrowRight size={16} aria-hidden />
       </OnboardingPrimaryButton>

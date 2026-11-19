@@ -25,11 +25,11 @@ export const DASHBOARD_PAGE_SHELL_FILL_WHITE =
 
 /** Viewport-fit home column — canonical dashboard gutter (px-8 pt-5 pb-5). */
 export const DASHBOARD_HOME_CONTENT_COLUMN =
-  "mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col gap-4 px-8 pb-5 pt-5";
+  "mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col gap-4 px-4 pb-5 pt-5 sm:px-8";
 
 /** Shared column — nav + page content share this wrapper so outer edges align. */
 export const DASHBOARD_CONTENT_COLUMN =
-  "mx-auto w-full max-w-[1500px] px-8";
+  "mx-auto w-full max-w-[1500px] px-4 sm:px-8";
 
 /** Canonical home card — white, rounded, soft elevation. */
 export const DASHBOARD_HOME_CARD =
@@ -199,7 +199,7 @@ export const DASHBOARD_HOME_PANEL_EMPTY_INSET =
 export const DASHBOARD_EYEBROW_CLASS =
   "text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6b7c75]";
 export const DASHBOARD_TITLE_CLASS =
-  "text-[26px] font-semibold leading-tight tracking-tight text-[#11181d] sm:text-[28px]";
+  "text-[24px] font-semibold leading-tight tracking-tight text-[#11181d] sm:text-[28px]";
 export const DASHBOARD_SECTION_TITLE_CLASS =
   "text-[15px] font-semibold tracking-tight text-[#11181d]";
 export const DASHBOARD_BODY_CLASS = "text-[14px] leading-relaxed text-[#5b6b65]";
@@ -211,11 +211,11 @@ export const DASHBOARD_HINT_CLASS = "text-[12.5px] leading-relaxed text-[#6b7c75
 
 /** Readable field chrome (stronger border + navy focus ring). */
 export const DASHBOARD_INPUT_CLASS =
-  "border-[#b9c8c1] bg-[#fbfcfb] focus-visible:border-[#11181d] focus-visible:ring-1 focus-visible:ring-[#11181d]";
+  "min-h-11 border-[#b9c8c1] bg-[#fbfcfb] focus-visible:border-[#11181d] focus-visible:ring-1 focus-visible:ring-[#11181d]";
 
 /** Native <select> chrome that matches DASHBOARD_INPUT_CLASS. */
 export const DASHBOARD_SELECT_CLASS =
-  "h-10 w-full rounded-lg border border-[#b9c8c1] bg-[#fbfcfb] px-3 text-[13px] text-[#11181d] shadow-sm focus-visible:border-[#11181d] focus-visible:ring-1 focus-visible:ring-[#11181d] focus-visible:outline-none";
+  "min-h-11 w-full rounded-lg border border-[#b9c8c1] bg-[#fbfcfb] px-3 text-[13px] text-[#11181d] shadow-sm focus-visible:border-[#11181d] focus-visible:ring-1 focus-visible:ring-[#11181d] focus-visible:outline-none";
 
 /** Home first-row card footers — soft grey, aligned with hero glass metrics. */
 export const DASHBOARD_HOME_PANEL_ACTION_BUTTON_CLASS =
@@ -223,11 +223,11 @@ export const DASHBOARD_HOME_PANEL_ACTION_BUTTON_CLASS =
 
 /** The one primary CTA used everywhere. */
 export const DASHBOARD_PRIMARY_BUTTON_CLASS =
-  "h-10 cursor-pointer rounded-lg bg-[#11181d] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#243136] disabled:cursor-not-allowed";
+  "h-11 cursor-pointer rounded-lg bg-[#11181d] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#243136] disabled:cursor-not-allowed";
 
 /** Quiet secondary button (outline). */
 export const DASHBOARD_SECONDARY_BUTTON_CLASS =
-  "h-10 cursor-pointer rounded-lg border border-[#b9c8c1] bg-[#fbfcfb] px-4 text-[13px] font-medium text-[#35443f] transition-colors hover:bg-white disabled:cursor-not-allowed";
+  "h-11 cursor-pointer rounded-lg border border-[#b9c8c1] bg-[#fbfcfb] px-4 text-[13px] font-medium text-[#35443f] transition-colors hover:bg-white disabled:cursor-not-allowed";
 
 /* ------------------------------------------------------------------ */
 /* Status colours — quiet, meaning-only. Used for badges + checklist.  */

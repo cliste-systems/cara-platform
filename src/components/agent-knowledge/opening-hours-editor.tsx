@@ -37,7 +37,7 @@ type Props = {
 };
 
 const timeClass =
-  "h-9 min-w-0 flex-1 rounded-lg border border-slate-200/90 bg-white px-2 text-[13px] text-[#0b1220] shadow-sm outline-none focus-visible:border-[#0b1220]/30 focus-visible:ring-2 focus-visible:ring-[#0b1220]/10";
+  "h-11 min-w-0 w-0 flex-1 rounded-lg border border-slate-200/90 bg-white px-2 text-[13px] text-[#0b1220] shadow-sm outline-none focus-visible:border-[#0b1220]/30 focus-visible:ring-2 focus-visible:ring-[#0b1220]/10";
 
 const NOTICE_ATTENTION =
   "rounded-lg border border-amber-300/70 bg-amber-50/95 px-3 py-2 text-[12.5px] leading-relaxed text-[#0b1220]/90";
@@ -118,7 +118,7 @@ export function OpeningHoursEditor({
                   aria-selected={active}
                   onClick={() => setSelectedDay(day)}
                   className={cn(
-                    "cursor-pointer rounded-full px-1 py-1.5 text-center text-[11px] font-medium transition-colors duration-200 sm:text-[12px]",
+                    "min-h-11 cursor-pointer rounded-lg px-1 py-1.5 text-center text-[11px] font-medium transition-colors duration-200 sm:text-[12px]",
                     active
                       ? "bg-[#0b1220] text-white"
                       : open

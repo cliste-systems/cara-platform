@@ -110,7 +110,7 @@ export const LEGACY_DASHBOARD_REDIRECTS: Record<string, string> = {
   "/dashboard/calendar": DASHBOARD_ROUTES.home,
   "/dashboard/bookings": DASHBOARD_ROUTES.home,
   "/dashboard/payments": DASHBOARD_ROUTES.home,
-  "/dashboard/services": DASHBOARD_ROUTES.home,
+
   "/dashboard/storefront": DASHBOARD_ROUTES.home,
   "/dashboard/reports": DASHBOARD_ROUTES.home,
 };

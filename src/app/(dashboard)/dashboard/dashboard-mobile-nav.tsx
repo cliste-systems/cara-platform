@@ -19,6 +19,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -29,11 +30,14 @@ import { dashboardFollowUpHubHref } from "@/lib/dashboard-follow-up-hub";
 import { dashboardSidebarBadgeClassName } from "@/components/dashboard/dashboard-sidebar-nav-shared";
 import { cn } from "@/lib/utils";
 
+import { DashboardSignOutButton } from "./dashboard-sign-out-button";
 import type { DashboardSidebarNavItem } from "./dashboard-sidebar";
 import { isDashboardNavItemActive } from "@/lib/dashboard-nav-active";
 
 const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard": LayoutDashboard,
+  "/dashboard/services": LayoutGrid,
+  "/dashboard/business/profile": Building2,
   "/dashboard/calls": Phone,
   "/dashboard/call-history": Phone,
   "/dashboard/routing": Share2,
@@ -73,15 +77,15 @@ function MobileNavLink({
       href={item.href}
       onClick={onNavigate}
       className={cn(
-        "flex min-w-0 items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-colors",
+        "flex min-h-12 min-w-0 items-center justify-between gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#353d42]",
         active
-          ? "bg-slate-100 text-slate-950"
+          ? "bg-[#eaf0ec] text-[#11181d] ring-1 ring-inset ring-[#d9e2dd]"
           : "text-slate-600 hover:bg-slate-50 hover:text-slate-950",
       )}
       aria-current={active ? "page" : undefined}
     >
       <span className="flex min-w-0 items-center gap-2">
-        <Icon className="size-3.5 shrink-0 opacity-80" aria-hidden />
+        <Icon className="size-[18px] shrink-0 opacity-80" aria-hidden />
         <span className="truncate">{label}</span>
       </span>
       {showBadge ? (
@@ -96,7 +100,12 @@ function MobileNavLink({
   );
 }
 
-export function DashboardMobileNav({
+export function DashboardMobileNav(props: DashboardMobileNavProps) {
+  const pathname = usePathname();
+  return <DashboardMobileNavContents key={pathname} {...props} />;
+}
+
+function DashboardMobileNavContents({
   items,
   accountNav,
 }: DashboardMobileNavProps) {
@@ -133,7 +142,7 @@ export function DashboardMobileNav({
         <div className="flex items-center gap-2">
           <Link
             href={notificationHref}
-            className="relative inline-flex size-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
+            className="relative inline-flex size-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
             aria-label="Open follow-ups"
           >
             <Bell className="size-4" aria-hidden />
@@ -141,7 +150,7 @@ export function DashboardMobileNav({
           <button
             type="button"
             onClick={() => setOpen((current) => !current)}
-            className="inline-flex size-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
+            className="inline-flex size-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
             aria-expanded={open}
             aria-controls="dashboard-mobile-menu"
             aria-label="Toggle dashboard menu"
@@ -155,10 +164,15 @@ export function DashboardMobileNav({
         </div>
       </div>
 
-      {open ? (
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="dashboard-mobile-drawer [&_[data-slot=dialog-close]]:size-11 left-auto right-0 top-0 flex h-dvh max-h-dvh w-[min(340px,100vw)] max-w-full translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-l border-[#d9e2dd] bg-[#fbfcfb] p-0 sm:max-w-[340px]">
+          <div className="shrink-0 border-b border-[#d9e2dd] px-5 py-6 pr-14">
+            <DialogTitle className="text-lg font-semibold">Your workspace</DialogTitle>
+            <DialogDescription className="mt-1 text-xs">Everything you need to manage Cara.</DialogDescription>
+          </div>
         <nav
           id="dashboard-mobile-menu"
-          className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.06)]"
+          className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain p-4 pb-[max(16px,env(safe-area-inset-bottom))]"
           aria-label="Dashboard"
         >
           {items.map((item) => (
@@ -166,7 +180,7 @@ export function DashboardMobileNav({
           ))}
           {accountNav.length > 0 ? (
             <>
-              <p className="col-span-2 px-1 pt-2 text-[10px] font-semibold tracking-[0.2em] text-slate-400 uppercase">
+              <p className="mt-3 border-t border-[#d9e2dd] px-3 pb-2 pt-5 text-[10px] font-semibold tracking-[0.2em] text-slate-400 uppercase">
                 Account
               </p>
               {accountNav.map((item) => (
@@ -179,7 +193,8 @@ export function DashboardMobileNav({
             </>
           ) : null}
         </nav>
-      ) : null}
+        <div className="shrink-0 border-t border-[#d9e2dd] p-4 pb-[max(16px,env(safe-area-inset-bottom))]"><DashboardSignOutButton /></div>
+      </DialogContent></Dialog>
     </div>
   );
 }

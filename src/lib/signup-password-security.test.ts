@@ -1,3 +1,4 @@
+import "../../scripts/mock-server-only.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createHash} from "node:crypto";
@@ -10,10 +11,15 @@ test("breached password is rejected using only its five-character hash prefix", 
 });
 test("password lookup fails closed on outages or malformed responses",async()=>{
  const original=global.fetch;
- try {for(const response of [new Response("error",{status:503}),new Response("unexpected")]){global.fetch=async()=>response;assert.equal((await checkSignupPassword("fixture")).ok,false);}}
+ try {for(const response of [new Response("error",{status:503}),new Response("unexpected")]){global.fetch=async()=>response;assert.equal((await checkSignupPassword("fixture-password")).ok,false);}}
  finally{global.fetch=original;}
 });
 test("padding results with count zero are not treated as a breach",async()=>{
- const original=global.fetch;const password="fixture";const hash=createHash("sha1").update(password).digest("hex").toUpperCase();global.fetch=async()=>new Response(`${hash.slice(5)}:0`);
+ const original=global.fetch;const password="fixture-password";const hash=createHash("sha1").update(password).digest("hex").toUpperCase();global.fetch=async()=>new Response(`${hash.slice(5)}:0`);
  try{assert.equal((await checkSignupPassword(password)).ok,true);}finally{global.fetch=original;}
+});
+
+test("oversized passwords are rejected before an external lookup",async()=>{
+ const original=global.fetch;global.fetch=async()=>{throw new Error("lookup must not run");};
+ try{const result=await checkSignupPassword("x".repeat(129));assert.equal(result.ok,false);if(!result.ok)assert.match(result.message,/8 and 128/);}finally{global.fetch=original;}
 });

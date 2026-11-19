@@ -297,12 +297,15 @@ export function AdminEmailInboxView({
   const messageRequestRef = useRef(0);
   const listRequestRef = useRef(0);
   const listPendingRef = useRef(false);
-  const replyDraftsRef = useRef(new Map<string, string>());
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [readerOpen, setReaderOpen] = useState(false);
   const [expandedReader, setExpandedReader] = useState(false);
   const [replyOpen, setReplyOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [reply, setReply] = useState("");
+  const reply = selectedId ? replyDrafts[selectedId] ?? "" : "";
+  function saveDraft(id: string, text: string) {
+    setReplyDrafts(current => ({ ...current, [id]: text }));
+  }
   const [composing, setComposing] = useState(false);
   const [composeTo, setComposeTo] = useState("");
   const [composeSubject, setComposeSubject] = useState("");
@@ -334,14 +337,9 @@ export function AdminEmailInboxView({
       if (silent && listPendingRef.current) return;
       const requestId = ++listRequestRef.current;
       listPendingRef.current = true;
-      if (!silent) {
-        setLoadingList(true);
-        setError(null);
-      }
-      try {
-        const data = await apiJson<{ messages: EmailListItem[] }>(
+      await apiJson<{ messages: EmailListItem[] }>(
           `/api/admin/inbox?folder=${nextFolder}&identity=${identityKey}`,
-        );
+        ).then((data) => {
         if (requestId !== listRequestRef.current) return;
         for (const message of data.messages) {
           const cached = messageCacheRef.current.get(message.id);
@@ -368,7 +366,7 @@ export function AdminEmailInboxView({
             ? (data.messages[0]?.id ?? null)
             : null;
         });
-      } catch (loadError) {
+      }).catch((loadError: unknown) => {
         if (requestId !== listRequestRef.current) return;
         if (!silent) {
           setError(
@@ -377,12 +375,12 @@ export function AdminEmailInboxView({
               : "Could not load inbox.",
           );
         }
-      } finally {
+      }).finally(() => {
         if (requestId === listRequestRef.current) {
           listPendingRef.current = false;
           setLoadingList(false);
         }
-      }
+      });
     },
     [identityKey],
   );
@@ -428,14 +426,14 @@ export function AdminEmailInboxView({
       const cached = messageCacheRef.current.get(id);
 
       if (cached && cached.direction !== "outbound") {
-        setSelected(cached);
-        setLoadingMessage(false);
+        // Use the same asynchronous delivery boundary as a fresh read.
+        const message = await Promise.resolve(cached);
+        if (requestId === messageRequestRef.current) {
+          setSelected(message);
+          setLoadingMessage(false);
+        }
         return;
       }
-
-      setLoadingMessage(true);
-      setSelected(null);
-      setError(null);
 
       try {
         const data = await apiJson<{ message: EmailMessage }>(
@@ -502,21 +500,28 @@ export function AdminEmailInboxView({
     [refreshDeliveryStatus],
   );
 
-  useEffect(() => {
-    void loadFolder(folder);
-  }, [folder, loadFolder]);
+  const folderKey = JSON.stringify([identityKey, folder]);
+  const [previousFolder, setPreviousFolder] = useState(folderKey);
+  if (previousFolder !== folderKey) {
+    setPreviousFolder(folderKey);
+    setLoadingList(true);
+    setError(null);
+  }
+  useEffect(() => { void loadFolder(folder); }, [folder, loadFolder]);
 
-  useEffect(() => {
+  const readerKey = composing ? null : selectedId;
+  const [previousReader, setPreviousReader] = useState(readerKey);
+  if (previousReader !== readerKey) {
+    setPreviousReader(readerKey);
     setReplyOpen(false);
-    setReply(selectedId ? (replyDraftsRef.current.get(selectedId) ?? "") : "");
-    if (selectedId && !composing) {
-      void loadMessage(selectedId);
-    } else {
-      ++messageRequestRef.current;
-      setSelected(null);
-      setLoadingMessage(false);
-    }
-  }, [selectedId, composing, loadMessage]);
+    setSelected(null);
+    setLoadingMessage(Boolean(readerKey));
+    setError(null);
+  }
+  useEffect(() => {
+    if (readerKey) void loadMessage(readerKey);
+    return () => { ++messageRequestRef.current; };
+  }, [readerKey, loadMessage]);
 
   useEffect(() => {
     if (folder !== "inbox" && folder !== "sent") return;
@@ -587,9 +592,8 @@ export function AdminEmailInboxView({
       });
 
       if (target === "reply") {
-        if (selectedId) replyDraftsRef.current.set(selectedId, data.suggested);
+        if (selectedId) saveDraft(selectedId, data.suggested);
         if (draftMessageRequest !== messageRequestRef.current) return;
-        setReply(data.suggested);
       } else {
         setComposeBody(data.suggested);
       }
@@ -622,8 +626,7 @@ export function AdminEmailInboxView({
           body: JSON.stringify({ text: reply }),
         },
       );
-      setReply("");
-      replyDraftsRef.current.delete(selected.id);
+      saveDraft(selected.id, "");
       setReplyOpen(false);
       setNotice("Reply sent.");
       messageCacheRef.current.delete(selected.id);
@@ -980,7 +983,7 @@ export function AdminEmailInboxView({
               <button
                 type="button"
                 disabled={loadingList}
-                onClick={() => void loadFolder(folder, true)}
+                onClick={() => { setLoadingList(true); setError(null); void loadFolder(folder, true); }}
                 aria-label="Refresh emails"
                 title="Refresh emails"
                 className={cn(toolbarButtonClass, "h-8 px-2")}
@@ -1536,11 +1539,7 @@ export function AdminEmailInboxView({
                             value={reply}
                             disabled={sending || checkingGrammar === "reply"}
                             onChange={(event) => {
-                              setReply(event.target.value);
-                              replyDraftsRef.current.set(
-                                selected.id,
-                                event.target.value,
-                              );
+                              saveDraft(selected.id, event.target.value);
                             }}
                             maxLength={20_000}
                             rows={4}

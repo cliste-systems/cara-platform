@@ -1,3 +1,6 @@
+import {hasAccountOwnerAccess} from "@/lib/account-owner-access";
+import {loadDashboardBillingDetails} from "@/lib/dashboard-billing-details";
+import { setupOptionLabel } from "@/lib/setup-option-label";
 import { redirect } from "next/navigation";
 
 import { loadAccountBilling, loadAccountLocations } from "@/lib/account-session";
@@ -34,19 +37,21 @@ export default async function BillingPage({ searchParams }: PageProps) {
   const checkoutSessionId = firstParam(sp.session_id);
 
   if (status === "return" && checkoutSessionId) {
+    let finalised = false;
     try {
       await finaliseBillingCheckout(checkoutSessionId);
+      finalised = true;
     } catch (err) {
       console.warn("[billing] finalise checkout failed", err);
     }
-    redirect("/dashboard/usage?billing=ready");
+    redirect(finalised ? "/dashboard/usage?billing=ready" : "/dashboard/usage?billing=pending");
   }
 
-  const { supabase, accountId, organizationId } = await requireDashboardSession();
+  const { supabase, accountId, organizationId, user, profile } = await requireDashboardSession();
 
   // Retail pilot clients are invoiced directly by Cliste — no self-serve billing.
   const { data: orgNicheRow } = await supabase.from("organizations")
-    .select("niche").eq("id", organizationId).maybeSingle();
+    .select("niche,launch_tier").eq("id", organizationId).maybeSingle();
   if (parseOrganizationNiche(orgNicheRow?.niche) === "retail") {
     if (!suspendedQuery) redirect("/dashboard");
     return (
@@ -72,15 +77,28 @@ export default async function BillingPage({ searchParams }: PageProps) {
   const periodStart = accountBilling?.billingPeriodStart ??
     new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0, 10);
 
-  const [{ data: usageRows }, { data: smsRows }] = await Promise.all([
-    customerUsageFilters(supabase.from("usage_records")
-      .select("organization_id, minutes_billable, synced_to_stripe_at, ended_at"))
-      .in("organization_id", locationIds.length > 0 ? locationIds : [organizationId])
-      .gte("billing_period_start", periodStart),
-    supabase.from("sms_usage_records").select("organization_id, segments, sent_at")
-      .in("organization_id", locationIds.length > 0 ? locationIds : [organizationId])
-      .gte("sent_at", `${periodStart}T00:00:00.000Z`),
-  ]);
+  // Read every page rather than silently truncating totals at the API row cap.
+  const usageRows: { organization_id: string; minutes_billable: number | null; synced_to_stripe_at: string | null; ended_at: string | null }[] = [];
+  const smsRows: { organization_id: string; segments: number }[] = [];
+  let usageError: { message: string } | null = null;
+  let smsError: { message: string } | null = null;
+  for (let offset = 0; ; offset += 500) {
+    const result = await customerUsageFilters(supabase.from("usage_records")
+      .select("id, organization_id, minutes_billable, synced_to_stripe_at, ended_at"))
+      .in("organization_id", locationIds.length ? locationIds : [organizationId])
+      .gte("billing_period_start", periodStart).order("id").range(offset, offset + 499);
+    if (result.error) { usageError = result.error; usageRows.length = 0; break; }
+    usageRows.push(...(result.data ?? []));
+    if ((result.data?.length ?? 0) < 500) break;
+  }
+  for (let offset = 0; ; offset += 500) {
+    const result = await supabase.from("sms_usage_records").select("id, organization_id, segments")
+      .in("organization_id", locationIds.length ? locationIds : [organizationId])
+      .gte("sent_at", `${periodStart}T00:00:00.000Z`).order("id").range(offset, offset + 499);
+    if (result.error) { smsError = result.error; smsRows.length = 0; break; }
+    smsRows.push(...(result.data ?? []));
+    if ((result.data?.length ?? 0) < 500) break;
+  }
 
   const breakdownByOrg = new Map<string, { usedMinutes: number; usedSms: number; callsCounted: number }>();
   for (const location of locations) {
@@ -132,11 +150,13 @@ export default async function BillingPage({ searchParams }: PageProps) {
   const extraMinutes = Math.max(0, usedMinutes - includedMinutes);
   const remainingMinutes = Math.max(0, includedMinutes - usedMinutes);
   const progressPct = includedMinutes > 0 ? Math.min(100, Math.round((usedMinutes / includedMinutes) * 100)) : 0;
-  const projectedOverageCents = plan ? extraMinutes * plan.overageRateCents : 0;
+  const projectedOverageCents = plan ? extraMinutes * plan.overageRateCents + extraSms * plan.smsOverageRateCents : 0;
   const hasBillingPortal = Boolean(accountBilling?.platformCustomerId?.trim());
   const hasSubscription = Boolean(accountBilling?.platformSubscriptionId?.trim());
   const suspended = suspendedQuery || accountBilling?.status === "suspended";
-  const canManageBilling = hasBillingPortal || hasSubscription || suspended;
+  const owner=await hasAccountOwnerAccess(supabase,{userId:user.id,accountId,profileRole:profile.role});
+  const canManageBilling = owner && (hasBillingPortal || hasSubscription || suspended);
+  const billingDetails=owner?await loadDashboardBillingDetails(accountBilling?.platformSubscriptionId??null,accountBilling?.platformCustomerId??null):null;
 
   const data: UsagePageData = {
     planName: plan?.name ?? "No plan",
@@ -148,13 +168,17 @@ export default async function BillingPage({ searchParams }: PageProps) {
     progressPct,
     projectedOverageCents,
     periodStart,
-    periodEnd: null,
+    periodEnd: billingDetails?.renewsAt??null,
+    billingDetails,
+    setupChoice:setupOptionLabel(orgNicheRow?.launch_tier),
+    loadError:usageError||smsError||!accountBilling?"We couldn’t load complete usage information. Refresh before relying on these totals.":null,
     callsCounted: usageRows?.length ?? 0,
     lastCallAt,
     lastStripeSync,
     hasBillingPortal,
     hasSubscription,
     canManageBilling,
+    canSetUpBilling: owner && !canManageBilling,
     suspended,
     suspendedReason: null,
     usedSms,
@@ -169,7 +193,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
   return (
     <div className={cn(DASHBOARD_PAGE_SHELL_FILL_WHITE, "overflow-hidden")} data-dashboard-fill>
       <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
-        <UsageView className="min-h-0 flex-1" data={data} billingReady={billingReady} checkoutCancelled={checkoutCancelled} />
+        <UsageView className="min-h-0 flex-1" data={data} billingReady={billingReady} billingPending={firstParam(sp.billing) === "pending"} checkoutCancelled={checkoutCancelled} />
       </div>
     </div>
   );

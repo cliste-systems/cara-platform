@@ -28,7 +28,7 @@ export function SignupVoiceCard({ greeting, playing, loading, error, elapsed, on
   return (
     <section aria-label="Cara voice preview" className={styles.card}>
       <div className={styles.portrait}>
-        <Image src="/cara-voice-portrait.webp" alt="Cara smiling, wearing her headset" fill sizes="(max-width: 767px) 100vw, 280px" preload unoptimized />
+        <picture><source media="(max-width:767px)" srcSet="/cara-greeting-mobile.webp"/><Image src="/cara-greeting-desktop-v2.webp" alt="Cara welcoming a caller through her headset at her desk" fill sizes="(max-width: 767px) calc(100vw - 64px), 320px" preload unoptimized /></picture>
       </div>
       <div className={styles.player}>
         <p className={styles.eyebrow}>{sample ? "A hello from Cara" : "Your callers’ first hello"}</p>
@@ -44,7 +44,7 @@ export function SignupVoiceCard({ greeting, playing, loading, error, elapsed, on
             </button>
             <span className={styles.time} aria-label="Elapsed playback time">{Math.floor(seconds/60)}:{String(seconds%60).padStart(2,"0")}</span>
           </div>
-          <p className={styles.note} role="status">{loading ? "Preparing your personalised greeting." : active ? "Cara is speaking." : sample ? "Voice sample · Your greeting will use your business name." : "Listen when you’re ready, or continue below."}</p>
+          {(loading || active || sample) && <p className={styles.note} role="status">{loading ? "Preparing your personalised greeting." : active ? "Cara is speaking." : "Voice sample · Your greeting will use your business name."}</p>}
           <AuthFormAlert title="Audio unavailable" message={sample ? sampleError : error} />
         </div>
       </div>

@@ -50,16 +50,17 @@ function bumpTopic(
   counts: Map<string, HomeTopTopicRow>,
   label: string,
   id?: string,
+  count = 1,
 ): void {
   const normalized = label.trim();
   if (!normalized) return;
   const key = id ?? normalizeTopicKey(normalized);
   const existing = counts.get(key);
   if (existing) {
-    existing.count += 1;
+    existing.count += count;
     return;
   }
-  counts.set(key, { id: key, label: normalized, count: 1 });
+  counts.set(key, { id: key, label: normalized, count });
 }
 
 export function buildHomeTopTopicRows(input: {
@@ -67,10 +68,14 @@ export function buildHomeTopTopicRows(input: {
   ticketSummaries: (string | null | undefined)[];
   trainingGaps: (string | null | undefined)[];
   limit?: number;
+  weightedCallSummaries?: { summary: string; count: number }[];
 }): HomeTopTopicRow[] {
   const limit = input.limit ?? 3;
   const counts = new Map<string, HomeTopTopicRow>();
 
+  for (const row of input.weightedCallSummaries ?? []) {
+    bumpTopic(counts, inferTopicLabel(row.summary), undefined, Number(row.count));
+  }
   for (const summary of input.callSummaries) {
     bumpTopic(counts, inferTopicLabel(summary));
   }

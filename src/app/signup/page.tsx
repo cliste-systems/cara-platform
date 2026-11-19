@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 
 import { PRODUCT_NAME } from "@/lib/company-details";
-import { isSignupOnboardingDevRelaxed } from "@/lib/onboarding-dev";
+import {headers} from "next/headers";
+import { isLocalSignupCodePreview, isSignupOnboardingDevRelaxed } from "@/lib/onboarding-dev";
 import {
   parseMarketingPlanIntent,
 } from "@/lib/signup-plan-intent";
@@ -25,7 +26,7 @@ export const dynamic = "force-dynamic";
 export default async function SignupPage(props: { searchParams?: SearchParams }) {
   // Local QA can open signup without being redirected by an existing admin session.
   const relaxed = isSignupOnboardingDevRelaxed();
-  const user = relaxed ? null : await getAuthUserOrNull();
+  const user = relaxed||isLocalSignupCodePreview(await headers()) ? null : await getAuthUserOrNull();
   if (user) {
     redirect("/auth/post-login");
   }

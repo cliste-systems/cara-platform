@@ -1,4 +1,6 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { isLocalSetupTestEnabled } from "@/lib/onboarding-dev";
+import { withLocalAnalyticsSample } from "@/lib/dashboard-analytics-sample";
 import { NextResponse } from "next/server";
 
 import { ALL_LOCATIONS_VIEW_COOKIE } from "@/lib/account-locations";
@@ -28,5 +30,5 @@ export async function GET(request: Request) {
     organizationSlug: orgRow?.slug,
   });
 
-  return NextResponse.json(snapshot);
+  return NextResponse.json(orgRow?.niche !== "retail" && isLocalSetupTestEnabled(await headers()) ? withLocalAnalyticsSample(snapshot) : snapshot);
 }

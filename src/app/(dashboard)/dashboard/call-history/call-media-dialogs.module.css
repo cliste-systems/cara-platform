@@ -1,0 +1,68 @@
+.media{padding:24px}.mediaButtons{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mediaButtons .mediaButton{width:100%;display:flex;align-items:center;justify-content:flex-start;gap:11px;padding:16px 14px;border-radius:18px;text-align:left;background:#ffffff05;border:1px solid #ffffff20;min-height:82px;color:#eee}
+.mediaButton>svg:first-child{width:21px;height:21px;color:#b5b9bc}.mediaButton>svg:last-child{width:16px;height:16px;margin-left:auto;flex-shrink:0}.mediaButton>span{display:block;min-width:0}.mediaButton strong{display:block;font-size:13px;font-weight:500}.mediaButton small{display:block;font-size:11px;color:#bbb;line-height:1.4;margin-top:5px}.mediaButton:disabled{opacity:.45;cursor:default}
+.popup{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:61;display:flex;flex-direction:column;width:560px;max-width:calc(100vw - 32px);max-height:min(740px,calc(100dvh - 48px));border:1px solid #ffffff20;border-radius:26px;background:linear-gradient(135deg,#2b2c2c,#242525);color:#f5f5f5;box-shadow:0 24px 80px #0006;overflow:hidden;outline:none;opacity:1;translate:0 0;transition:opacity .24s cubic-bezier(.2,.65,.3,1),translate .24s cubic-bezier(.2,.65,.3,1);font-size:13px}
+.popup[data-starting-style],.popup[data-ending-style]{opacity:0;translate:0 5px}
+.header{padding:24px;display:flex;align-items:flex-start;justify-content:space-between;gap:18px;border-bottom:1px solid #ffffff16;flex-shrink:0}.header>div{min-width:0}.header h2{font-size:23px;font-weight:500;letter-spacing:-.035em;margin:0}.header p{font-size:12px;color:#aaa;line-height:1.5;margin:7px 0 0;overflow-wrap:anywhere}
+.popup button{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #ffffff20;border-radius:24px;min-height:40px;padding:9px 15px;color:#ddd;background:#ffffff05;font:inherit;cursor:pointer;transition:background-color .18s ease,color .18s ease,border-color .18s ease}.popup button svg{width:17px;height:17px;stroke-width:1.5}.popup button:disabled{opacity:.35;cursor:default}.popup .close{width:36px;height:36px;min-height:36px;flex-shrink:0;padding:8px;border-radius:50%;background:#ffffff08;border:0}
+.body{padding:24px;overflow-y:auto;overscroll-behavior:contain;min-height:0;scrollbar-width:thin;scrollbar-color:#666 transparent;outline:none}.conversation{display:flex;flex-direction:column;gap:22px}.conversation>div{padding:16px 18px;background:#ffffff04;border:1px solid #ffffff09;border-radius:17px}.conversation span{color:#bbb;font-size:11px;font-weight:500}.conversation [data-speaker=cara] span{color:#a8b4e0}.conversation p{font-size:14px;line-height:1.8;margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.footer{padding:17px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-top:1px solid #ffffff16;flex-shrink:0}.popup .primary{background:#fff;border-color:#fff;color:#222}.muted{color:#aaa;font-size:12px;line-height:1.7}.copyStatus{flex-basis:100%;font-size:11px;color:#bbb}.copyStatus:empty{display:none}
+.samplePlayer{padding:8px 0}.sampleLabel{font-size:15px;margin:0 0 6px}.samplePlayer>.muted{margin:0}.playback{display:flex;gap:16px;align-items:center;margin-top:26px}.popup .play{border-radius:50%;width:54px;height:54px;padding:16px;flex-shrink:0;background:#fff;color:#222}.timeline{flex:1;min-width:0}.timeline input{width:100%;height:4px;accent-color:#eee;cursor:pointer}.timeline>div{display:flex;justify-content:space-between;color:#aaa;font-size:11px;font-variant-numeric:tabular-nums;margin-top:9px}.playerTools{display:flex;justify-content:space-between;gap:10px;margin-top:24px}.playerTools button{font-size:12px;border-color:transparent}
+.recordingPlayer>div{background:transparent;border:0;box-shadow:none;padding:0}.recordingPlayer :global([class*="text-"]){color:#ccc}.recordingPlayer button{min-width:40px}.recordingPlayer button[aria-label="Play recording"],.recordingPlayer button[aria-label="Pause recording"]{background:#fff;color:#222}.recordingPlayer [role=slider]{background:#ffffff30}.recordingPlayer [role=slider]>div:first-child{background:#ddd}
+.popup button:focus-visible,.body:focus-visible{outline:0;box-shadow:inset 0 0 0 1px #a8b4e0}.timeline input:focus-visible{outline:1px solid #a8b4e0;outline-offset:5px}
+@media(hover:hover){.popup button:not(:disabled):hover{background:#fff;color:#222;border-color:#fff}.popup .primary:hover,.popup .play:hover{background:#d7d9d9;border-color:#d7d9d9}.mediaButtons .mediaButton:not(:disabled):hover small,.mediaButtons .mediaButton:not(:disabled):hover svg{color:inherit}}
+@media(max-width:600px){.media{padding:20px}.mediaButtons{gap:9px}.mediaButtons .mediaButton{padding:14px 11px;gap:8px}.mediaButton>svg:first-child{width:18px;height:18px}.mediaButton small{font-size:10px}.mediaButton>svg:last-child{width:13px;height:13px}.popup{max-width:calc(100vw - 28px);max-height:calc(100dvh - 40px);border-radius:24px}.header,.body{padding:20px}.footer{padding:16px 20px}.conversation p{font-size:13px}.popup .primary{font-size:12px}}
+@media(max-width:350px){.mediaButton>svg:last-child{display:none}.mediaButtons .mediaButton{gap:7px;padding-inline:10px}}
+@media(prefers-reduced-motion:reduce){.popup,.popup button{transition:none}.popup[data-starting-style],.popup[data-ending-style]{translate:0 0}}
+
+.media{padding:20px 24px}.media>h3{font-size:18px;font-weight:500;line-height:1.3;letter-spacing:-.025em;margin:0 0 14px;color:#eee}
+.header{position:relative;isolation:isolate;overflow:hidden;min-height:112px;align-items:center;background:radial-gradient(ellipse at 100% 0,#a8b4e012,transparent 68%)}
+.header>div:not(.headerArt),.header>.close{position:relative;z-index:2}.header>div:not(.headerArt){max-width:76%}
+.headerArt{position:absolute;inset:0 0 0 auto;width:240px;pointer-events:none;z-index:0;mask-image:linear-gradient(90deg,transparent,#000 50%);opacity:.7}
+.headerArt svg{width:100%;height:100%;stroke:#a8b4e0;stroke-width:1;stroke-opacity:.35}.headerArt svg path{stroke-width:1.6;stroke-opacity:.65}.headerArt svg rect{fill:#a8b4e004}
+.conversation{gap:14px}.conversation>div{padding:13px 16px}.conversation p{margin-top:6px;line-height:1.7}
+.samplePlayer{padding:0}.playback{margin-top:22px}.playerTools{margin-top:18px}.footer{padding-block:15px}
+@media(max-width:600px){.media{padding:18px 20px}.media>h3{font-size:17px;margin-bottom:13px}.header{min-height:108px}.headerArt{width:200px;opacity:.6}.body{padding:18px 20px}.conversation>div{padding:12px 14px}.conversation{gap:12px}.footer{padding-block:14px}}
+/* Keep decorative strokes out of the close control's hit area. */
+.headerArt{right:44px}
+
+/* Mobile media actions have their own icon row and readable text beneath. */
+@media(max-width:600px){
+ .mediaButtons{gap:12px}
+ .media .mediaButtons .mediaButton{position:relative;display:grid;grid-template-columns:1fr auto;grid-template-rows:34px auto;align-items:start;gap:14px 8px;min-height:132px;padding:16px;border-radius:19px;background:linear-gradient(145deg,#ffffff07,#ffffff02);border-color:#ffffff1c}
+ .media .mediaButton>svg:first-child{width:32px;height:32px;padding:7px;box-sizing:border-box;border-radius:11px;background:#a8b4e00c;color:#bfc8e3;stroke-width:1.5}
+ .media .mediaButton>svg:last-child{display:block;grid-column:2;grid-row:1;width:14px;height:14px;margin:8px 0 0;color:#929a96}
+ .media .mediaButton>span{grid-column:1 / -1;grid-row:2}
+ .media .mediaButton strong{font-size:14px;line-height:1.3;letter-spacing:-.015em;font-weight:500}
+ .media .mediaButton small{font-size:11px;line-height:1.5;margin-top:5px;color:#a5ada8}
+ .media .mediaButtons .mediaButton:active:not(:disabled){background:#ffffff10;border-color:#ffffff40;transform:translateY(1px)}
+ .media .mediaButton:focus-visible{outline:0;box-shadow:inset 0 0 0 1px #a8b4e080}
+}
+@media(hover:hover){.media .mediaButtons .mediaButton:not(:disabled):hover{background:#ffffff0e;color:#fff;border-color:#ffffff40}.media .mediaButtons .mediaButton:not(:disabled):hover small{color:#c4cbc6}.media .mediaButtons .mediaButton:not(:disabled):hover svg{color:#c7d0e9}}
+@media(max-width:350px){.media .mediaButtons .mediaButton{padding:14px 12px;min-height:126px}.mediaButtons{gap:9px}.media .mediaButton strong{font-size:13px}.media .mediaButton small{font-size:10px}}
+
+.header:has(.caraArt){min-height:138px}
+.header .caraArt{width:270px;right:30px;opacity:.72;background-position:center 36%;background-size:cover;mask-image:linear-gradient(90deg,transparent,#000 35%,#000 83%,transparent),linear-gradient(0deg,transparent,#000 35%);mask-composite:intersect}
+.caraArt[data-kind=recording]{background-image:url('/cara-recording-header-v1.jpg')}
+.caraArt[data-kind=transcript]{background-image:url('/cara-transcript-header-v1.jpg')}
+.spin{animation:mediaSpin 1s linear infinite}@keyframes mediaSpin{to{transform:rotate(360deg)}}
+@media(max-width:600px){.header:has(.caraArt){min-height:132px}.header .caraArt{width:215px;right:28px;opacity:.65}.header:has(.caraArt)>div:not(.headerArt){max-width:66%}}
+@media(prefers-reduced-motion:reduce){.spin{animation:none}}
+.popup :global(.animate-spin){color:#f5f5f5!important}
+.popup button:has(>.spin){background:#fff;color:#222;border-color:#fff}
+.popup button:has(>.spin)>.spin{color:#222}
+.popup [role=status]{color:#ddd}
+
+.headerMeta{display:grid;grid-template-columns:max-content max-content;gap:12px 24px;margin:16px 0 0}
+.metaCaller{grid-column:1/-1}
+.headerMeta dt{color:#9ba39e;font-size:10px;line-height:1.5;margin:0 0 4px;font-weight:400}
+.headerMeta dd{color:#e6eae7;font-size:13px;line-height:1.5;margin:0;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.header .headerMeta .metaCaller dd{font-size:14px}
+.header:has(.headerMeta){min-height:192px;align-items:flex-start}
+.header:has(.headerMeta)>.close{margin-top:0}
+.header:has(.headerMeta)>.caraArt{width:270px;opacity:.55}
+.srOnly{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(max-width:600px){.header:has(.headerMeta){min-height:194px}.headerMeta{gap:12px 20px;margin-top:14px}.header:has(.headerMeta)>.caraArt{width:215px;opacity:.5}.headerMeta dd{font-size:12px}}
+
+.media .mediaButtons .mediaButton>svg:first-child,.media .mediaButtons .mediaButton>svg:last-child{color:#f5f5f5;background:transparent}
+@media(hover:hover){.media .mediaButtons .mediaButton:not(:disabled):hover svg{color:#fff}}

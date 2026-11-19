@@ -6,27 +6,48 @@ export type BusinessClassification={version:1;categoryId:string;specialtyIds:str
 type Specialty={id:string;label:string;legacyNiche?:OrganizationNiche;services:readonly string[]};
 type Category={id:string;label:string;niche:OrganizationNiche;specialties:readonly Specialty[]};
 const slug=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+/** Service-facing names; stored IDs retain their original values for existing selections. */
+const SPECIALTY_LABELS:Readonly<Record<string,string>>={
+ electrician:'Electrical', plumber:'Plumbing', heating_engineer:'Heating',
+ carpenter_joiner:'Carpentry & joinery', builder:'Building & construction', roofer:'Roofing',
+ painter_decorator:'Painting & decorating', plasterer:'Plastering', tiler:'Tiling',
+ flooring_installer:'Flooring', locksmith:'Locksmith services', multi_trade:'Multi-trade services',
+ hair_salon:'Hairdressing', barber:'Barbering', nail_salon:'Nail care', beauty_salon:'Beauty treatments',
+ makeup_artist:'Makeup', optician:'Optical care', personal_trainer:'Personal training',
+ garage_mechanic:'Vehicle repairs & servicing', tyre_centre:'Tyre services', vehicle_dealership:'Vehicle sales',
+ accountant_bookkeeper:'Accounting & bookkeeping', solicitor:'Legal services', consultant:'Consultancy',
+ architect:'Architecture', engineer:'Engineering', surveyor:'Surveying', recruitment_agency:'Recruitment',
+ insurance_broker:'Insurance brokerage', financial_adviser:'Financial advice',
+ estate_agent:'Property sales', letting_agent:'Lettings', tutor:'Tutoring', language_school:'Language teaching',
+ driving_instructor:'Driving lessons', training_provider:'Training', music_teacher:'Music lessons',
+ dance_school:'Dance classes', veterinary_practice:'Veterinary care', pet_groomer:'Pet grooming',
+ boarding_kennels_cattery:'Pet boarding', dog_walker:'Dog walking', animal_trainer:'Animal training',
+ event_planner:'Event planning', photographer:'Photography', videographer:'Videography', designer:'Design',
+ software_business:'Software', web_agency:'Web design & development', telecoms_provider:'Telecoms',
+ taxi_chauffeur:'Taxi & chauffeur services', courier:'Courier services', farm_business:'Farming',
+ agricultural_contractor:'Agricultural contracting',
+};
 function category(id:string,label:string,niche:OrganizationNiche,labels:string[],services:string[]):Category{
- return {id,label,niche,specialties:labels.map(label=>({id:slug(label),label,services}))};
+ return {id,label,niche,specialties:labels.map(label=>({id:slug(label),label:SPECIALTY_LABELS[slug(label)]??label,services}))};
 }
 /** Selection context, not a list of services a business is assumed to provide. Retail is intentionally team-managed. */
 export const BUSINESS_CATEGORIES:readonly Category[]=[
  category('trades','Trades & construction','trades',['Electrician','Plumber','Heating engineer','Carpenter / joiner','Builder','Roofer','Painter / decorator','Plasterer','Tiler','Flooring installer','Locksmith','Windows & glazing','Groundwork','Multi-trade'],['Repair enquiries','Installation enquiries','Maintenance enquiries','Quotes and estimates']),
- category('home_services','Home & property maintenance','home_services',['Cleaning','Gardening / landscaping','Property maintenance','Pest control','Appliance repair','Removals / storage','Waste removal'],['Service enquiries','Quotes and estimates','Appointments','Existing job enquiries']),
- category('beauty','Hair, beauty & grooming','beauty',['Hair salon','Barber','Nail salon','Beauty salon','Lashes / brows','Waxing','Makeup artist','Tanning','Spa'],['Appointments','Service enquiries','Prices from our confirmed price list','Existing booking enquiries']),
+ category('home_services','Home maintenance','home_services',['Cleaning','Gardening / landscaping','Property maintenance','Pest control','Appliance repair','Removals / storage','Waste removal'],['Service enquiries','Quotes and estimates','Appointments','Existing job enquiries']),
+ category('beauty','Hair & beauty','beauty',['Hair salon','Barber','Nail salon','Beauty salon','Lashes / brows','Waxing','Makeup artist','Tanning','Spa'],['Appointments','Service enquiries','Prices from our confirmed price list','Existing booking enquiries']),
  category('health','Health & care','other',['GP / medical practice','Dental practice','Physiotherapy','Optician','Pharmacy','Counselling / psychotherapy','Podiatry','Home care'],['Appointment enquiries','Opening hours and location','Existing appointment enquiries','Requests for the practice team']),
  category('fitness','Fitness & wellbeing','fitness',['Gym','Personal trainer','Yoga','Pilates','Sports coaching','Massage'],['Class enquiries','Appointments','Membership enquiries','Existing booking enquiries']),
  category('hospitality','Food & hospitality','hospitality',['Restaurant','Café','Takeaway','Pub / bar','Catering','Hotel','Guesthouse / B&B','Holiday accommodation'],['Booking enquiries','Opening hours','Group enquiries','Existing booking enquiries']),
  category('automotive','Automotive','automotive',['Garage / mechanic','Tyre centre','Body repair','Vehicle dealership','Vehicle recovery','Valeting / detailing','Vehicle rental'],['Service enquiries','Quotes and estimates','Appointments','Existing job enquiries']),
- category('professional','Professional & business services','professional_services',['Accountant / bookkeeper','Solicitor','Consultant','Architect','Engineer','Surveyor','Recruitment agency','Insurance broker','Financial adviser'],['Initial enquiries','Appointments','Existing client enquiries','Requests for the team']),
+ category('professional','Professional services','professional_services',['Accountant / bookkeeper','Solicitor','Consultant','Architect','Engineer','Surveyor','Recruitment agency','Insurance broker','Financial adviser'],['Initial enquiries','Appointments','Existing client enquiries','Requests for the team']),
  category('property','Property services','professional_services',['Estate agent','Letting agent','Property management','Accommodation management'],['Viewing enquiries','Property enquiries','Existing client enquiries','Maintenance requests']),
  category('education','Education & training','education',['Tutor','Language school','Driving instructor','Training provider','Music teacher','Dance school','Childcare'],['Course enquiries','Lesson enquiries','Enrolment enquiries','Existing booking enquiries']),
  category('pets','Pets & animals','other',['Veterinary practice','Pet groomer','Boarding kennels / cattery','Dog walker','Animal trainer','Equestrian services'],['Appointments','Service enquiries','Existing booking enquiries','Requests for the team']),
- category('events','Events & creative services','events',['Event planner','Event venue','Photographer','Videographer','Entertainment','Equipment hire','Designer'],['Event enquiries','Quotes and estimates','Availability enquiries','Existing booking enquiries']),
- category('technology','Technology & communications','professional_services',['IT support','Computer / phone repair','Software business','Web agency','Telecoms provider'],['Support enquiries','Service enquiries','Quotes and estimates','Existing customer enquiries']),
+ category('events','Events & creative','events',['Event planner','Event venue','Photographer','Videographer','Entertainment','Equipment hire','Designer'],['Event enquiries','Quotes and estimates','Availability enquiries','Existing booking enquiries']),
+ category('technology','IT & communications','professional_services',['IT support','Computer / phone repair','Software business','Web agency','Telecoms provider'],['Support enquiries','Service enquiries','Quotes and estimates','Existing customer enquiries']),
  category('transport','Transport & logistics','other',['Taxi / chauffeur','Courier','Haulage','Passenger transport','Delivery service'],['Booking enquiries','Quotes and estimates','Existing delivery enquiries','Requests for the team']),
- category('agriculture','Agriculture & rural services','other',['Farm business','Agricultural contractor','Agricultural machinery repair','Forestry services'],['Service enquiries','Quotes and estimates','Existing job enquiries','Requests for the team']),
- category('community','Community & organisations','other',['Charity','Community organisation','Sports club','Membership organisation'],['General enquiries','Membership enquiries','Event enquiries','Requests for the team']),
+ category('agriculture','Agriculture & rural','other',['Farm business','Agricultural contractor','Agricultural machinery repair','Forestry services'],['Service enquiries','Quotes and estimates','Existing job enquiries','Requests for the team']),
+ category('community','Community groups','other',['Charity','Community organisation','Sports club','Membership organisation'],['General enquiries','Membership enquiries','Event enquiries','Requests for the team']),
  category('other','Other business','other',['Other speciality'],['General enquiries','Appointments','Quotes and estimates','Requests for the team']),
 ].map(c=>c.id==='beauty'?{...c,specialties:c.specialties.map(s=>({...s,legacyNiche:s.id==='hair_salon'?'hair_salon' as const:s.id==='barber'?'barber' as const:'beauty' as const}))}:c);
 /** Choices for new setup; BUSINESS_CATEGORIES remains the historical parsing registry. */

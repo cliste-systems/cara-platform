@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useDashboardVertical } from "@/app/(dashboard)/dashboard/dashboard-vertical-context";
+import { ServiceBusinessOverview } from "./service-business-overview";
+import { FormFeedback } from "@/components/ui/form-feedback";
 import type { DashboardHomeSnapshot } from "@/lib/dashboard-home-snapshot";
 import { DASHBOARD_ACTIVITY_EVENT } from "@/lib/dashboard-live-events";
 import type { DashboardMetricRangeKey } from "@/lib/dashboard-metric-range";
@@ -22,6 +25,7 @@ type DashboardHomeLiveProps = {
   heroClassName?: string;
   cardsClassName?: string;
   enterClassName?: string;
+  greeting?: {intro:string;closing:string};
 };
 
 export function DashboardHomeLive({
@@ -31,14 +35,14 @@ export function DashboardHomeLive({
   heroClassName,
   cardsClassName,
   enterClassName,
+  greeting,
 }: DashboardHomeLiveProps) {
-  const [snapshot, setSnapshot] = useState(initialSnapshot);
+  const {vertical} = useDashboardVertical();
+  const [refreshError,setRefreshError] = useState<string|null>(null);
+  const [loaded, setLoaded] = useState({ source: initialSnapshot, value: initialSnapshot });
+  const snapshot = loaded.source === initialSnapshot ? loaded.value : initialSnapshot;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef(false);
-
-  useEffect(() => {
-    setSnapshot(initialSnapshot);
-  }, [initialSnapshot]);
 
   const fetchSnapshot = useCallback(async () => {
     if (inFlightRef.current) return;
@@ -48,13 +52,16 @@ export function DashboardHomeLive({
         `/api/dashboard/home?range=${encodeURIComponent(metricRange)}`,
         { cache: "no-store" },
       );
-      if (!res.ok) return;
+      if (!res.ok) throw new Error("Refresh failed");
       const next = (await res.json()) as DashboardHomeSnapshot;
-      setSnapshot(next);
+      setLoaded({ source: initialSnapshot, value: next });
+      setRefreshError(null);
+    } catch {
+      setRefreshError("Your dashboard couldn’t refresh. The last loaded information is still shown.");
     } finally {
       inFlightRef.current = false;
     }
-  }, [metricRange]);
+  }, [metricRange, initialSnapshot]);
 
   const scheduleRefresh = useCallback(() => {
     if (typeof document !== "undefined" && document.visibilityState !== "visible") {
@@ -81,8 +88,10 @@ export function DashboardHomeLive({
     };
   }, [fetchSnapshot, scheduleRefresh]);
 
+  if (vertical.id !== "retail") return <ServiceBusinessOverview snapshot={snapshot} refreshError={refreshError} onRetry={()=>void fetchSnapshot()} greeting={greeting}/>;
   return (
     <DashboardHomeEnter className={enterClassName}>
+      <FormFeedback message={refreshError || snapshot.error}/>
       <DashboardHomeHero
         className={heroClassName}
         greeting={snapshot.greeting}

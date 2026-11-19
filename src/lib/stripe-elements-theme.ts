@@ -20,7 +20,7 @@ export const CLISTE_STRIPE_APPEARANCE: Appearance = {
     colorText: "#292929",
     colorTextSecondary: "#737373",
     colorTextPlaceholder: "#737373",
-    colorDanger: "#69504b",
+    colorDanger: "#a13d35",
     fontFamily: CLISTE_STRIPE_FONT_FAMILY,
     fontSizeBase: "16px",
     fontWeightNormal: "400",
@@ -39,6 +39,16 @@ export const CLISTE_STRIPE_APPEARANCE: Appearance = {
     },
     ".Input:focus": {
       border: "1px solid #292929",
+    },
+    ".Input--invalid": {
+      borderColor: "#a13d35",
+      backgroundColor: "#fff7f6",
+      boxShadow: "none",
+    },
+    ".Error": {
+      color: "#a13d35",
+      fontSize: "12px",
+      lineHeight: "1.45",
     },
     ".Label": {
       fontSize: "11px",

@@ -25,15 +25,18 @@ import { buildKnowledgeFolders, parseServiceDepartmentNames } from "@/lib/cara-k
 import type { CaraKnowledgeFolderPageData } from "@/lib/load-cara-knowledge-folders";
 import { buildCaraKnowledgeFolderViewModel } from "@/lib/load-cara-knowledge-folders";
 import { requireDashboardSession } from "@/lib/dashboard-session";
-import { canManageDashboardConfig } from "@/lib/team-roles";
+
 import { CARA_TRAINING_OPEN_STATUSES } from "@/lib/cara-training";
-import { mergeDevelopmentTrainingDemos } from "@/lib/cara-training-demo-items";
+import { parseAgentFaqs, type AgentFaq } from "../agent-setup/agent-faqs";
+import { hasAccountOwnerAccess } from "@/lib/account-owner-access";
 import { enrichTrainingItemsWithCallFacts, enrichTrainingItemsWithCallLinks } from "@/lib/cara-training-call-link";
 import { isOpenTrainingStatus } from "@/app/(dashboard)/dashboard/cara-training/cara-training-helpers";
 import { parseCaraTrainingPatch, type CaraTrainingItemRow } from "@/lib/cara-training-types";
 import { loadCaraKnowledgeHistory, type CaraKnowledgeHistoryItem } from "./load-cara-knowledge-history";
 
 export type CaraKnowledgePageData = {
+  faqs: AgentFaq[];
+  version: string;
   index: CaraKnowledgeIndex;
   folders: CaraKnowledgeFolderPageData;
   openInputCount: number;
@@ -59,7 +62,7 @@ function rowToTrainingItemRow(row: Record<string, unknown>): CaraTrainingItemRow
 }
 
 export async function loadCaraKnowledgePageData(): Promise<CaraKnowledgePageData> {
-  const { supabase, organizationId, profile } = await requireDashboardSession();
+  const { supabase, organizationId, profile, user, accountId } = await requireDashboardSession();
   const [
     { data: org, error: orgError },
     { data: rows, error: trainingError },
@@ -100,9 +103,7 @@ export async function loadCaraKnowledgePageData(): Promise<CaraKnowledgePageData
   const callLogIds = [...new Set(openTrainingItems.map((item) => item.call_log_id?.trim())
     .filter((id): id is string => Boolean(id)))];
   const callLogsForFacts = await loadCustomerKnowledgeCallFacts(supabase, organizationId, callLogIds);
-  const trainingItems = mergeDevelopmentTrainingDemos(
-    enrichTrainingItemsWithCallFacts(openTrainingItems, callLogsForFacts),
-  );
+  const trainingItems = enrichTrainingItemsWithCallFacts(openTrainingItems, callLogsForFacts);
   const index = mergeTemporalUpdatesIntoKnowledgeIndex(buildCaraKnowledgeIndex({
     faqs: org?.agent_faqs,
     servicesOffered: org?.agent_services_departments,
@@ -122,7 +123,7 @@ export async function loadCaraKnowledgePageData(): Promise<CaraKnowledgePageData
     const lifecycle = resolveTemporalLifecycle(row);
     return lifecycle === "active" || lifecycle === "scheduled";
   }).length;
-  const canManage = canManageDashboardConfig(profile?.role);
+  const canManage = await hasAccountOwnerAccess(supabase,{userId:user.id,accountId,profileRole:profile.role});
   if (canManage) {
     const { createAdminClient } = await import("@/utils/supabase/admin");
     const admin = createAdminClient();
@@ -142,6 +143,8 @@ export async function loadCaraKnowledgePageData(): Promise<CaraKnowledgePageData
     storeDepartments: (storeDepartments ?? []) as { name: string; active: boolean }[],
   });
   return {
+    faqs:parseAgentFaqs(org?.agent_faqs),
+    version:org?.updated_at??"",
     index,
     folders,
     openInputCount: trainingItems.length,

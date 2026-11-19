@@ -27,7 +27,7 @@ function normalizeCallerE164(raw: string | null | undefined): string {
     return "";
   }
 
-  let candidate = trimmed.replace(/^sip[:_]/i, "");
+  const candidate = trimmed.replace(/^sip[:_]/i, "");
   if (candidate.startsWith("+")) {
     return /^\+[1-9]\d{6,14}$/.test(candidate) ? candidate : "";
   }
