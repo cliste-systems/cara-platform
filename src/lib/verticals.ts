@@ -108,7 +108,7 @@ const RETAIL_CAPABILITIES: VerticalPackCapabilities = {
 };
 
 const GENERIC_CAPABILITIES: VerticalPackCapabilities = {
-  usesServiceCatalog: false,
+  usesServiceCatalog: true,
   skipServiceArea: false,
   bookingMenuImport: false,
   catalogSatisfiesServicesGate: false,
@@ -140,7 +140,7 @@ const SALON_BEAUTY_PACK: VerticalPack = {
   onboarding: {
     profileHeaderTitle: "Tell us about your salon",
     profileHeaderSubtitle:
-      "A few details so Cara can greet your clients and book the way you would.",
+      "A few details so Cara can answer your clients’ questions and capture enquiries.",
     pickerIcon: "sparkles",
   },
 };

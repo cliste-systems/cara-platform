@@ -1,8 +1,11 @@
+import {IRISH_COUNTIES} from "./irish-counties";
 export type BusinessVerificationDetails = {
+ websiteStatus?: "provided" | "not_available"; addressLine1?:string; addressLine2?:string; town?:string; county?:string;
  legalName: string; registrationNumber: string; website: string; address: string;
  eircode: string; representative: string; email: string; businessType: "company" | "sole_trader";
 };
 export type FirstCallSetupState = {
+ connection?: import("./phone-connection").PhoneConnection|null;
  progressKey?: string;
  smsPricing?: import("./sms-plan-pricing").SmsPlanPricing | null;
  email: string; emailVerified: boolean; businessName: string; legalName: string;
@@ -28,13 +31,21 @@ export function validateVerificationDetails(raw: unknown): { details: BusinessVe
  const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
  const field = (key: string) => typeof value[key] === "string" ? value[key].trim() : "";
  const details: BusinessVerificationDetails = { legalName:field("legalName"),registrationNumber:field("registrationNumber"),website:field("website"),address:field("address"),eircode:field("eircode").toUpperCase(),representative:field("representative"),email:field("email"),businessType:value.businessType === "sole_trader" ? "sole_trader" : "company" };
+ // Keep older clients and saved free-text addresses compatible; new forms send structured fields.
+ if(["addressLine1","addressLine2","town","county"].some(key=>Object.hasOwn(value,key))){
+  const addressLine1=field("addressLine1"),addressLine2=field("addressLine2"),town=field("town"),county=field("county");
+  if(addressLine1.length<3||addressLine1.length>300||addressLine2.length>300||town.length<2||town.length>100||!IRISH_COUNTIES.some(item=>item===county))return {error:"Enter your street address, town or city, and select an Irish county."};
+  Object.assign(details,{addressLine1,addressLine2,town,county,address:[addressLine1,addressLine2,town,`Co. ${county}`].filter(Boolean).join(", ")});
+ }
  if ([details.legalName,details.representative].some(v=>v.length<2||v.length>200) || details.address.length<8 || details.address.length>1000) return {error:"Enter your legal name, full business address and authorised contact."};
  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(details.email)||details.email.length>254) return {error:"Enter a valid contact email."};
  if (!/^[A-Z][0-9A-Z]{2} ?[0-9A-Z]{4}$/.test(details.eircode)) return {error:"Enter a valid seven-character Eircode."};
  if (details.registrationNumber.length>80 || (details.businessType === "company" && !details.registrationNumber)) return {error:"Enter your company registration number."};
+ const withoutWebsite=value.websiteStatus==="not_available";
  const website=normalizeBusinessWebsite(details.website);
- if(!website)return {error:"Enter your business website, for example yourbusiness.ie. If you do not have one, contact support."};
- details.website=website;
+ if(!withoutWebsite&&!website)return {error:"Enter your business website or select ‘I don’t have a website’."};
+ details.website=withoutWebsite?"":website!;
+ details.websiteStatus=withoutWebsite?"not_available":"provided";
  return {details};
 }
 export type FirstCallSection = "profile" | "hours" | "services" | "greeting";
@@ -57,7 +68,7 @@ export function firstCallSteps(s: FirstCallSetupState) {
   {id:"hours",title:"Opening hours",detail:"When customers can reach you",complete:s.hoursReady},
   {id:"greeting",title:"Your greeting",detail:"How Cara welcomes callers",complete:s.greetingReady},
   {id:"test",title:"Try Cara",detail:s.hadConversation?"Test call complete":"Call Cara and try a few questions",complete:firstCallTestComplete(s)},
-  {id:"forwarding",title:"Set up call forwarding",detail:"Connect your business number, then open your dashboard",complete:firstCallTestComplete(s)&&Boolean(s.forwardingReviewed)},
+  {id:"forwarding",title:"Set up call forwarding",detail:"Connect your existing business number",complete:firstCallTestComplete(s)&&Boolean(s.connection?.verified_at&&s.connection?.trial_activated_at)},
  ];
  return items.map((step,index)=>({...step,unlocked:
   items.slice(0,index).every(v=>v.complete)

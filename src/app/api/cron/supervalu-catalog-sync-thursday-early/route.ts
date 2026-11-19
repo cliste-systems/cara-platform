@@ -1,4 +1,4 @@
-import { runSupervaluCatalogSyncCron } from "@/app/api/cron/supervalu-catalog-sync/route";
+import { runSupervaluCatalogSyncCron } from "@/lib/supervalu-catalog-sync-cron";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;

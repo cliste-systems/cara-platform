@@ -8,7 +8,8 @@ import { DashboardFormScrollRegion } from "@/components/dashboard/dashboard-form
 import { DASHBOARD_PRIMARY_BUTTON_CLASS } from "@/components/dashboard/dashboard-surface";
 import { Button } from "@/components/ui/button";
 import { caraNavChildLabel } from "@/lib/dashboard-cara-nav";
-import { cn } from "@/lib/utils";
+import {WorkspaceSectionNav} from "@/components/dashboard/workspace-section-nav";
+import {FormFeedback} from "@/components/ui/form-feedback";
 
 import { CaraSetupUnsavedGuard } from "./cara-setup-unsaved-guard";
 import { useCaraSetupForm } from "./cara-setup-form-context";
@@ -31,7 +32,7 @@ export function CaraSetupShell({ children }: { children: React.ReactNode }) {
               <Button
                 type="button"
                 onClick={form.save}
-                disabled={form.pending}
+                disabled={form.pending || !form.canManage || !form.isDirty}
                 className={DASHBOARD_PRIMARY_BUTTON_CLASS}
               >
                 {form.pending ? "Saving…" : "Save changes"}
@@ -41,27 +42,17 @@ export function CaraSetupShell({ children }: { children: React.ReactNode }) {
                   Unsaved changes
                 </p>
               ) : null}
-              {form.status ? (
-                <p
-                  className={cn(
-                    "text-[13px]",
-                    form.status.kind === "ok"
-                      ? "text-slate-600"
-                      : "text-red-600",
-                  )}
-                >
-                  {form.status.message}
-                </p>
-              ) : null}
             </div>
           }
         />
+        <FormFeedback message={form.status?.kind === "error" ? form.status.message : null} />
 
+        {form.niche !== "retail" && <WorkspaceSectionNav group="business"/>}
         <DashboardFormScrollRegion
           className="min-h-0 flex-1"
           scrollClassName="divide-y divide-[#dfe7e2] bg-[#fbfcfb]"
         >
-          {children}
+          <fieldset disabled={!form.canManage || form.pending} className="min-w-0">{children}</fieldset>
         </DashboardFormScrollRegion>
       </div>
     </CaraSetupUnsavedGuard>

@@ -1,4 +1,5 @@
 "use client";
+import { FormFeedback } from "@/components/ui/form-feedback";
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -44,9 +45,7 @@ export function TicketCloseButton({ ticketId, className }: TicketCloseButtonProp
           {pending ? "Closing…" : "Close ticket"}
         </button>
         {msg ? (
-          <span className="text-[11px] text-red-600" role="alert">
-            {msg}
-          </span>
+          <FormFeedback message={msg} />
         ) : null}
       </span>
 

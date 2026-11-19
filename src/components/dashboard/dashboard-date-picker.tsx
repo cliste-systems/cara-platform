@@ -319,7 +319,7 @@ export function DashboardDatePicker() {
           <button
             type="button"
             onClick={() => shiftDay(-1)}
-            className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-[#64748b] transition-colors hover:bg-[#f1f5f9] hover:text-[#0b1220]"
+            className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-[#64748b] transition-colors hover:bg-[#f1f5f9] hover:text-[#0b1220]"
             aria-label="Previous day"
           >
             <ChevronLeft className="size-4" aria-hidden />
@@ -335,7 +335,7 @@ export function DashboardDatePicker() {
             aria-expanded={open}
             aria-haspopup="dialog"
             className={cn(
-              "inline-flex h-9 min-w-0 cursor-pointer items-center gap-2 rounded-full px-3.5 text-[13px] font-medium transition-colors sm:px-4",
+              "inline-flex h-11 min-w-0 cursor-pointer items-center gap-2 rounded-full px-3.5 text-[13px] font-medium transition-colors sm:px-4",
               open || !isToday
                 ? "bg-[#0b1220] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_2px_6px_rgba(15,23,42,0.12)]"
                 : "text-[#0b1220] hover:bg-[#f1f5f9]",
@@ -358,7 +358,7 @@ export function DashboardDatePicker() {
             type="button"
             onClick={() => shiftDay(1)}
             disabled={isToday}
-            className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-[#64748b] transition-colors hover:bg-[#f1f5f9] hover:text-[#0b1220] disabled:cursor-not-allowed disabled:opacity-30"
+            className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-[#64748b] transition-colors hover:bg-[#f1f5f9] hover:text-[#0b1220] disabled:cursor-not-allowed disabled:opacity-30"
             aria-label="Next day"
           >
             <ChevronRight className="size-4" aria-hidden />

@@ -16,6 +16,7 @@ const groups = [
     { href: "/admin/payments/platform-income", label: "Billing", icon: ArrowDownLeft, permission: "billing", exact: false },
   ] },
   { label: "Administration", items: [
+    { href: "/admin/monitoring", label: "Errors & performance", icon: ShieldCheck, permission: "team", exact: false },
     { href: "/admin/settings", label: "Settings & tools", icon: ShieldCheck, permission: null, exact: false },
   ] },
 ] as const;

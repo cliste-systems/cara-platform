@@ -1,3 +1,6 @@
+import { FormFeedback } from "@/components/ui/form-feedback";
+import { FollowUps } from "./follow-ups";
+import { ServiceCallsPage } from "./service-calls-page";
 import { redirect } from "next/navigation";
 
 import {
@@ -57,7 +60,9 @@ import { CallHistoryPageSections } from "./call-history-page-sections";
 export const dynamic = "force-dynamic";
 
 type CallHistoryPageProps = {
-  searchParams?: Promise<{ call?: string; date?: string; range?: string; page?: string }>;
+  searchParams?: Promise<{ call?: string;
+    filter?: string; status?: string; followUp?: string;
+    ticket?: string; date?: string; range?: string; page?: string; q?: string; outcome?: string }>;
 };
 
 type CallLogListRow = {
@@ -196,6 +201,9 @@ function toListItem(
 
 export default async function CallHistoryPage({ searchParams }: CallHistoryPageProps) {
   const sp = searchParams ? await searchParams : {};
+  const activeOrganization = await getCachedDashboardOrganizationRow();
+  if (activeOrganization?.niche !== "retail") return <ServiceCallsPage params={sp} />;
+  if(sp.filter === "follow_up" || sp.ticket) return <FollowUps status={sp.status === "resolved" ? "resolved" : "open"} selectedId={sp.followUp ?? sp.ticket} page={parsePageParam(sp.page)}/>;
   const now = new Date();
   const selectedDate = parseCallsPageDateParam(sp.date, now);
   const selectedDateParam = formatCallsPageDateParam(selectedDate, now);
@@ -360,9 +368,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
       <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
         <CallHistoryPageSections animateKey={`${selectedDateParam}-${page}`}>
           {error ? (
-            <p className="shrink-0 text-[13px] text-red-700">
-              Could not load calls: {error.message}
-            </p>
+            <FormFeedback title="Calls couldn’t load" message="Please refresh to try again. Your call history hasn’t changed." />
           ) : (
             <CallHistoryPageContent
               className="min-h-0 flex-1"

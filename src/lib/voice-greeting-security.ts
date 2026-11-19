@@ -1,6 +1,8 @@
 /** Limits and sanitisation for editable voice greeting lines. */
 
 export const MAX_GREETING_LINE_LENGTH = 200;
+export const MAX_GREETING_INTRO_LENGTH = 160;
+export const MAX_GREETING_CLOSING_LENGTH = 80;
 export const MAX_GREETING_SCRIPT_LENGTH = 500;
 
 const CONTROL_AND_BIDI =
@@ -54,6 +56,8 @@ export function sanitizeVoiceGreetingPayload(input: {
   greetingClosing: string;
   defaultClosing: string;
 }): SanitizedVoiceGreetingPayload {
+  const formatError = greetingPartsFormatError(input.greetingIntro,input.greetingClosing);
+  if(formatError)return {ok:false,message:formatError};
   const greetingIntro = sanitizeGreetingLine(input.greetingIntro);
   const greetingClosing =
     sanitizeGreetingLine(input.greetingClosing) || input.defaultClosing;
@@ -69,4 +73,14 @@ export function sanitizeVoiceGreetingPayload(input: {
   }
 
   return { ok: true, greetingIntro, greetingClosing };
+}
+
+/** Check raw input before whitespace/control sanitisation can hide oversized payloads. */
+export function greetingPartsFormatError(intro:string,closing:string):string|null {
+ for(const [label,raw,max] of [['Opening line',intro,MAX_GREETING_INTRO_LENGTH],['Closing question',closing,MAX_GREETING_CLOSING_LENGTH]] as const){
+  if(raw.length>max)return `${label} must be ${max} characters or fewer.`;
+  if(/[\r\n\u2028\u2029]/.test(raw))return `${label} must be a single short line.`;
+  if(/[<>]/.test(raw))return 'Use plain greeting text without markup.';
+ }
+ return null;
 }

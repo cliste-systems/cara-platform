@@ -1,5 +1,7 @@
 "use client";
 
+import { useServiceTheme } from "@/components/dashboard/service-theme-context";
+import { FormFeedback } from "@/components/ui/form-feedback";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { LifeBuoy, Plus, Search } from "lucide-react";
@@ -63,11 +65,14 @@ function statusVariant(status: string): "success" | "muted" {
 }
 
 export function SupportView({ initialTickets, className }: SupportViewProps) {
+  const serviceTheme = useServiceTheme();
   const router = useRouter();
-  const reduceMotion = useReducedMotion();
+  const prefersReducedMotion = useReducedMotion();
+  const reduceMotion = prefersReducedMotion || serviceTheme;
   const [statusFilter, setStatusFilter] = useState<SupportStatusFilter>("all");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -95,8 +100,8 @@ export function SupportView({ initialTickets, className }: SupportViewProps) {
     if (selectedId && filtered.some((t) => t.id === selectedId)) {
       return selectedId;
     }
-    return filtered[0]?.id ?? null;
-  }, [selectedId, filtered]);
+    return serviceTheme ? null : filtered[0]?.id ?? null;
+  }, [selectedId, filtered, serviceTheme]);
 
   const selected = useMemo(
     () => filtered.find((t) => t.id === resolvedSelectedId) ?? null,
@@ -108,6 +113,7 @@ export function SupportView({ initialTickets, className }: SupportViewProps) {
       e.preventDefault();
       setFormMsg(null);
       startTransition(async () => {
+        try {
         const result = await createSupportTicket({ subject, body });
         if (result.ok) {
           setSubject("");
@@ -120,6 +126,7 @@ export function SupportView({ initialTickets, className }: SupportViewProps) {
         } else {
           setFormMsg(result.message);
         }
+        } catch { setFormMsg("We couldn’t send your request. Your message is still here — please try again."); }
       });
     },
     [subject, body, router],
@@ -129,8 +136,6 @@ export function SupportView({ initialTickets, className }: SupportViewProps) {
     setNewOpen(open);
     if (!open) {
       setFormMsg(null);
-      setSubject("");
-      setBody("");
     }
   }, []);
 
@@ -149,10 +154,10 @@ export function SupportView({ initialTickets, className }: SupportViewProps) {
       <div className="shrink-0">
         <DashboardPageHeader
           eyebrow="Support"
-          title="Support"
+          title={serviceTheme ? "Help & support" : "Support"}
           icon={LifeBuoy}
-          description="Submit a ticket when you need help. The Cliste team replies here."
-          descriptionLine2="Your whole team shares this inbox for your business."
+          description="Ask a question or get help from the Cara team."
+
           summary={[
             { value: String(metrics.open), label: "open" },
             { value: String(metrics.closed), label: "closed" },
@@ -175,10 +180,13 @@ export function SupportView({ initialTickets, className }: SupportViewProps) {
         className={cn(
           DASHBOARD_CARD_SURFACE,
           "flex min-h-0 flex-1 flex-col overflow-hidden",
+          !mobileDetailOpen && "max-lg:max-h-[60dvh] max-lg:flex-none",
         )}
       >
-        <ListDetailLayout
-          className="min-h-0 flex-1 gap-0 max-xl:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(280px,0.75fr)_minmax(360px,1fr)]"
+        <ListDetailLayout hideDetail={!selected}
+          mobileDetailOpen={mobileDetailOpen}
+          onMobileBack={() => setMobileDetailOpen(false)}
+          className="min-h-0 flex-1 gap-0 xl:grid-cols-[minmax(280px,0.75fr)_minmax(360px,1fr)]"
           list={
             <div className="flex h-full min-h-0 flex-col overflow-hidden border-slate-100 bg-white max-xl:border-b xl:border-r">
               <div className="flex shrink-0 flex-col gap-2 border-b border-slate-100 px-4 py-3 sm:px-5">
@@ -226,7 +234,7 @@ export function SupportView({ initialTickets, className }: SupportViewProps) {
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search tickets"
                     aria-label="Search tickets"
-                    className="h-9 border-slate-300 bg-white py-1 pl-8 text-[13px] placeholder:text-slate-400"
+                    className="h-11 border-slate-300 bg-white py-1 pl-8 text-[13px] placeholder:text-slate-400"
                   />
                 </div>
               </div>
@@ -240,7 +248,7 @@ export function SupportView({ initialTickets, className }: SupportViewProps) {
                     }
                     description={
                       initialTickets.length === 0
-                        ? "Use New ticket when you need help from the Cliste team."
+                        ? "Use New ticket when you need help from the HelloCara team."
                         : "Try a different filter or search term."
                     }
                     className="py-12"
@@ -254,7 +262,7 @@ export function SupportView({ initialTickets, className }: SupportViewProps) {
                         const row = (
                           <button
                             type="button"
-                            onClick={() => setSelectedId(t.id)}
+                            onClick={() => {setSelectedId(t.id); setMobileDetailOpen(true);}}
                             className={cn(
                               "grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-start gap-3 px-4 py-3.5 text-left transition-colors sm:px-5",
                               "hover:bg-slate-50/90",
@@ -397,21 +405,21 @@ export function SupportView({ initialTickets, className }: SupportViewProps) {
       </DashboardAnimatedPageSections>
 
       <Dialog open={newOpen} onOpenChange={onNewOpenChange}>
-        <DialogContent className="sm:max-w-md" showCloseButton>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md" showCloseButton>
           <DialogHeader>
             <DialogTitle>New ticket</DialogTitle>
             <DialogDescription>
               Describe your question or issue. We will reply in this thread.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit}>
+          <form noValidate onSubmit={handleSubmit}>
             <DashboardAnimatedGroup className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="support-subject">Subject</Label>
                 <Input
                   id="support-subject"
                   value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
+                  onChange={(e) => { setSubject(e.target.value); setFormMsg(null); }}
                   placeholder="e.g. Call audio quality on inbound calls"
                   maxLength={200}
                   autoComplete="off"
@@ -423,17 +431,13 @@ export function SupportView({ initialTickets, className }: SupportViewProps) {
                 <Textarea
                   id="support-body"
                   value={body}
-                  onChange={(e) => setBody(e.target.value)}
+                  onChange={(e) => { setBody(e.target.value); setFormMsg(null); }}
                   placeholder="Include what happened, when, and anything that helps us help you."
                   className={cn(fieldClass, "min-h-32 resize-y")}
                   maxLength={8000}
                 />
               </div>
-              {formMsg ? (
-                <p className="text-[13px] text-red-600" role="alert">
-                  {formMsg}
-                </p>
-              ) : null}
+              <FormFeedback message={formMsg} focusOnError />
             </DashboardAnimatedGroup>
             <DialogFooter className="mt-4 gap-2 sm:gap-0">
               <Button

@@ -3,9 +3,11 @@
 import {useEffect, useId, useImperativeHandle, useRef, useState, type Ref} from 'react';
 import {AnimatePresence, motion, useReducedMotion} from 'motion/react';
 import {CalendarDays, Check, Clock3, Moon} from 'lucide-react';
+import {SetupTimePicker} from './setup-time-picker';
 import {CallHandlingPreferences} from './call-handling-preferences';
 import {DAY_KEYS, DAY_LABELS} from '@/lib/business-hours';
 import {firstCallHoursErrors,hoursPanelForField,type HoursPanel} from '@/lib/first-call-hours-validation';
+import {SetupSectionTransition} from './setup-section-transition';
 import {AuthFormAlert} from '@/components/auth/auth-form-alert';
 
 const field='w-full rounded-xl border border-[#d9e2dd] bg-white px-3 py-2 text-xs text-[#11181d] outline-none transition-colors focus:border-[#84938c] focus:ring-2 focus:ring-[#353D42]/10';
@@ -25,14 +27,14 @@ export function FirstCallHoursFields({values,smsPricing,ref}:{ref?:Ref<HoursFiel
  const visibleErrors=Object.entries(errors).filter(([name])=>hoursPanelForField(name)===panel);
  function focusProblem(){if(!pendingFocus.current)return;const target=root.current?.querySelector<HTMLElement>(`[data-hours-field="${pendingFocus.current}"]`);if(target){target.focus({preventScroll:true});target.scrollIntoView({block:"nearest",inline:"nearest",behavior:"instant"});pendingFocus.current=null;}}
  useEffect(()=>{focusProblem();},[panel,attempted]);
- useImperativeHandle(ref,()=>({validate(){const issues=firstCallHoursErrors(fields);setAttempted(true);const first=Object.keys(issues)[0];if(!first)return true;pendingFocus.current=first;setPanel(hoursPanelForField(first));requestAnimationFrame(focusProblem);return false;}}));
+ useImperativeHandle(ref,()=>({validate(){const issues=firstCallHoursErrors(fields);setAttempted(true);const first=Object.keys(issues)[0];if(!first)return true;pendingFocus.current=first;const targetPanel=hoursPanelForField(first);setPanel(targetPanel);requestAnimationFrame(focusProblem);return false;}}));
  function fieldProps(name:string){return {'data-hours-field':name,'aria-invalid':Boolean(errors[name]),'aria-describedby':errors[name]?`${scope}-${name}-error`:undefined};}
  function fieldError(name:string){return errors[name]?<span id={`${scope}-${name}-error`} className="block text-xs leading-5 text-[#a13d35]">{errors[name]}</span>:null;}
  const update=(name:string,value:string)=>setFields(previous=>({...previous,[name]:value}));
  const tabs:{id:HoursPanel;label:string;icon:typeof Clock3}[]=[{id:'week',label:'Usual hours',icon:Clock3},{id:'holidays',label:'Bank holidays',icon:CalendarDays},{id:'outside',label:'Outside hours',icon:Moon}];
  function choice(name:string,value:string,label:string,Icon:typeof Clock3) {
   const checked=fields[name]===value;
-  return <motion.button key={value} type="button" aria-pressed={checked} onClick={()=>update(name,value)} whileTap={reduced?undefined:{scale:0.98}} className={`relative flex min-h-16 flex-1 items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-xs font-medium transition-colors ${focus} ${checked?'border-[#353D42] bg-[#f3f6f4] text-[#11181d]':'border-[#d9e2dd] bg-white text-[#5b6b65] hover:border-[#84938c]'}`}>
+  return <motion.button data-holiday-choice key={value} type="button" aria-pressed={checked} onClick={()=>update(name,value)} whileTap={reduced?undefined:{scale:0.98}} className={`relative flex min-h-16 flex-1 items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-xs font-medium transition-colors ${focus} ${checked?'border-[#353D42] bg-[#f3f6f4] text-[#11181d]':'border-[#d9e2dd] bg-white text-[#5b6b65] hover:border-[#84938c]'}`}>
    <Icon size={16} aria-hidden="true"/><span>{label}</span>{checked&&<motion.span initial={{scale:reduced?1:0}} animate={{scale:1}} className="absolute right-2 top-2 flex size-3.5 items-center justify-center rounded-full bg-[#353D42] text-white"><Check size={10}/></motion.span>}
   </motion.button>;
  }
@@ -46,30 +48,32 @@ export function FirstCallHoursFields({values,smsPricing,ref}:{ref?:Ref<HoursFiel
    </button>)}
   </div>
   <div data-hours-panel-body={panel} className="relative">
-   <AnimatePresence mode="wait" initial={false}>
+   <SetupSectionTransition animateHeight screenKey={panel}>
     <motion.div key={panel} initial={{opacity:0,y:reduced?0:6}} animate={{opacity:1,y:0}} exit={{opacity:0,y:reduced?0:-4}} transition={{duration,ease:[0.22,1,0.36,1]}} onAnimationComplete={focusProblem} className="relative flex flex-col">
      {panel==='week'&&<>
       <div data-setup-schedule-heading className="mb-2 grid grid-cols-[1fr_80px_14px_80px] gap-2 px-2 text-[10px] font-medium uppercase tracking-wider text-[#63756c]"><span>Weekly schedule</span><span aria-hidden={!hasOpenDay} className={`text-center transition-opacity duration-200 motion-reduce:transition-none ${hasOpenDay?"opacity-100":"opacity-0"}`}>From</span><span/><span aria-hidden={!hasOpenDay} className={`text-center transition-opacity duration-200 motion-reduce:transition-none ${hasOpenDay?"opacity-100":"opacity-0"}`}>Until</span></div>
       <div className="divide-y divide-[#e3e9e5]">{DAY_KEYS.map(day=>{const open=fields[`${day}_open`]==='on';return <div data-setup-schedule-row key={day} className={`grid min-h-8 grid-cols-[1fr_80px_14px_80px] items-center gap-x-2 px-2 ${errors[`${day}_start`]||errors[`${day}_end`]?"gap-y-1 py-1":"h-8"}`}>
        <label className="flex w-fit cursor-pointer items-center gap-3 text-xs text-[#353D42]"><input type="checkbox" className="peer sr-only" checked={open} onChange={e=>update(`${day}_open`,e.target.checked?'on':'')}/><span className={`relative h-4 w-7 rounded-full transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 ${open?'bg-[#353D42]':'bg-[#e3e9e5]'}`}><motion.span initial={false} animate={{x:open?14:2}} transition={{duration:reduced?0:0.18}} className="absolute top-0.5 size-3 rounded-full bg-white shadow-sm"/></span><span>{DAY_LABELS[day]}</span></label>
-       {open?<><input aria-label={`${DAY_LABELS[day]} opening time`} type="time" {...fieldProps(`${day}_start`)} value={fields[`${day}_start`]} onChange={e=>update(`${day}_start`,e.target.value)} className="h-7 min-w-0 rounded-md border border-[#d9e2dd] bg-white px-1 text-[11px] text-[#353D42] outline-none focus:ring-2 focus:ring-[#353D42]/10 aria-invalid:border-[#a13d35]"/><span className="text-center text-xs text-[#63756c]">–</span><input aria-label={`${DAY_LABELS[day]} closing time`} type="time" {...fieldProps(`${day}_end`)} value={fields[`${day}_end`]} onChange={e=>update(`${day}_end`,e.target.value)} className="h-7 min-w-0 rounded-md border border-[#d9e2dd] bg-white px-1 text-[11px] text-[#353D42] outline-none focus:ring-2 focus:ring-[#353D42]/10 aria-invalid:border-[#a13d35]"/></>:<span className="col-span-3 text-right text-xs text-[#63756c]">Closed</span>}
+       <div className="relative col-span-3 min-h-9"><AnimatePresence initial={false} mode="wait"><motion.div key={open?'open':'closed'} initial={{opacity:0,y:reduced?0:4}} animate={{opacity:1,y:0}} exit={{opacity:0,y:reduced?0:-4}} transition={{duration:reduced?0:.18}} className="grid min-h-9 grid-cols-[1fr_14px_1fr] items-center gap-2">
+       {open?<><SetupTimePicker aria-label={`${DAY_LABELS[day]} opening time`} {...fieldProps(`${day}_start`)} value={fields[`${day}_start`]} onChange={value=>update(`${day}_start`,value)} className="h-7 min-w-0 rounded-md border border-[#d9e2dd] bg-white px-1 text-[11px] text-[#353D42] outline-none focus:ring-2 focus:ring-[#353D42]/10 aria-invalid:border-[#a13d35]"/><span className="text-center text-xs text-[#63756c]">–</span><SetupTimePicker aria-label={`${DAY_LABELS[day]} closing time`} {...fieldProps(`${day}_end`)} value={fields[`${day}_end`]} onChange={value=>update(`${day}_end`,value)} className="h-7 min-w-0 rounded-md border border-[#d9e2dd] bg-white px-1 text-[11px] text-[#353D42] outline-none focus:ring-2 focus:ring-[#353D42]/10 aria-invalid:border-[#a13d35]"/></>:<span className="col-span-3 text-right text-xs text-[#63756c]">Closed</span>}
+       </motion.div></AnimatePresence></div>
        {(errors[`${day}_start`]||errors[`${day}_end`])&&<div className="col-span-full text-left">{fieldError(`${day}_start`)}{fieldError(`${day}_end`)}</div>}
       </div>;})}</div>
       <p className="mt-auto pt-2 text-center text-[11px] text-[#63756c]">Irish local time · Switch on the days you’re open.</p>
      </>}
      {panel==='holidays'&&<>
       <p className="mb-4 text-center text-xs leading-5 text-[#5b6b65]">How do your hours change on bank & public holidays?</p>
-      <div className="flex gap-2">{choice('holidayMode','usual','Usual hours',CalendarDays)}{choice('holidayMode','closed','Closed',Moon)}{choice('holidayMode','different','Different hours',Clock3)}</div>
+      <div className="flex gap-2">{choice('holidayMode','usual','As usual',CalendarDays)}{choice('holidayMode','closed','Closed',Moon)}{choice('holidayMode','different','Custom',Clock3)}</div>
       <div className="mt-4 flex items-center justify-center">
        <AnimatePresence mode="wait" initial={false}><motion.div key={fields.holidayMode} initial={{opacity:0,y:reduced?0:4}} animate={{opacity:1,y:0}} exit={{opacity:0,y:reduced?0:-4}} transition={{duration}} className="w-full">
-        {fields.holidayMode==='different'?<div className="mx-auto grid max-w-sm grid-cols-2 gap-3">{[['holidayStart','Opening time'],['holidayEnd','Closing time']].map(([name,label])=><label key={name} className="block space-y-2 text-xs text-[#5b6b65]"><span>{label}</span><input type="time" {...fieldProps(name)} aria-label={`Bank holiday ${label.toLowerCase()}`} value={fields[name]} onChange={e=>update(name,e.target.value)} className={`${field} h-11 aria-invalid:border-[#a13d35]`}/>{fieldError(name)}</label>)}</div>:<p className="rounded-2xl bg-[#f7f9f8] px-4 py-4 text-center text-sm leading-6 text-[#353D42]">{fields.holidayMode==='closed'?'Cara will let callers know you’re closed on bank and public holidays.':'Cara will use your usual weekly hours for that day.'}</p>}
+        {fields.holidayMode==='different'?<div data-holiday-range className="grid grid-cols-2 gap-0 rounded-2xl border border-[#dedede] bg-[#fafafa] p-4">{[['holidayStart','Opens at'],['holidayEnd','Closes at']].map(([name,label])=><label key={name} className="block min-w-0 space-y-2 px-3 text-xs text-[#626262]"><span>{label}</span><SetupTimePicker {...fieldProps(name)} aria-label={`Bank holiday ${label.toLowerCase()}`} value={fields[name]} onChange={value=>update(name,value)} className={`${field} h-11 aria-invalid:border-[#a13d35]`}/>{fieldError(name)}</label>)}</div>:<p className="rounded-2xl bg-[#f7f9f8] px-4 py-4 text-center text-sm leading-6 text-[#353D42]">{fields.holidayMode==='closed'?'Cara will let callers know you’re closed on bank and public holidays.':'Cara will use your usual weekly hours for that day.'}</p>}
        </motion.div></AnimatePresence>
       </div>
      </>}
      {panel==='outside'&&<CallHandlingPreferences values={fields} onChange={update} smsPricing={smsPricing} alertPhoneProps={fieldProps("alertPhone")} alertPhoneError={fieldError("alertPhone")}/>}
 
     </motion.div>
-   </AnimatePresence>
+   </SetupSectionTransition>
   </div>
  </div>;
 }

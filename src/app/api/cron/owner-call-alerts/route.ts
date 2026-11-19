@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { timingSafeEqualUtf8 } from '@/lib/timing-safe-equal';
+import { processKnowledgeDeliveries } from '@/lib/knowledge-delivery-retries';
 import { processOwnerCallAlerts } from '@/lib/owner-call-sms-alerts';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,7 @@ async function run(request: Request) {
   }
 
   try {
-    return NextResponse.json({ ok: true, ...await processOwnerCallAlerts() });
+    return NextResponse.json({ ok: true, ...await processOwnerCallAlerts(), ...await processKnowledgeDeliveries() });
   } catch {
     return NextResponse.json({ ok: false, error: 'Call alerts could not be processed.' }, { status: 500 });
   }

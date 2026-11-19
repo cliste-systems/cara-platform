@@ -12,9 +12,9 @@ export function PaymentPreview({setupTier="diy",cardDeclined=false}:{cardDecline
   const setup = LAUNCHES[setupTier];
   const setupLabel = setup.priceCents ? `${setup.name} · ${new Intl.NumberFormat("en-IE",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(setup.priceCents/100)} once, on your first invoice after the trial` : undefined;
   return <main className="flex min-h-dvh flex-col bg-white">
-    <SignupBrandFrame stage="billing" title="Set up billing" description="Add your payment details to start your 7-day free trial.">
+    <SignupBrandFrame stage="billing" title="Set up billing" description="Save your payment details. Your 7-day trial starts when your number is connected.">
       <Elements stripe={getStripeJs()} options={{ mode: "setup", currency: "eur", appearance: CLISTE_STRIPE_APPEARANCE, fonts: CLISTE_STRIPE_FONTS }}>
-        <CheckoutFormInner initialFeedback={cardDeclined ? checkoutFeedback("confirmation", {code:"card_declined"}) : undefined} subscriptionId="" returnUrl="" summary={{ planName: "Growth", amountLabel: "€199", intervalLabel: "month", trialDays: 7, email: "you@business.ie", setupTier, setupLabel }} paymentOnly setupBusy onActivated={() => {}} />
+        <CheckoutFormInner initialFeedback={cardDeclined ? checkoutFeedback("confirmation", {code:"card_declined"}) : undefined} subscriptionId="" returnUrl="" summary={{ trialStartsOnConnection:true, planName: "Growth", amountLabel: "€199", recurringAmountCents:19900, setupAmountCents:setup.priceCents, intervalLabel: "month", trialDays: 7, email: "you@business.ie", setupTier, setupLabel }} paymentOnly setupBusy onActivated={() => {}} />
       </Elements>
     </SignupBrandFrame>
   </main>;

@@ -88,13 +88,14 @@ test("invalid revocation targets never reach the privileged database function", 
   await assert.rejects(h.revokeAdminStaffSessions(userId, { sessionId, exceptSessionId: sessionId }), /valid session/);
 });
 
-function actions() {
+function actions(passwordAllowed = true) {
   const revoked: { userId: string; options: { sessionId?: string; exceptSessionId?: string } }[] = [];
   let authenticated = 0;
   let changedPassword: string | null = null;
   const a = isolated<typeof import("../app/(admin)/admin/security/actions")>("../app/(admin)/admin/security/actions.ts", {
     "next/cache": { revalidatePath() {} }, "next/headers": { headers: async () => new Headers() },
     "next/navigation": { redirect(path: string) { throw new Error(`REDIRECT:${path}`); } },
+    "@/lib/signup-password-security": { checkSignupPassword: async () => passwordAllowed ? { ok: true } : { ok: false, message: "Choose a unique password." } },
     "@/lib/admin-session": { requireAdminStaffContext: async () => { authenticated++; return { user: { id: userId, email: "staff@example.invalid" } }; } },
     "@/lib/admin-sessions": { getAdminSessionId: async () => sessionId, revokeAdminStaffSessions: async (target: string, options: { sessionId?: string; exceptSessionId?: string }) => { revoked.push({ userId: target, options }); return 1; } },
     "@/lib/invite-onboarding": { validateInvitePassword: (password: unknown, confirmation: unknown) => typeof password === "string" && password.length >= 12 && password === confirmation ? null : "Invalid password" },
@@ -137,4 +138,15 @@ test("password changes require a valid confirmed password and revoke other sessi
   form.set("password", "unique-long-test-password"); form.set("confirmation", "unique-long-test-password");
   assert.ok((await a.changeAdminPassword({}, form)).success); assert.equal(changedPassword(), "unique-long-test-password");
   assert.equal(authenticated(), 2); assert.equal(revoked[0].userId, userId); assert.equal(revoked[0].options.exceptSessionId, sessionId);
+});
+
+test("a breached-password decision cannot change credentials or revoke sessions", async () => {
+  const { a, revoked, changedPassword, authenticated } = actions(false);
+  const form = new FormData();
+  form.set("password", "unique-long-test-password");
+  form.set("confirmation", "unique-long-test-password");
+  assert.match((await a.changeAdminPassword({}, form)).error ?? "", /unique password/);
+  assert.equal(authenticated(), 1);
+  assert.equal(changedPassword(), null);
+  assert.equal(revoked.length, 0);
 });

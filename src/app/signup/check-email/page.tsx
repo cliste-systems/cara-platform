@@ -1,3 +1,5 @@
+import {headers} from "next/headers";
+import {isLocalSignupCodePreview} from "@/lib/onboarding-dev";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -46,7 +48,7 @@ export default async function SignupCheckEmailPage({
 
         {email ? (
           <OnboardingEnter tone="profile">
-            <VerifyCodeForm email={email} />
+            <VerifyCodeForm email={email} allowLocalCode={isLocalSignupCodePreview(await headers())} />
           </OnboardingEnter>
         ) : null}
 

@@ -7,8 +7,8 @@ import {classificationFromFields,classificationBusinessType,classificationNiche,
 import { DAY_KEYS, serializeBusinessHours, type WeekSchedule } from "@/lib/business-hours";
 import { detectPromptInjectionViolation } from "@/lib/prompt-injection-guard";
 import { buildFullVoiceGreeting, defaultVoiceGreetingIntro, voiceLegalDisclosure } from "@/lib/voice-greeting";
-import { sanitizeGreetingLine } from "@/lib/voice-greeting-security";
-import { validateVoiceGreetingGuardrails } from "@/lib/voice-greeting-guardrails";
+import { greetingPartsFormatError,sanitizeGreetingLine } from "@/lib/voice-greeting-security";
+import { voiceGreetingSafetyIssue } from "@/lib/voice-greeting-guardrails";
 import type { FirstCallSection } from "./first-call-setup";
 export const FIRST_CALL_SECTIONS: FirstCallSection[]=["profile","hours","services","greeting"];
 export function firstCallConfigPatch(section:FirstCallSection,raw:Record<string,string>,businessName:string,classification:BusinessClassification|null=null):{ok:true;patch:Record<string,unknown>}|{ok:false;message:string}{
@@ -50,8 +50,9 @@ export function firstCallConfigPatch(section:FirstCallSection,raw:Record<string,
   return {ok:true,patch:{agent_services_departments:serviceItems(field("services")).join("\n"),agent_services_not_offered:serviceItems(field("notOffered")).join("\n")||null,...(starter?{service_starter_state:starter}:{})}};
  }
  if(section==="greeting"){
+  const formatError=greetingPartsFormatError(raw.intro??"",raw.closing??"");if(formatError)return {ok:false,message:formatError};
   const intro=sanitizeGreetingLine(field("intro"))||defaultVoiceGreetingIntro(businessName),closing=sanitizeGreetingLine(field("closing"));
-  const result=validateVoiceGreetingGuardrails({greetingIntro:intro,greetingClosing:closing,businessName});if(!result.ok)return result;
+  const issue=voiceGreetingSafetyIssue(intro,closing);if(issue)return {ok:false,message:issue};
   const greeting=buildFullVoiceGreeting(intro,"Cara",closing);if(greeting.length>500||!greeting.includes(voiceLegalDisclosure("Cara")))return {ok:false,message:"Keep the greeting under 500 characters."};
   return {ok:true,patch:{greeting}};
  }

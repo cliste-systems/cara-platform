@@ -279,8 +279,10 @@ export async function persistPlatformCheckoutSession(
     platform_customer_id: customerId,
     updated_at: new Date().toISOString(),
   };
-  await admin.from("accounts").update(billingPatch).eq("id", accountId);
-  await admin.from("organizations").update(billingPatch).eq("account_id", accountId);
+  const accountResult = await admin.from("accounts").update(billingPatch).eq("id", accountId).select("id");
+  if (accountResult.error || !accountResult.data?.length) throw new Error("Billing account could not be saved.");
+  const organizationResult = await admin.from("organizations").update(billingPatch).eq("account_id", accountId).select("id");
+  if (organizationResult.error || !organizationResult.data?.length) throw new Error("Billing locations could not be saved.");
 }
 
 /**

@@ -6,6 +6,19 @@ import type { ServicePolicyFlag } from "@/lib/service-policy-presets";
 
 export type ServiceCatalogSource = "manual" | "booking_import" | "website_import";
 
+export type ServicePriceMode = "unset" | "fixed" | "from" | "range" | "hourly" | "quote" | "free";
+export type ServiceDetails = {
+  priceMode: ServicePriceMode;
+  priceMax?: number;
+  priceUnit?: "hour" | "day";
+  priceNotes?: string;
+  durationMode?: "unset" | "exact" | "estimate" | "range";
+  durationMaxMinutes?: number;
+  durationUnit?: "minute" | "hour" | "day";
+  status?: "available" | "unavailable" | "archived";
+  privateNotes?: string;
+};
+
 export type ServiceCatalogItem = {
   id: string;
   name: string;
@@ -18,6 +31,8 @@ export type ServiceCatalogItem = {
   aiVoiceNotes: string | null;
   policyFlags: ServicePolicyFlag[];
   source: ServiceCatalogSource;
+  details?: ServiceDetails;
+  updatedAt?: string;
 };
 
 export type ServiceCatalogDraft = Omit<ServiceCatalogItem, "id"> & {
@@ -56,25 +71,38 @@ export function formatServiceDuration(minutes: number): string | null {
 }
 
 export function formatServiceCatalogLine(
-  item: Pick<ServiceCatalogItem, "name" | "price" | "durationMinutes">,
+  item: Pick<ServiceCatalogItem, "name" | "price" | "durationMinutes" | "details">,
 ): string {
   const parts = [item.name.trim()];
-  const duration = formatServiceDuration(item.durationMinutes);
+  const durationText = (minutes: number) => item.details?.durationUnit === "day" && minutes > 0 ? `${Number((minutes / 1440).toFixed(2))} days` : formatServiceDuration(minutes);
+  const duration = durationText(item.durationMinutes);
   const price = formatServicePriceEur(item.price);
-  if (duration) parts.push(duration);
-  if (price) parts.push(`from ${price}`);
+  const d = item.details;
+  if (d?.status === "unavailable") parts.push("Temporarily unavailable — take an enquiry; do not confirm availability");
+  if (duration && d?.durationMode !== "unset") {
+    const max = durationText(d?.durationMaxMinutes ?? 0);
+    parts.push(d?.durationMode === "range" && max ? `${duration}–${max}` : `${d?.durationMode === "estimate" ? "about " : ""}${duration}`);
+  }
+  const mode = d?.priceMode ?? (price ? "from" : "unset");
+  if (mode === "free") parts.push("Free");
+  else if (mode === "quote") parts.push("Quote required — take details for a quote");
+  else if (price && mode !== "unset") {
+    const max = formatServicePriceEur(d?.priceMax ?? 0);
+    parts.push(mode === "fixed" ? price : mode === "range" && max ? `${price}–${max}` : mode === "hourly" ? `${price} per ${d?.priceUnit ?? "hour"}` : `from ${price}`);
+  }
+  if (d?.priceNotes?.trim()) parts.push(d.priceNotes.trim());
   return parts.join(" — ");
 }
 
 export function catalogHasExtractedPrices(
-  services: Pick<ServiceCatalogItem, "price">[],
+  services: Pick<ServiceCatalogItem, "price" | "details">[],
 ): boolean {
-  return services.some((s) => servicePriceIsSet(s.price));
+  return services.some((s) => s.details?.status !== "archived" && (s.details?.priceMode === "free" || (!["unset","quote"].includes(s.details?.priceMode ?? "from") && servicePriceIsSet(s.price))));
 }
 
 /** Owner can opt out; default on when catalog has prices. */
 export function resolveQuotePricesOnCalls(
-  services: Pick<ServiceCatalogItem, "price">[],
+  services: Pick<ServiceCatalogItem, "price" | "details">[],
   ownerPreference: boolean | null | undefined,
 ): boolean {
   if (!catalogHasExtractedPrices(services)) return false;

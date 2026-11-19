@@ -8,7 +8,7 @@ import { OnboardingPrimaryButton } from "@/components/onboarding/onboarding-prim
 export function CheckoutRetry({ message }: { message: string }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  return <div className="space-y-4">
+  return <div data-checkout-retry className="flex flex-col gap-4">
     <AuthFormAlert title="We couldn’t prepare billing" message={message}/>
     <OnboardingPrimaryButton className="w-full" pending={pending} onClick={() => startTransition(() => router.refresh())}>
       {pending ? "Trying again…" : "Try again"}

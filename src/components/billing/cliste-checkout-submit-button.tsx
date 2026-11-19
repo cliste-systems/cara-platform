@@ -13,6 +13,7 @@ export type CheckoutSubmitPhase = "idle" | "loading" | "success";
 type Props = {
   phase: CheckoutSubmitPhase;
   idleLabel?: string;
+  successLabel?:string;
   loadingLabel?: string;
   trialDays: number;
   disabled?: boolean;
@@ -23,6 +24,7 @@ export function ClisteCheckoutSubmitButton({
   phase,
   trialDays,
   idleLabel,
+  successLabel,
   loadingLabel,
   disabled = false,
   className,
@@ -69,7 +71,7 @@ export function ClisteCheckoutSubmitButton({
             transition={{ duration: 0.35, ease: ONBOARDING_EASE }}
           >
             <Check className="size-5" strokeWidth={2.5} aria-hidden />
-            Trial started
+            {successLabel??"Trial started"}
           </motion.span>
         ) : (
           idleLabel ?? `Start ${trialDays}-day free trial`

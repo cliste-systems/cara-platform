@@ -12,14 +12,13 @@ import {
 import { customerIncomingCallDetail } from "@/lib/dashboard-customer-events";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 
-const IS_DEV = process.env.NODE_ENV === "development";
-
 /**
  * Supabase Realtime on activity tables (migration 034) is the primary path — events
  * arrive in ~1s. Migration 062 sets REPLICA IDENTITY FULL so org-scoped filters work.
- * Polling is a fallback when Realtime is down (12s dev / 30s prod).
+ * Polling is a fallback when Realtime is down (30s in development and production).
  */
-const POLL_INTERVAL_MS = IS_DEV ? 12_000 : 30_000;
+const IS_DEV = process.env.NODE_ENV === "development";
+const POLL_INTERVAL_MS = 30_000;
 
 /** Coalesce Realtime bursts (insert + enrichment update) into one RSC refresh. */
 const REALTIME_DEBOUNCE_MS = 400;
@@ -28,14 +27,14 @@ const REALTIME_DEBOUNCE_MS = 400;
 const MIN_MS_BETWEEN_POLL_REFRESH = 4_000;
 
 /** On home, layout refresh is throttled — content updates via client snapshot fetch. */
-const MIN_MS_BETWEEN_HOME_LAYOUT_REFRESH = 10_000;
+const MIN_MS_BETWEEN_HOME_LAYOUT_REFRESH = 30_000;
 
 function isDashboardHomePath(pathname: string | null): boolean {
   return pathname === DASHBOARD_ROUTES.home;
 }
 
 /**
- * Realtime is event-driven (no cost unless data actually changes) and the
+ * Realtime is event-driven; connections and delivered messages incur usage. The
  * sidebar badges live on every dashboard page, so we subscribe everywhere
  * under `/dashboard`. The only exclusion is `/dashboard/set-password`,
  * where the session is mid-bootstrap and we don't want stray refreshes.
@@ -53,8 +52,7 @@ function shouldEnableRealtime(pathname: string | null): boolean {
 function shouldPoll(pathname: string | null): boolean {
   if (!shouldEnableRealtime(pathname)) return false;
   if (!pathname) return false;
-  if (pathname === "/dashboard/settings") return false;
-  return true;
+  return ["/dashboard", "/dashboard/calls", "/dashboard/call-history", "/dashboard/activity", "/dashboard/action-inbox", "/dashboard/cara-knowledge", "/dashboard/cara-training"].includes(pathname);
 }
 
 function isRealtimeHealthyStatus(status: string): boolean {
@@ -115,6 +113,7 @@ export function DashboardLiveRefresh({
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       return;
     }
+    if (!shouldPoll(pathnameRef.current) || document.querySelector('[role="dialog"], [role="alertdialog"]') || document.activeElement?.matches('input, textarea, select, [contenteditable="true"]')) return;
     const now = Date.now();
     if (now - lastPollRefreshAt.current < MIN_MS_BETWEEN_POLL_REFRESH) {
       return;
@@ -147,7 +146,7 @@ export function DashboardLiveRefresh({
     if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
     realtimeDebounceRef.current = setTimeout(() => {
       realtimeDebounceRef.current = null;
-      if (pathnameRef.current === "/dashboard/settings") return;
+      if (!shouldPoll(pathnameRef.current) || document.querySelector('[role="dialog"], [role="alertdialog"]') || document.activeElement?.matches('input, textarea, select, [contenteditable="true"]')) return;
 
       const now = Date.now();
       const onHome = isDashboardHomePath(pathnameRef.current);
@@ -232,6 +231,7 @@ export function DashboardLiveRefresh({
         },
         scheduleRealtimeRefresh,
       )
+      .on("postgres_changes", { event: "*", schema: "public", table: "action_tickets", filter }, scheduleRealtimeRefresh)
       .on(
         "postgres_changes",
         {
@@ -299,7 +299,8 @@ export function DashboardLiveRefresh({
         const healthy = isRealtimeHealthyStatus(status);
         realtimeHealthyRef.current = healthy;
         if (shouldPoll(pathnameRef.current)) {
-          startPolling();
+          if (healthy) stopPolling();
+          else startPolling();
         }
         if (IS_DEV && (status === "CHANNEL_ERROR" || status === "TIMED_OUT")) {
           console.warn(

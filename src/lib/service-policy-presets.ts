@@ -309,11 +309,12 @@ export function compileServicePolicySentences(
 export function compileServiceCatalogKnowledgeLine(
   item: Pick<
     ServiceCatalogItem,
-    "name" | "price" | "durationMinutes" | "policyFlags" | "aiVoiceNotes"
+    "name" | "price" | "durationMinutes" | "policyFlags" | "aiVoiceNotes" | "description" | "details"
   >,
 ): string {
   const base = formatServiceCatalogLine(item);
   const parts: string[] = [base];
+  if (item.description?.trim()) parts.push(item.description.trim());
 
   const presetSentences = compileServicePolicySentences(item.policyFlags ?? []);
   parts.push(...presetSentences);

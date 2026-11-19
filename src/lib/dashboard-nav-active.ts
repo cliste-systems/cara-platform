@@ -2,12 +2,14 @@ export type DashboardNavItemActive = {
   href: string;
   activePrefix?: string;
   activeAliases?: string[];
+  inactivePaths?: string[];
 };
 
 export function isDashboardNavItemActive(
   pathname: string,
   item: DashboardNavItemActive,
 ): boolean {
+  if (item.inactivePaths?.some(path => pathname === path || pathname.startsWith(path + "/"))) return false;
   if (item.activePrefix) {
     return pathname.startsWith(item.activePrefix);
   }

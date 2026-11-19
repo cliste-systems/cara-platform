@@ -1,6 +1,13 @@
 "use client";
+import {AnimatePresence,motion,useReducedMotion} from "motion/react";
+import {CircleAlert} from "lucide-react";
 import {useId,useState} from "react";
 import {AuthFormAlert} from "@/components/auth/auth-form-alert";
+
+function FieldError({id,message}:{id:string;message?:string}) {
+ const reduced=useReducedMotion();
+ return <AnimatePresence initial={false}>{message && <motion.span key="error" initial={reduced?false:{height:0,opacity:0}} animate={{height:"auto",opacity:1}} exit={{height:0,opacity:0}} transition={{duration:reduced?0:.24}} data-field-error-slot className="block overflow-hidden"><span id={id} data-field-error role="alert" className="mt-2 flex items-start gap-1.5 text-xs font-normal leading-5 text-[#a13d35]"><CircleAlert size={14} className="mt-0.5 shrink-0" aria-hidden/>{message}</span></motion.span>}</AnimatePresence>;
+}
 
 const REQUIRED_MESSAGES:Record<string,string>={fullName:"Enter your name.",businessName:"Enter your business name.",legalCompanyName:"Enter your legal company or trading name.",email:"Enter your email address.",password:"Create a password with at least 8 characters.",acceptLegal:"Please accept the terms and Data Processing Agreement to create your account."};
 
@@ -25,14 +32,14 @@ export function useSetupValidation(custom:Record<string,(value:string,field:HTML
    if(error){next[field.name]=error;first??=field;}
   }
   setErrors(next);
-  if(first)requestAnimationFrame(()=>{if(first.isConnected){first.focus({preventScroll:true});first.scrollIntoView({block:"nearest",inline:"nearest",behavior:"instant"});}});
+  if(first)requestAnimationFrame(()=>{if(first.isConnected){first.focus({preventScroll:true});const container=first.closest(".signup-account-field, [data-legal-acceptance]")??first;container.scrollIntoView({block:"center",inline:"nearest",behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth"});}});
   return !first;
  }
  return {
   validate,
   clear:(name:string)=>setErrors(v=>{if(!v[name])return v;const next={...v};delete next[name];return next;}),
   props:(name:string)=>({"aria-invalid":Boolean(errors[name]),"aria-describedby":errors[name]?`${id}-${name}`:undefined}),
-  error:(name:string)=>errors[name]?<span id={`${id}-${name}`} role="alert" className="mt-2 block text-xs font-normal leading-5 text-[#a13d35]">{errors[name]}</span>:null,
+  error:(name:string)=><FieldError id={`${id}-${name}`} message={errors[name]}/>,
   summary:Object.keys(errors).length?<AuthFormAlert message="Please check the marked fields to continue."/>:null,
  };
 }

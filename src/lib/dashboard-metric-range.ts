@@ -25,8 +25,7 @@ export function getDashboardMetricRangeLowerBoundIso(
     return subDays(now, 7).toISOString();
   }
   if (key === "4w") {
-    // Nav label “30 days” — use 45 days so recent pilot calls are not clipped at month boundaries.
-    return subDays(now, 45).toISOString();
+    return subDays(now, 28).toISOString();
   }
 
   const zonedNow = toZonedTime(now, DUBLIN);

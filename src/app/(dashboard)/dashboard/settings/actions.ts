@@ -27,6 +27,8 @@ export async function saveOrganizationSettings(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { supabase, organizationId } = await requireDashboardAdmin();
 
+  const {data:org,error:loadError}=await supabase.from("organizations").select("niche,updated_at").eq("id",organizationId).single();
+  if(loadError||!org)return {ok:false,message:"We couldn’t load your settings. Please try again."};
   const notificationEmail = String(payload?.notificationEmail ?? "").trim();
   const notificationPhone = String(payload?.notificationPhone ?? "").trim();
   const callRoutingMode = parseCallRoutingMode(payload?.callRoutingMode);
@@ -45,24 +47,20 @@ export async function saveOrganizationSettings(
     return { ok: false, message: "Transfer number looks too long." };
   }
 
-  const { error } = await supabase
-    .from("organizations")
-    .update({
-      is_active: payload.isActive,
-      notification_email: notificationEmail || null,
-      notification_phone: notificationPhone || null,
-      call_routing_mode: callRoutingMode,
-      fallback_number: transferNumber || null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", organizationId);
-
-  if (error) {
-    return { ok: false, message: error.message };
+  const patch: Record<string,unknown>={
+    notification_email:notificationEmail||null,
+    notification_phone:notificationPhone||null,
+    updated_at:new Date().toISOString(),
+  };
+  if(org.niche === "retail"){
+    patch.call_routing_mode=callRoutingMode;
+    patch.fallback_number=transferNumber||null;
+    const compiled=await regenerateCaraCustomPrompt(supabase,organizationId,{dryRun:true,orgPatch:patch});
+    if(!compiled.ok||!compiled.prompt)return {ok:false,message:"We couldn’t update Cara’s call settings. Please try again."};
+    patch.custom_prompt=compiled.prompt;patch.prompt_compile_warnings=compiled.warnings;
   }
-
-  // Transfer number / routing mode feed Cara's call-handling prompt.
-  await regenerateCaraCustomPrompt(supabase, organizationId);
+  const {data:saved,error}=await supabase.from("organizations").update(patch).eq("id",organizationId).eq("updated_at",org.updated_at).select("id").maybeSingle();
+  if(error||!saved)return {ok:false,message:"Your settings couldn’t be saved. Refresh if they changed in another tab, then try again."};
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/settings");

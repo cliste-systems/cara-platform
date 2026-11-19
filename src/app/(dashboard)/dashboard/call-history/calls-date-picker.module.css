@@ -1,0 +1,31 @@
+.trigger{display:flex;align-items:center;justify-content:center;gap:9px;min-width:145px;white-space:nowrap;font-size:12px!important;padding:10px 14px!important}
+.trigger svg{width:16px!important;height:16px!important;color:#bbb}
+.backdrop{position:fixed;inset:0;z-index:60;background:#11161666;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.calendar{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:61;width:336px;max-height:calc(100dvh - 32px);overflow:auto;max-width:calc(100vw - 32px);padding:18px;border:1px solid #ffffff20;border-radius:22px;background:linear-gradient(135deg,#2b2c2c,#242525);color:#f5f5f5;box-shadow:0 16px 48px #0004;outline:none;font-size:13px}
+.calendar header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.calendar h2{font-size:15px;font-weight:500;letter-spacing:-.025em;margin:0}.calendar header>div{display:flex;gap:4px}
+.calendar button{border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:50%;background:transparent;color:inherit;transition:background-color .18s ease,color .18s ease;min-height:34px;min-width:34px;font:inherit;padding:0}
+.calendar button:disabled{cursor:default;opacity:.25}.calendar header svg{width:17px;height:17px;stroke-width:1.5}
+.weekdays,.days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}.weekdays{margin-bottom:8px;color:#999;font-size:11px;text-align:center}.weekdays span{padding:4px 0}
+.days button{width:100%;aspect-ratio:1;position:relative;font-size:12px}.days button[data-outside=true]{color:#777}.days button[aria-pressed=true]{background:#fff;color:#222}.days button[data-today=true]:not([aria-pressed=true]):after{content:"";position:absolute;bottom:4px;width:3px;height:3px;border-radius:50%;background:#bec9f7}
+.calendar footer{display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid #ffffff16}.calendar footer span{font-size:11px;color:#aaa}.calendar footer button{border-radius:20px;padding:6px 13px;background:#ffffff0a;font-size:12px}
+.description{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.calendar button:focus-visible{outline:0;box-shadow:inset 0 0 0 1px #b9c3f3}
+@media(hover:hover){.calendar button:not(:disabled):hover{background:#fff;color:#222}}
+@media(max-width:600px){.trigger{grid-column:2;grid-row:2;min-width:0;width:140px;padding-inline:10px!important;font-size:12px!important;gap:7px}.days button{min-height:36px}}
+@media(prefers-reduced-motion:reduce){.calendar button{transition:none}}
+
+.calendar{padding:22px;border-radius:26px;box-shadow:0 24px 80px #0006}
+.calendar header{margin-bottom:20px}.calendar h2{font-size:18px}.calendar header>div{gap:2px}
+.calendar .close{margin-left:6px;background:#ffffff08}
+.calendar .days button{min-height:38px;font-size:13px}
+.calendar footer{margin-top:18px;padding-top:16px}
+@media(max-width:600px){.calendar{width:calc(100vw - 40px);max-width:340px;padding:20px}.backdrop{backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}}
+
+/* Base UI retains the dialog until its closing transition finishes. */
+.calendar{opacity:1;translate:0 0;transition:opacity .24s cubic-bezier(.2,.65,.3,1),translate .24s cubic-bezier(.2,.65,.3,1)}
+.backdrop{opacity:1;transition:opacity .24s ease}
+.calendar[data-starting-style],.calendar[data-ending-style]{opacity:0;translate:0 5px}
+.backdrop[data-starting-style],.backdrop[data-ending-style]{opacity:0}
+:global(.cara-workspace){transition:filter .24s ease}
+:global(body:has([data-calls-calendar]:not([data-ending-style]),[data-calls-media-dialog]:not([data-ending-style])) .cara-workspace){filter:blur(5px)}
+@media(prefers-reduced-motion:reduce){.calendar,.backdrop,:global(.cara-workspace){transition:none!important}.calendar[data-starting-style],.calendar[data-ending-style]{translate:0 0}}

@@ -1,0 +1,400 @@
+.workspace{--muted:#707070;--panel:#efefef;position:fixed;inset:0;z-index:10;display:flex;gap:22px;padding:28px;color:#202020;background:#fff;overflow:hidden}
+.workspace a,.workspace button{-webkit-tap-highlight-color:transparent;transition:background .18s ease,color .18s ease,opacity .18s ease;cursor:pointer}
+.workspace a:focus-visible,.workspace button:focus-visible{outline:2px solid #555;outline-offset:3px}
+.workspace svg{flex-shrink:0;stroke-width:1.6}
+.rail{width:84px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;border-radius:32px;background:linear-gradient(135deg,#2c2c2c,#222);padding:20px 8px;color:#fff;overflow:auto;scrollbar-width:thin}
+.logo{display:block;width:48px;margin-bottom:20px}.logo img{filter:brightness(0) invert(1)}
+.rail nav{width:100%;display:flex;flex-direction:column;gap:12px}.navItem{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:68px;width:100%;border-radius:18px;font-size:11px;text-align:center;color:#fff;line-height:1.3;padding:8px 3px}
+.navItem svg{width:20px;height:20px}.navItem[data-active=true]{background:linear-gradient(135deg,#858585,#6d6d6d)}.navItem:hover{background:#ffffff25;color:white}.navBadge{position:absolute;top:4px;right:4px;background:#fff;color:#222;border-radius:20px;padding:1px 4px;font-size:10px}
+.railBottom{margin-top:auto;padding-top:14px;display:flex;flex-direction:column;align-items:center;gap:8px;width:100%}.railBottom:before{content:"";height:1px;width:44px;background:#646464}.avatar{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#aaa,#777);color:white;font-size:19px}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}.topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:14px;min-height:48px;flex-shrink:0}.business{min-width:0;display:flex;align-items:center;gap:8px}.business>button:last-child{border-radius:30px;background:#f5f5f5;color:#222;border-color:#e1e1e1;max-width:min(40vw,340px)}.topActions{display:flex;align-items:center;gap:16px}.topActions time{font-size:13px;color:var(--muted)}.bell{display:grid;place-items:center;border:1px solid #e5e5e5;border-radius:50%;width:44px;height:44px}.bell svg{width:21px}.teach{display:flex;align-items:center;justify-content:center;gap:9px;border-radius:30px;padding:0 22px;height:48px;background:#292929;color:white;font-size:16px}.teach:hover{background:#414141;color:white}.teach svg{width:21px}.mobileMenu{display:none}.content{flex:1;min-height:0;overflow:auto;scrollbar-width:thin;overscroll-behavior:contain}.content>[data-dashboard-fill]{background:#fff!important}.content :global(.dashboard-page-heading){color:#202020}.content :global([data-dashboard-home]){background:white}
+.overview{min-height:100%;display:flex;flex-direction:column;gap:20px;padding-bottom:2px;animation:arrive .35s ease both}.intro{display:flex;align-items:center;justify-content:space-between;gap:12px}.intro h1{font-size:36px;letter-spacing:-.05em;font-weight:550;line-height:1.15}.intro p{font-size:19px;color:var(--muted);margin-top:4px;letter-spacing:-.025em}
+.grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(250px,1fr);gap:14px;flex:1;min-height:0}.mainColumn{display:grid;grid-template-rows:215px minmax(280px,1fr);gap:14px;min-width:0}.summary{display:grid;grid-template-columns:1fr 1.7fr;gap:14px}.metrics{display:grid;grid-template-rows:1fr 1fr;gap:12px}.card{background:linear-gradient(125deg,#ededed,#f1f1f1);border-radius:16px;overflow:hidden}.metric{display:flex;align-items:center;gap:16px;padding:16px}.metric:hover,.shortcut:hover{background:#e6e6e6}.metric>span:nth-child(2){min-width:0;display:flex;flex-direction:column;font-size:14px;line-height:1.25}.metric strong{font-size:32px;font-weight:550;line-height:1.2}.circleIcon{display:grid;place-items:center;flex-shrink:0;width:55px;height:55px;background:#fff;border-radius:50%}.circleIcon svg{width:27px;height:27px}.arrow{margin-left:auto;width:18px;color:var(--muted)}
+.greeting{isolation:isolate;position:relative;background:#292929;color:#fff}.pill{display:inline-flex;align-items:center;justify-content:center;gap:9px;border:1px solid #e5e5e5;border-radius:28px;min-height:38px;padding:8px 18px;background:#fff;color:#222;font-size:13px;white-space:nowrap;margin-top:auto}.pill svg{width:15px;height:15px}.pill:hover{background:#e9e9e9;color:#111}
+.lists{display:grid;grid-template-columns:1fr 1fr;gap:14px;min-width:0;min-height:0}.panel{display:flex;flex-direction:column;padding:12px;gap:10px;min-width:0}.panelHeading{display:flex;align-items:center;gap:10px;min-height:44px}.squareIcon{width:44px;height:44px;background:#fff;border-radius:14px;display:grid;place-items:center;flex-shrink:0}.squareIcon svg{width:25px;height:25px}.panelHeading h2{font-size:18px;letter-spacing:-.04em;font-weight:550;line-height:1.2}.count{display:grid;place-items:center;min-width:28px;height:28px;background:#ddd;border-radius:50%;font-size:14px;padding:0 6px}.rows{background:#ffffff80;border-radius:15px;flex:1;min-height:130px;padding:0 10px;overflow:auto}.row{display:flex;align-items:center;gap:10px;min-height:70px;border-bottom:1px solid #ddd;padding:10px 0}.row:last-child{border:0}.row:hover{background:#ffffff60}.rowAvatar{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:#ddd;font-size:14px;flex-shrink:0}.rowCopy{min-width:0;flex:1}.rowCopy strong{font-size:14px;font-weight:500;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rowCopy small{font-size:12px;display:block;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.row time{font-size:11px;color:var(--muted);white-space:nowrap}.row>svg{width:20px}.row p{font-size:13px;flex:1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.answer{display:flex;align-items:center;gap:8px;border:1px solid #ddd;border-radius:25px;background:#fff;padding:8px 12px;font-size:12px;white-space:nowrap}.answer svg{width:16px}.wideButton{display:flex;align-items:center;justify-content:center;gap:10px;min-height:42px;border-radius:28px;border:1px solid #ddd;background:#fff;color:#222;font-size:14px;padding:9px 14px;flex-shrink:0}.wideButton:hover{background:#e7e7e7;color:#111}.wideButton svg{width:18px;height:18px}.empty{padding:26px 12px;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:100%;text-align:center;gap:7px;color:var(--muted);font-size:13px;line-height:1.5}.empty strong{font-size:14px;color:#333;font-weight:500}
+.rightColumn{display:grid;grid-template-rows:repeat(3,76px) minmax(230px,1fr);gap:10px;min-height:0}.shortcut{display:flex;align-items:center;gap:13px;padding:14px}.shortcut strong{display:block;font-size:14px;font-weight:550}.shortcut small{display:block;color:var(--muted);font-size:12px;margin-top:4px}.status{display:flex;flex-direction:column;min-height:230px;background:#f5f5f5}.statusBadge svg{width:16px}.statusDescription{display:flex;gap:10px;align-items:flex-start}.statusDescription>svg{width:26px;height:26px}.statusDescription h2{font-size:18px;font-weight:550;letter-spacing:-.035em}.statusDescription p{font-size:12px;color:var(--muted);line-height:1.5;margin-top:3px}.error{font-size:13px;color:#8d3f35}.menuDialog{background:white}.mobileLinks{display:flex;flex-direction:column;gap:6px}.mobileLinks .navItem{flex-direction:row;color:#222;justify-content:flex-start;padding:12px;font-size:15px;min-height:48px;gap:12px}.mobileLinks .navItem[data-active=true]{background:#eee}.mobileLinks>a,.mobileLinks>button{padding:12px;text-align:left}
+@keyframes arrive{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(min-width:1500px){.workspace{padding:clamp(28px,7vh,90px) 30px}.mainColumn{grid-template-rows:240px minmax(300px,1fr)}.intro h1{font-size:40px}.rightColumn{grid-template-rows:repeat(3,84px) minmax(240px,1fr)}}
+@media(max-width:1199px){.workspace{padding:20px;gap:16px}.grid{grid-template-columns:minmax(0,2.8fr) minmax(220px,1fr)}.summary{grid-template-columns:1fr 1.4fr}.metric{gap:10px;padding:12px}.circleIcon{width:42px;height:42px}.panelHeading h2{font-size:16px}.row time{display:none}.answer{padding:8px}.shortcut{gap:10px;padding:12px}}
+@media(max-width:1023px){.workspace{padding:18px;display:block;overflow:auto}.rail{display:none}.main{min-height:100%;height:auto}.topbar{gap:8px;margin-bottom:20px}.topActions{gap:8px}.topActions time{display:none}.teach{height:42px;font-size:13px;padding:0 15px}.mobileMenu{display:grid;place-items:center;width:40px;height:40px;border:1px solid #ddd;border-radius:50%;background:white}.business>button:last-child{max-width:230px;font-size:12px}.content{overflow:visible;min-height:0}.overview{gap:18px}.intro h1{font-size:32px}.intro p{font-size:17px}.grid{grid-template-columns:1fr}.mainColumn{grid-template-rows:220px auto}.lists{min-height:310px}.rightColumn{grid-template-columns:repeat(3,1fr);grid-template-rows:auto auto}.status{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;min-height:190px}.shortcut{min-height:90px;gap:10px}.shortcut .squareIcon{width:36px;height:36px}.shortcut small{font-size:11px}.shortcut strong{font-size:13px}}
+@media(max-width:600px){.workspace{padding:16px}.business{flex:1}.business>button:last-child{max-width:calc(100vw - 165px);font-size:12px;padding:0 10px;gap:6px}.topbar{align-items:center}.topActions .bell{display:none}.teach{width:40px;height:40px;padding:0}.teach span{display:none}.teach:after{content:none}.intro{align-items:flex-start}.intro h1{font-size:30px}.intro p{font-size:16px}.intro select{max-width:90px}.grid{gap:14px}.mainColumn{display:flex;flex-direction:column}.summary{display:flex;flex-direction:column;gap:12px}.metrics{grid-template-columns:1fr 1fr;grid-template-rows:100px;gap:10px}.metric{gap:9px;padding:12px}.metric>span:nth-child(2){font-size:12px}.metric strong{font-size:28px}.circleIcon{width:36px;height:36px}.circleIcon svg{width:22px}.metric>.arrow{display:none}.greeting{height:200px}.pill{font-size:12px;padding:8px 14px}.lists{grid-template-columns:1fr;gap:14px}.panel{min-height:260px}.panelHeading h2{font-size:18px}.rightColumn{grid-template-columns:1fr;grid-template-rows:repeat(3,74px) auto}.shortcut{min-height:74px;padding:14px}.shortcut strong{font-size:15px}.shortcut small{font-size:12px}.shortcut .squareIcon{width:44px;height:44px}.status{display:flex;min-height:290px}.statusDescription h2{font-size:20px}.row time{display:block}.rowCopy strong{font-size:14px}}
+@media(prefers-reduced-motion:reduce){.overview{animation:none}.workspace a,.workspace button{transition:none}}
+/* Keep the approved portrait crops proportional, and exclude the mockup's UI. */
+.greeting{container-type:inline-size}
+
+
+
+@media(max-width:1023px) and (min-width:601px){}
+@media(max-width:600px){}
+@media(min-width:1024px) and (min-height:820px){.workspace{padding:10vh 28px}}
+@media(min-width:1024px) and (max-height:819px){.workspace{padding:20px 24px}.mainColumn{grid-template-rows:190px minmax(250px,1fr)}.overview{gap:14px}.intro h1{font-size:32px}.intro p{font-size:17px}.rightColumn{grid-template-rows:repeat(3,68px) minmax(210px,1fr)}.shortcut{padding:10px}.topbar{margin-bottom:10px}}
+
+.greeting{container-type:size}
+
+@media(max-width:600px){.intro{position:relative;padding-right:0}.intro>div:first-child{flex:1;min-width:0}.intro h1{font-size:28px}.intro>button{width:90px;font-size:12px}.content>div>section{margin-bottom:16px}}
+.overview{min-height:0;flex:1}
+@media(min-width:1024px){.mainColumn{grid-template-rows:190px minmax(250px,1fr)}.rightColumn{grid-template-rows:repeat(3,68px) minmax(210px,1fr)}}
+
+/* Dedicated status artwork: no mockup UI or embedded labels. */
+.status{min-width:0;min-height:280px;display:flex;flex-direction:column}
+.statusArt{position:relative;flex:none;width:100%;aspect-ratio:2 / 1;overflow:hidden;background:#dededc url('/cara-status-desktop-v1.webp') center / cover no-repeat}
+.statusBadge{position:absolute;top:12px;left:12px;display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:7px 11px;border-radius:24px;background:#292929;color:white;font-size:11px;line-height:1.2}
+.statusBadge svg{width:14px;height:14px}
+.statusCopy{flex:1;min-height:150px;padding:16px 12px 12px;display:flex;flex-direction:column;justify-content:space-between;gap:20px}
+.statusDescription{min-width:0}.statusDescription>div{min-width:0}.status .wideButton{white-space:normal;text-align:center}
+@media(max-width:1023px) and (min-width:601px){.status{display:grid;grid-template-columns:1fr 1fr;min-height:210px}.statusArt{height:100%;aspect-ratio:auto;background-image:url('/cara-status-mobile-v1.webp')}.statusCopy{padding:20px;min-height:210px}}
+@media(max-width:600px){.status{display:flex;min-height:0}.statusArt{aspect-ratio:3 / 2;background-image:url('/cara-status-mobile-v1.webp')}.statusCopy{min-height:160px;padding:16px}.statusBadge{top:12px;left:12px}}
+
+/* Match the portrait to the live connection state. */
+.statusArt[data-connected=false]{background-image:url('/cara-status-desktop-v1.webp')}
+@media(min-width:1024px){.statusArt{flex:1;min-height:100px;aspect-ratio:auto;background-position:center 35%}.statusCopy{flex:none;min-height:150px}}
+@media(max-width:1023px){.statusArt[data-connected=false]{background-image:url('/cara-status-mobile-v1.webp')}}
+
+/* Compact page margins and four live metric tiles. */
+@media(min-width:1024px){.workspace{padding:24px;gap:22px}.summary{grid-template-columns:1.25fr 1.5fr}.metrics{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:12px}.metric{padding:12px;gap:10px}.metric .circleIcon{width:40px;height:40px}.metric .circleIcon svg{width:22px;height:22px}.metric>span:nth-child(2){font-size:12px}.metric strong{font-size:27px}.metric>.arrow{display:none}}
+@media(max-width:1023px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(95px,1fr));gap:10px}.mainColumn{grid-template-rows:auto auto}.summary{align-items:stretch}}
+@media(max-width:600px){.metrics{grid-template-rows:repeat(2,100px)}}
+
+/* Balance primary navigation between the brand and account controls. */
+.rail>.logo{flex-shrink:0;margin-bottom:0}
+.rail>nav{flex:1;justify-content:center;padding:24px 0}
+.railBottom{flex-shrink:0;margin-top:0}
+
+.healthCard{padding:16px;display:flex;flex-direction:column;gap:0;min-width:0;align-self:start}
+.healthHeader{display:flex;gap:10px;align-items:center;padding-bottom:16px}.healthHeader h2{font-size:18px;font-weight:550;letter-spacing:-.035em}.healthHeader p{font-size:12px;color:var(--muted);margin-top:3px}
+.healthRow{display:flex;align-items:center;gap:12px;padding:18px 0;border-top:1px solid #ddd;text-align:left;width:100%;color:#222;background:transparent}.healthRow:hover{background:#ffffff60}.healthRow>svg{width:21px;height:21px;flex-shrink:0}.healthRow>svg:last-child{margin-left:auto;width:16px;color:var(--muted)}
+.healthRowCopy{display:flex;flex-direction:column;gap:6px;min-width:0}.healthRowCopy strong{font-size:14px;font-weight:550}.healthRowCopy small{font-size:12px;color:var(--muted)}
+.healthState{display:inline-flex;align-items:center;gap:6px;font-size:12px;line-height:1.4;color:#686868}.healthState i{width:7px;height:7px;border-radius:50%;background:#888;flex:none}.healthState[data-state=operational]{color:#326c4d}.healthState[data-state=operational] i{background:#438d62}.healthState[data-state=maintenance],.healthState[data-state=degraded]{color:#946112}.healthState[data-state=maintenance] i,.healthState[data-state=degraded] i{background:#c58d28}.healthState[data-state=outage]{color:#aa3f3f}.healthState[data-state=outage] i{background:#bf4c4c}
+.healthFootnote{font-size:11px;line-height:1.5;color:var(--muted);border-top:1px solid #ddd;padding-top:12px}
+.serviceReports{display:flex;flex-direction:column;gap:0}.serviceReports li{padding:14px 0;border-bottom:1px solid #eee}.serviceReports li>div{display:flex;justify-content:space-between;gap:12px;align-items:center}.serviceReports a{font-size:14px;font-weight:550}.serviceReports p{font-size:12px;color:#707070;line-height:1.5;margin-top:5px}
+@media(max-width:1023px) and (min-width:601px){.healthCard{grid-column:1/-1}}
+
+/* Status tiles and editorial updates fill the overview's final column. */
+.cornerStack{display:flex;flex-direction:column;gap:12px;min-height:0}
+.statusTiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.statusTiles .healthRow{position:relative;flex-direction:column;align-items:flex-start;justify-content:center;gap:10px;border:1px solid #e8e8e6;border-radius:16px;background:#f3f3f1;padding:16px 12px;min-height:116px}
+.statusTiles .healthRow:hover{background:#eaeae7}.statusTiles .healthRow>svg:first-child{width:21px;height:21px}.statusTiles .healthRow>svg:last-child{position:absolute;top:18px;right:12px;width:15px;height:15px}.statusTiles .healthRowCopy{gap:5px}.statusTiles .healthRowCopy strong{font-size:13px;letter-spacing:-.02em}.statusTiles .healthState{font-size:11px}
+.updatesCard{position:relative;isolation:isolate;flex:1;min-height:250px;width:100%;overflow:hidden;display:flex;flex-direction:column;align-items:flex-start;text-align:left;border-radius:18px;padding:20px;background:#dddcd8;color:#242424}
+.updatesArt{position:absolute;inset:0;z-index:-2;background:url('/cara-status-mobile-v1.webp') 64% center / cover no-repeat;transition:transform .3s ease}
+.updatesCard:after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(235,234,230,.97) 0%,rgba(235,234,230,.90) 28%,rgba(235,234,230,.15) 72%)}
+.updatesCard:hover .updatesArt{transform:scale(1.025)}.updatesTag{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:550;background:#ffffffbd;padding:7px 10px;border-radius:24px}.updatesTag svg{width:12px;height:12px}
+.updatesCopy{display:flex;flex-direction:column;align-items:flex-start;gap:12px;margin-top:auto;padding-top:26px;max-width:64%}.updatesCopy>strong{font-size:26px;font-weight:550;letter-spacing:-.05em;line-height:1.08}.updatesCopy>span:not(.updatesCta){font-size:12px;line-height:1.5;max-width:150px;color:#555}.updatesCta{display:inline-flex;align-items:center;gap:14px;background:#292929;border-radius:24px;padding:10px 14px;font-size:12px;color:#fff}.updatesCta svg{width:15px;height:15px}
+.updateEntries{display:flex;flex-direction:column;gap:22px;margin-top:12px}.updateEntries article+article{border-top:1px solid #e5e5e5;padding-top:20px}.updateEntries h3{font-size:18px;font-weight:550;letter-spacing:-.025em}.updateEntries p{font-size:14px;line-height:1.65;color:#666;margin-top:8px}.updateEntries a,.updateEntries button{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:500;margin-top:12px}.updateEntries svg{width:15px;height:15px}.updateEyebrow{display:block;font-size:11px;color:#777;margin-bottom:12px}
+@media(max-width:1023px) and (min-width:601px){.cornerStack{grid-column:1/-1;display:grid;grid-template-columns:1fr 1.5fr}.statusTiles{grid-template-columns:1fr}.updatesCard{min-height:270px}}
+@media(max-width:600px){.cornerStack{gap:12px}.updatesCard{min-height:280px}.updatesCopy>strong{font-size:28px}}
+@media(prefers-reduced-motion:reduce){.updatesArt{transition:none}}
+.updatesArt{left:20%;background-position:65% center}
+@media(max-width:600px){.updatesCopy>strong{font-size:25px}.updatesCopy{max-width:58%}}
+
+/* One utility-card treatment across account and connection actions. */
+.shortcut,.statusTiles .healthRow{border:1px solid #e8e8e6;background:#f2f2f0;border-radius:16px;min-height:68px;padding:12px 14px;gap:12px}
+.shortcut:hover,.statusTiles .healthRow:hover{background:#e9e9e6}
+.shortcut .squareIcon,.statusTiles .squareIcon{width:38px;height:38px;border-radius:12px;background:#fff;border:1px solid #e7e7e4;display:grid;place-items:center;flex-shrink:0}
+.shortcut .squareIcon svg,.statusTiles .squareIcon svg{width:20px;height:20px;stroke-width:1.6}
+.shortcut strong,.statusTiles .healthRowCopy strong{font-size:13px;font-weight:550;letter-spacing:-.015em;line-height:1.35}
+.shortcut small,.statusTiles .healthState{font-size:11px;line-height:1.4;margin-top:0}
+.shortcut small{margin-top:4px}.shortcut>.arrow,.statusTiles .healthRow>svg:last-child{width:16px;height:16px;color:#858580}
+.statusTiles{grid-template-columns:1fr;gap:10px}
+.statusTiles .healthRow{flex-direction:row;align-items:center;justify-content:flex-start;text-align:left}
+.statusTiles .healthRowCopy{flex:1;gap:4px}
+.statusTiles .healthRow>svg:last-child{position:static;margin-left:auto}
+.updatesCard{background:#292929;color:#fff;min-height:250px;padding:22px;justify-content:flex-end}
+.updatesArt{inset:0 0 22% 8%;background-image:url('/cara-greeting-desktop-v2.webp');background-position:center 28%;background-size:cover;mask-image:linear-gradient(90deg,transparent,#000 32%);opacity:1}
+.updatesCard:after{background:linear-gradient(0deg,#292929 0%,#292929 24%,rgba(41,41,41,.9) 38%,rgba(41,41,41,.1) 72%)}
+.updatesCopy{position:relative;max-width:100%;width:100%;padding-top:80px;margin-top:0;gap:9px}
+.updatesCopy>strong{font-size:24px;font-weight:500;letter-spacing:-.04em;line-height:1.15;max-width:250px;text-wrap:balance}
+.updatesCopy>span:not(.updatesCta){max-width:240px;font-size:12px;line-height:1.5;color:#d0d0cd}
+.updatesCta{background:#fff;color:#292929;border:1px solid #fff;padding:9px 14px;margin-top:6px;gap:12px}
+@media(max-width:1023px) and (min-width:601px){.cornerStack{grid-template-columns:1fr 1.5fr}.statusTiles{align-content:start}.updatesCard{min-height:270px}}
+@media(max-width:600px){.updatesCard{min-height:300px;padding:22px}.updatesCopy{max-width:100%;padding-top:100px}.updatesCopy>strong{font-size:25px}}
+.updatesArt{background-position:center 12%}
+
+/* Purpose-made office greeting artwork with a compact playback layout. */
+.greeting{container-type:normal;position:relative;isolation:isolate;background:#292929;min-width:0}
+.greetingArt{position:absolute;inset:0;width:100%;height:100%;z-index:-2;background:url('/cara-greeting-office-desktop-v1.webp') center / cover no-repeat}
+.greetingCopy{position:relative;width:56%;height:100%;padding:20px 22px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:10px;background:linear-gradient(90deg,rgba(29,30,29,.84),rgba(29,30,29,.5) 72%,transparent)}
+.greeting h2{font-size:26px;letter-spacing:-.035em;line-height:1.08;font-weight:500;max-width:230px}
+.greeting p{font-size:13px;line-height:1.45;margin:0;max-width:190px;color:#e2e2df}
+.greeting .pill{margin-top:2px;min-height:36px;padding:8px 13px;gap:7px;font-size:12px;max-width:100%;white-space:nowrap;flex-shrink:0}
+@media(max-width:1199px) and (min-width:601px){.greetingCopy{padding:18px;width:60%}.greeting h2{font-size:24px}.greeting p{font-size:12px}}
+@media(max-width:600px){.greeting{height:220px;min-height:220px}.greetingArt{background-image:url('/cara-greeting-office-mobile-v1.webp')}.greetingCopy{width:60%;padding:18px;gap:10px}.greeting h2{font-size:24px}.greeting p{font-size:12px;max-width:150px}.greeting .pill{font-size:11px;padding:8px 11px;gap:6px}}
+/* Give Cara a little headroom in the shallow desktop greeting banner. */
+@media(min-width:1024px){.greetingArt{background-position:center top;transform:none;background-size:cover}}
+
+@media(min-width:1024px){.greetingArt{background-image:url('/cara-greeting-office-desktop-v2.webp');background-position:center top}}
+/* Updates uses its own standing portrait, separate from the greeting scene. */
+.updatesArt{inset:0;mask-image:none;background-image:url('/cara-updates-desktop-v1.webp');background-position:center 12%;background-size:cover}
+@media(max-width:600px){.updatesArt{background-image:url('/cara-updates-mobile-v1.webp');background-position:center 8%}}
+
+/* A connected conversation, with playback controls grouped below the scene. */
+.greetingArt{background-image:url('/cara-greeting-conversation-desktop-v1.webp');background-position:center top;transform:none;background-size:cover}
+.greetingCopy{position:absolute;inset:auto 0 0;width:100%;height:auto;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 14px;align-items:center;padding:20px 22px 18px;background:linear-gradient(0deg,rgba(24,26,25,.97),rgba(24,26,25,.85) 65%,transparent)}
+.greeting h2{grid-column:1;max-width:none;font-size:23px;line-height:1.15}.greeting p{grid-column:1;max-width:250px;font-size:12px}.greeting .pill{grid-column:2;grid-row:1 / 3;margin:0;align-self:center}
+@media(min-width:1024px){.greetingArt{background-image:url('/cara-greeting-conversation-desktop-v1.webp');background-position:center top}}
+@media(max-width:600px){.greeting{height:270px;min-height:270px}.greetingArt{background-image:url('/cara-greeting-conversation-mobile-v1.webp')}.greetingCopy{width:100%;padding:18px 16px;gap:7px 10px}.greeting h2{grid-column:1 / -1;font-size:23px}.greeting p{grid-column:1;max-width:180px;font-size:11px}.greeting .pill{grid-column:2;grid-row:2;min-height:36px;font-size:11px;padding:8px 10px}}
+
+/* Approved overview companion panel styling. */
+.cornerStack{flex:1;gap:20px;min-height:0}
+.connectionPanel{background:linear-gradient(125deg,#f2f3f4,#f0f1f2);padding:10px;border:1px solid #e3e5e8;border-radius:22px}
+.connectionHeading{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 7px 12px}.connectionHeading h2{font-size:20px;letter-spacing:-.035em;font-weight:500}.connectionHeading button{width:34px;height:34px;display:grid;place-items:center;border-radius:50%;border:1px solid #e0e1e5;background:white}.connectionHeading svg{width:16px;height:16px}
+.connectionPanel .statusTiles{display:flex;flex-direction:column;gap:0;border:1px solid #e5e6e8;border-radius:18px;background:#fff;padding:0 12px;overflow:hidden}
+.connectionPanel .healthRow{border:0;border-radius:0;background:white;padding:14px 0;min-height:62px;gap:10px}.connectionPanel .healthRow+.healthRow{border-top:1px solid #eee}.connectionPanel .healthRow .squareIcon{background:transparent;border:0;width:23px;height:23px}.connectionPanel .healthRow .squareIcon svg{width:20px;height:20px}.connectionPanel .healthRowCopy{flex:1;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:10px}.connectionPanel .healthRowCopy strong{font-size:12px;font-weight:400}.connectionPanel .healthState{font-size:11px}.connectionPanel .healthRow>svg:last-child{display:none}.connectionPanel .healthRow:hover{background:#fafafa}
+.cornerStack .updatesCard{border:8px solid #f2f3f4;outline:1px solid #e5e6e8;border-radius:22px;min-height:220px;padding:22px;background:#292929}.cornerStack .updatesArt{background-image:url('/cara-updates-desktop-v1.webp');background-position:center top}.cornerStack .updatesCopy{padding-top:70px;gap:0;max-width:68%}.cornerStack .updatesCopy>strong{font-size:26px;line-height:1.12;font-weight:500}.cornerStack .updatesCopy>span:not(.updatesCta){display:none}.cornerStack .updatesCta{margin-top:24px;width:38px;height:38px;padding:0;display:grid;place-items:center;font-size:0;gap:0;border-radius:50%}.cornerStack .updatesCta svg{width:18px;height:18px}
+@media(max-width:1199px){.connectionHeading h2{font-size:18px}.connectionPanel .healthRowCopy{align-items:flex-start;flex-direction:column;gap:4px}.cornerStack .updatesCopy>strong{font-size:23px}}
+@media(max-width:1023px) and (min-width:601px){.cornerStack{display:flex;grid-template-columns:none}.cornerStack .updatesCard{min-height:200px}}
+@media(max-width:600px){.connectionPanel .healthRowCopy{flex-direction:row;align-items:center}.connectionHeading h2{font-size:21px}.cornerStack .updatesCard{min-height:280px;flex:none}.cornerStack .updatesArt{background-image:url('/cara-updates-mobile-v1.webp')}.cornerStack .updatesCopy{max-width:65%}}
+@media(min-width:1024px){.connectionPanel .healthRow{min-height:52px;padding:10px 0}.connectionHeading{padding-bottom:8px;min-height:40px}.cornerStack .updatesCard{min-height:180px;padding:18px}.cornerStack .updatesCopy{padding-top:0}.cornerStack .updatesCopy>strong{font-size:24px}.cornerStack .updatesCta{margin-top:18px}}
+/* White brand navigation: fine architectural rules echo the marketing site. */
+.rail{background:#fff;color:#202020;border-radius:28px;border:1px solid #ededed;padding:20px 8px;box-shadow:none;scrollbar-color:#ddd transparent}
+.logo{width:48px}.logo img{filter:none}
+.rail>nav{gap:0;padding:26px 0}
+.rail .navItem{color:#292929;min-height:76px;border-radius:18px;font-size:10px;gap:6px;margin:5px 0}
+.rail .navItem svg{width:20px;height:20px;stroke-width:1.55}
+.rail nav .navItem:not(:last-child)::after{content:"";position:absolute;bottom:-6px;left:50%;width:22px;height:1px;transform:translateX(-50%);background:#ddd;pointer-events:none}
+.rail .navItem[data-active=true]{background:#ededed;color:#171717}
+.rail .navItem:hover{background:#f3f3f3;color:#171717}
+.rail .navItem:focus-visible{outline:2px solid #626262;outline-offset:2px}
+.railBottom:before{background:#ddd;width:22px}
+.rail .navBadge{background:#292929;color:#fff;top:5px;right:4px;font-size:9px}
+.rail .avatar{background:linear-gradient(130deg,#f0f0f0,#dedede);border:1px solid #d5d5d5;color:#292929;font-size:16px;width:44px;height:44px}
+@media(min-width:1024px) and (max-height:800px){.rail .navItem{min-height:62px;margin:4px 0}.rail>nav{padding:16px 0}.rail{padding-top:16px;padding-bottom:12px}.rail .railBottom .navItem{min-height:50px}}
+@media(prefers-reduced-motion:no-preference){.rail .navItem{transition:background .18s ease,color .18s ease}}
+.rail .logo img{filter:brightness(0)}
+/* Navigation-only design stage; page implementations remain intact. */
+.rail{background:transparent;border:0;border-radius:0;box-shadow:none}
+.rail .navItem>span,.rail .navBadge{display:none}
+.rail .navItem{min-height:58px;gap:0;margin:6px 0}
+.rail .navItem svg{width:22px;height:22px}
+.rail .railBottom .navItem{min-height:48px}
+.main{visibility:hidden;pointer-events:none}
+@media(max-width:1023px){.workspace{display:flex;padding:16px;gap:0}.rail{display:flex;width:64px;min-height:calc(100dvh - 32px);padding:16px 5px}.main{display:none}.rail>nav{padding:20px 0;justify-content:center}.rail .navItem{min-height:48px;margin:5px 0}.rail .logo{width:42px}.rail .avatar{width:38px;height:38px;font-size:14px}}
+/* Compact visual selection while preserving the full navigation hit area. */
+.rail .navItem[data-active=true],.rail .navItem:hover{background:transparent}
+.rail .navItem::before{content:"";position:absolute;left:50%;top:50%;width:42px;height:42px;transform:translate(-50%,-50%);border-radius:13px;pointer-events:none;z-index:0}
+.rail .navItem[data-active=true]::before{background:#ededed}
+.rail .navItem:hover::before{background:#f3f3f3}
+.rail .navItem svg{position:relative;z-index:1}
+
+/* Show the new wireframe workspace while retaining the icon-only navigation. */
+.main{visibility:visible;pointer-events:auto;display:flex}.topbar{display:none}.content{overflow:auto}.workspace{gap:12px;padding:18px 20px}.rail{flex-shrink:0}
+@media(max-width:1023px){.workspace{display:flex;gap:12px;padding:16px}.main{display:flex;min-width:0;min-height:0}.rail{position:sticky;top:0;align-self:flex-start;height:calc(100dvh - 32px);min-height:0}.content{overflow:visible}}
+@media(max-width:600px){.workspace{gap:8px;padding:12px 10px;overflow:auto}.rail{width:48px;padding:10px 2px;height:calc(100dvh - 24px)}.rail .logo{width:35px}.rail .navItem{min-height:44px;margin:5px 0}.rail .navItem::before{width:36px;height:36px;border-radius:11px}.rail .navItem svg{width:19px;height:19px}.rail .avatar{width:32px;height:32px;font-size:12px}.rail>nav{padding:16px 0}.railBottom{gap:5px;padding-top:8px}}
+/* Balance the navigation's optical weight with the adjacent content grid. */
+.rail{width:68px;padding:10px 5px;align-self:stretch}
+.rail .logo{width:40px}
+.rail>nav{flex:none;margin-block:auto;padding:20px 0;gap:0}
+.rail .navItem{min-height:48px;margin:4px 0;border-radius:12px}
+.rail .navItem svg{width:21px;height:21px;stroke-width:1.85}
+.rail .navItem::before{width:38px;height:38px;border-radius:12px}
+.rail .navItem[data-active=true]::before{background:#ededee}
+.rail nav .navItem:not(:last-child)::after{width:18px;bottom:-5px;background:#e6e6e6}
+.railBottom{margin-top:0;padding-top:0;gap:8px}
+.railBottom:before{width:18px;background:#e6e6e6}
+.rail .railBottom .navItem{min-height:40px;margin:4px 0}
+.rail .avatar{width:36px;height:36px;font-size:13px;background:#ededed;border:1px solid #dedede}
+@media(max-width:1023px){.rail{width:56px;padding:8px 3px;align-self:flex-start}.rail .logo{width:36px}.rail>nav{margin-block:auto;padding:16px 0}.rail .navItem{min-height:46px;margin:3px 0}}
+@media(max-width:600px){.rail{width:44px;padding:8px 1px}.rail .logo{width:32px}.rail .navItem{min-height:42px;margin:3px 0}.rail .navItem svg{width:19px;height:19px;stroke-width:1.85}.rail .navItem::before{width:34px;height:34px;border-radius:11px}.rail .avatar{width:30px;height:30px;font-size:11px}}
+/* Equal-size black navigation marks with more separation from the workspace. */
+.workspace{gap:30px}
+.rail .navItem{color:#000;min-height:56px}
+.rail .navItem svg{width:40px;height:40px;stroke:#000;stroke-width:1.6}
+.rail .logo img{filter:brightness(0)}
+.rail .navItem::before{width:48px;height:48px;border-radius:14px}
+.rail nav .navItem:not(:last-child)::after{bottom:-5px}
+.rail .railBottom .navItem{min-height:50px}
+@media(max-width:1023px){.workspace{gap:22px}.rail .navItem svg{width:36px;height:36px}.rail .navItem{min-height:52px}.rail .navItem::before{width:44px;height:44px}}
+@media(max-width:600px){.workspace{gap:16px}.rail .navItem svg{width:32px;height:32px}.rail .navItem{min-height:48px}.rail .navItem::before{width:40px;height:40px}.rail .railBottom .navItem{min-height:44px}}
+.rail .navItem svg{stroke-width:1.15}
+.rail .navItem{color:#626262}
+.rail .navItem svg{stroke:#626262}
+/* Restore balanced icon proportions rather than enlarging thin outlines. */
+.rail .navItem svg{width:26px;height:26px;stroke:#626262;stroke-width:1.65}
+.rail .navItem::before{width:40px;height:40px;border-radius:12px}
+@media(max-width:600px){.rail .navItem svg{width:23px;height:23px;stroke-width:1.65}.rail .navItem::before{width:36px;height:36px;border-radius:11px}}
+.mobileBrandBar{display:none}
+@media(max-width:600px){.workspace{display:block;padding:12px 14px;overflow:auto}.rail{display:none}.main{display:flex;width:100%;min-height:0}.mobileBrandBar{display:flex;align-items:center;gap:12px;margin-bottom:16px;min-height:42px}.mobileBrandBar>a{flex:none}.mobileBrandBar img{filter:brightness(0)}.mobileBrandBar>span{flex:1;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#626262}.mobileBrandBar>button{width:42px;height:42px;display:grid;place-items:center;border:1px solid #e6e6e6;border-radius:50%;background:white}.mobileBrandBar svg{width:21px;height:21px;stroke-width:1.5}.mobileLinks .navItem{display:flex;flex-direction:row;justify-content:flex-start;color:#292929;min-height:48px}.mobileLinks .navItem>span{display:block}.mobileLinks .navItem svg{width:22px;height:22px}.mobileLinks .navItem[data-active=true]{background:#eee}.menuDialog{max-height:85dvh;overflow:auto}}
+/* Fitted connection controls, sharing the overview's surface treatment. */
+.compactStatus{height:100%;min-height:0;display:block}
+.compactStatus .connectionHeading,.compactStatus .updatesCard{display:none}
+.compactStatus .connectionPanel{padding:0;border:0;background:none;height:100%}
+.compactStatus .connectionPanel .statusTiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:0;background:none;border:0;border-radius:0;height:100%}
+.compactStatus .connectionPanel .healthRow{border:1px solid #e2e2e2;border-radius:17px;background:linear-gradient(125deg,#f1f1f1,#e0e1e2);padding:10px 12px;min-height:58px;gap:10px}
+.compactStatus .connectionPanel .healthRow+.healthRow{border:1px solid #e2e2e2}
+.compactStatus .connectionPanel .healthRowCopy{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.compactStatus .connectionPanel .healthRowCopy strong{font-size:11px;font-weight:500}
+.compactStatus .connectionPanel .healthState{font-size:10px}
+.compactStatus .connectionPanel .squareIcon{flex-shrink:0}
+@media(min-width:851px){.rail{position:sticky;top:0;height:calc(100dvh - 36px);max-height:calc(100dvh - 36px);display:flex;flex-direction:column}.rail>nav{position:absolute;top:50%;left:5px;right:5px;transform:translateY(-50%);margin:0;padding:0}.railBottom{margin-top:auto}.rail .navItem svg{width:24px;height:24px;stroke-width:1.55;stroke:#666}.rail .navItem{min-height:54px;margin:6px 0}.rail .navItem::before{width:40px;height:40px}}
+@media(min-width:851px){
+.compactStatus .connectionPanel .statusTiles{gap:10px;overflow:visible}
+.compactStatus .connectionPanel .healthRow{height:100%;min-height:0;padding:12px 10px;border-radius:16px;gap:8px}
+.compactStatus .connectionPanel .healthRowCopy strong{font-size:12px}.compactStatus .connectionPanel .healthState{font-size:11px}.compactStatus .connectionPanel .squareIcon{width:19px;height:19px}.compactStatus .connectionPanel .squareIcon svg{width:19px;height:19px}
+.rail{overflow:visible}.rail>nav{top:50%;transform:translateY(-50%)}
+}
+@media(min-width:851px){.compactStatus .connectionPanel .healthRow{background:#f3f3f3;border:0;padding:8px 10px;border-radius:12px}.compactStatus .connectionPanel .healthRow+.healthRow{border:0}.compactStatus .connectionPanel .healthRowCopy strong{font-size:11px;font-weight:400}.compactStatus .connectionPanel .healthState{font-size:10px}}
+.signalBars{display:flex;align-items:flex-end;gap:3px;height:30px;flex:none;margin-left:auto;color:#aaa}
+.signalBars i{display:block;width:5px;background:currentColor;opacity:.2;border-radius:2px}
+.signalBars i:nth-child(1){height:20%}.signalBars i:nth-child(2){height:40%}.signalBars i:nth-child(3){height:60%}.signalBars i:nth-child(4){height:80%}.signalBars i:nth-child(5){height:100%}
+.signalBars[data-state=operational]{color:#31a66a}.signalBars[data-state=operational] i{opacity:1}
+.signalBars[data-state=maintenance],.signalBars[data-state=degraded]{color:#d28a23}.signalBars[data-state=maintenance] i:nth-child(-n+3),.signalBars[data-state=degraded] i:nth-child(-n+3){opacity:1}
+.signalBars[data-state=outage]{color:#d84d4d}.signalBars[data-state=outage] i:first-child{opacity:1}
+.compactStatus .connectionPanel .healthRowCopy{flex:1;min-width:0}
+@media(min-width:851px){.compactStatus .connectionPanel .healthRow{padding:10px 14px;gap:9px}.compactStatus .signalBars{height:32px}.compactStatus .signalBars i{width:6px}}
+@media(max-width:1100px){.compactStatus .connectionPanel .healthRow .squareIcon{display:none}.compactStatus .signalBars{gap:2px}.compactStatus .signalBars i{width:4px}}
+/* Matte status controls match the overview cards on every screen. */
+.compactStatus .connectionPanel .healthRow{background:#e9e9e9;border:0;border-radius:15px;padding:12px;gap:9px}
+.compactStatus .connectionPanel .healthRow+.healthRow{border:0}
+.compactStatus .connectionPanel .healthRowCopy strong{font-size:12px;font-weight:500}
+.compactStatus .connectionPanel .healthState{font-size:10px}
+.compactStatus .connectionPanel .statusTiles{gap:10px}
+.compactStatus .connectionPanel .squareIcon{display:grid;width:20px;height:20px}
+.compactStatus .connectionPanel .squareIcon svg{width:20px;height:20px}
+.compactStatus .signalBars{height:30px}
+.compactStatus .signalBars i{width:5px}
+@media(max-width:600px){.compactStatus .connectionPanel .healthRow{padding:11px 10px;gap:7px}.compactStatus .connectionPanel .squareIcon{display:none}.compactStatus .connectionPanel .healthRowCopy strong{font-size:11px}.compactStatus .signalBars{gap:2px;height:27px}.compactStatus .signalBars i{width:4px}.mobileBrandBar img{width:34px;height:40px;object-fit:contain}.workspace{padding-bottom:max(16px,env(safe-area-inset-bottom))}}
+@media(min-width:601px){.rail .logo img{width:40px;height:48px;object-fit:contain}.workspace{gap:22px}}
+.rail .logo img,.mobileBrandBar img{height:auto;object-fit:contain}
+/* Give the dashboard a little more breathing room at the window edges. */
+@media(min-width:851px){.workspace{padding:28px 30px}.rail{height:calc(100dvh - 56px);max-height:calc(100dvh - 56px)}}
+@media(min-width:601px) and (max-width:850px){.workspace{padding:22px}}
+@media(max-width:600px){.workspace{padding:20px 18px max(20px,env(safe-area-inset-bottom))}}
+/* One shared centre line for the brand, navigation and account controls. */
+@media(min-width:601px){
+.rail{position:relative;align-items:center}
+.rail .logo{display:flex;align-items:center;justify-content:center;width:100%;margin-inline:0;flex:none}
+.rail .logo img{display:block;width:40px;height:auto}
+.rail>nav{position:absolute;left:0;right:0;top:50%;width:100%;transform:translateY(-50%);margin:0;padding:0;align-items:center}
+.rail>nav .navItem{width:100%;margin-inline:0;align-items:center;justify-content:center;padding-inline:0}
+.railBottom{width:100%;align-items:center}
+.railBottom .navItem{width:100%;padding-inline:0}
+}
+
+.mobileBrandBar{justify-content:space-between}
+/* Consistent feedback for navigation, menus and connection controls. */
+.rail .navItem::before{transition:background-color .18s ease,transform .2s cubic-bezier(.22,1,.36,1)}
+.rail .navItem svg,.mobileBrandBar>button svg{transition:transform .2s cubic-bezier(.22,1,.36,1),stroke .18s ease}
+.rail .avatar,.mobileBrandBar>button,.compactStatus .connectionPanel .healthRow,.wideButton,.mobileLinks .navItem{transition:background-color .18s ease,transform .18s cubic-bezier(.22,1,.36,1),box-shadow .18s ease}
+.compactStatus .signalBars i{transition:opacity .25s ease,background-color .25s ease}
+.mobileBrandBar>button:active,.rail .avatar:active,.wideButton:active{transform:scale(.95)}
+.compactStatus .connectionPanel .healthRow:active,.mobileLinks .navItem:active{transform:scale(.985)}
+@media(hover:hover) and (pointer:fine){
+.rail .navItem:hover svg{transform:translateY(-1px);stroke:#222}
+.rail .navItem:active svg{transform:scale(.93)}
+.rail .avatar:hover,.mobileBrandBar>button:hover{background:#e9e9e9;box-shadow:0 2px 6px #00000008}
+.compactStatus .connectionPanel .healthRow:hover{background:#dfdfdf;transform:translateY(-1px)}
+.wideButton:hover{transform:translateY(-1px)}
+}
+@media(prefers-reduced-motion:reduce){
+.rail .navItem::before,.rail .navItem svg,.mobileBrandBar>button svg,.rail .avatar,.mobileBrandBar>button,.compactStatus .connectionPanel .healthRow,.wideButton,.mobileLinks .navItem,.compactStatus .signalBars i{transition:none}
+.rail .navItem:hover svg,.rail .navItem:active svg,.rail .avatar:active,.mobileBrandBar>button:active,.wideButton:active,.wideButton:hover,.compactStatus .connectionPanel .healthRow:hover,.compactStatus .connectionPanel .healthRow:active,.mobileLinks .navItem:active{transform:none}
+}
+
+/* Centre the desktop composition and its navigation on a shared rail. */
+@media(min-width:851px){
+.workspace{--desktop-side-padding:max(30px,calc((100vw - 1600px)/2));padding:36px var(--desktop-side-padding);gap:22px}
+.rail{height:min(820px,calc(100dvh - 72px));max-height:none;min-height:740px;display:grid;grid-template-rows:64px minmax(0,1fr) 112px;padding:0;justify-items:center;align-items:center}
+.rail .logo{margin:0;align-self:start;padding-top:8px}
+.rail>nav{position:static;transform:none;align-self:center;width:100%;margin:0;padding:0}
+.rail .navItem{min-height:48px;margin:5px 0}
+.rail .navItem svg{width:22px;height:22px}
+.railBottom{margin:0;padding:0;align-self:end}
+}
+
+/* Keep the workspace frame stable across pages and loading states. */
+@media(min-width:851px){
+.workspace{padding-block:max(36px,calc((100dvh - 820px)/2))}
+}
+
+/* Centre the rail in the full space between the window edge and content. */
+@media(min-width:851px){.rail{left:calc((22px - var(--desktop-side-padding))/2)}}
+
+/* Slightly larger brand and navigation, retaining the shared centre line. */
+@media(min-width:601px){.rail .logo img{width:44px}.rail .navItem svg{width:25px;height:25px}}
+
+/* Compact charcoal connection cards. Text and indicators use the live status. */
+.compactStatus .connectionPanel .healthRow{position:relative;overflow:hidden;background:radial-gradient(ellipse at 100% 100%,#414242 0%,#2b2c2c 48%,#222323 100%);color:#f5f5f5;padding:12px 14px;border:1px solid #ffffff0b;border-radius:16px;gap:10px;isolation:isolate}
+.compactStatus .connectionPanel .healthRowCopy{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.compactStatus .connectionPanel .healthRowCopy strong{font-size:12px;font-weight:500;color:#f5f5f5;line-height:1.2}
+.compactStatus .connectionPanel .healthRowCopy small{font-size:10px;line-height:1.3;color:#b5b7b7}
+.compactStatus .connectionPanel .healthState{font-size:10px;color:#b5b7b7;line-height:1.2}
+.compactStatus .connectionPanel .healthState[data-state=maintenance],.compactStatus .connectionPanel .healthState[data-state=degraded]{color:#e5a544}
+.compactStatus .connectionPanel .healthState[data-state=operational]{color:#6bd49a}
+.compactStatus .connectionPanel .healthState[data-state=outage]{color:#f07d7d}
+.compactStatus .connectionPanel .squareIcon{display:none}
+.compactStatus .connectionPanel .healthRow>svg:last-child{display:block;position:absolute;right:12px;top:10px;width:13px;height:13px;color:#b7baba;transform:rotate(-45deg)}
+.compactStatus .signalBars{height:32px;gap:3px;align-self:flex-end;margin-bottom:1px;color:#909595}
+.compactStatus .signalBars i{width:5px}
+.compactStatus .connectionPanel .healthRow:hover{background:radial-gradient(ellipse at 100% 100%,#4b4d4d 0%,#333535 48%,#292a2a 100%)}
+.compactStatus .connectionPanel .healthRow:focus-visible{outline:2px solid #777;outline-offset:3px}
+@media(max-width:600px){.compactStatus .connectionPanel .healthRow{padding:12px 10px;gap:6px}.compactStatus .connectionPanel .healthRowCopy strong{font-size:11px}.compactStatus .connectionPanel .healthRowCopy small{font-size:9px;max-width:115px}.compactStatus .signalBars{gap:2px;height:28px}.compactStatus .signalBars i{width:4px}}
+
+/* Equal two-line status cards. */
+.compactStatus .connectionPanel .statusTiles{align-items:stretch}
+.compactStatus .connectionPanel .healthRow{height:100%;min-height:72px;padding:14px;align-items:center}
+.compactStatus .connectionPanel .healthRowCopy{gap:6px;justify-content:center}
+.compactStatus .connectionPanel .healthRowCopy strong{font-size:12px;line-height:1.25}
+.compactStatus .connectionPanel .healthState{font-size:10px;line-height:1.25}
+.compactStatus .signalBars{align-self:center;margin-bottom:0}
+@media(max-width:600px){.compactStatus .connectionPanel .healthRow{padding:12px 10px}.compactStatus .connectionPanel .healthRowCopy strong{font-size:11px}}
+
+/* Keep the navigation affordance separate from the live status indicator. */
+.compactStatus .connectionPanel .healthRow{display:grid;grid-template-columns:minmax(0,1fr) 28px;grid-template-rows:auto auto;gap:7px 8px;align-content:center;min-height:86px}
+.compactStatus .connectionPanel .healthRowCopy{display:contents}
+.compactStatus .connectionPanel .healthRowCopy strong{grid-column:1;grid-row:1;align-self:center}
+.compactStatus .connectionPanel .healthState{grid-column:1;grid-row:2;align-self:center}
+.compactStatus .connectionPanel .healthRow>svg:last-child{position:static;grid-column:2;grid-row:1;box-sizing:border-box;width:26px;height:26px;padding:6px;border-radius:50%;background:#ffffff0a;color:#d4d6d6;justify-self:center;transform:rotate(-45deg);transition:background-color .18s ease,color .18s ease}
+.compactStatus .signalBars{grid-column:2;grid-row:2;height:20px;gap:2px;margin:0;justify-self:center;align-self:center}
+.compactStatus .signalBars i{width:4px}
+@media(hover:hover){.compactStatus .connectionPanel .healthRow:hover>svg:last-child{background:#fff;color:#222}}
+@media(prefers-reduced-motion:reduce){.compactStatus .connectionPanel .healthRow>svg:last-child{transition:none}}
+
+/* Group navigation with the title; reserve the right edge for status bars. */
+.compactStatus .connectionPanel .healthRow{grid-template-columns:minmax(0,max-content) 24px minmax(20px,1fr);column-gap:7px}
+.compactStatus .connectionPanel .healthRowCopy strong{grid-column:1;grid-row:1}
+.compactStatus .connectionPanel .healthRow>svg:last-child{grid-column:2;grid-row:1;width:23px;height:23px;padding:5px}
+.compactStatus .connectionPanel .healthState{grid-column:1/3;grid-row:2}
+.compactStatus .signalBars{grid-column:3;grid-row:1/3;justify-self:end;height:29px;align-self:center}
+@media(max-width:600px){.compactStatus .connectionPanel .healthRow{column-gap:4px}.compactStatus .signalBars{height:25px}.compactStatus .connectionPanel .healthRow>svg:last-child{width:21px;height:21px;padding:5px}}
+
+/* Balanced labels and a more legible status graphic. */
+@media(min-width:851px){.compactStatus .signalBars{height:44px;gap:4px}.compactStatus .signalBars i{width:7px}}
+@media(max-width:850px){.compactStatus .connectionPanel .healthRow{grid-template-rows:repeat(2,minmax(23px,auto));align-content:center}.compactStatus .signalBars{grid-row:1/-1;align-self:center;justify-self:center;height:32px;margin:0}.compactStatus .signalBars i{width:4px}}
+
+.compactStatus .connectionPanel .healthState{min-width:12ch;white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* Fixed proportions and status colour for both connection indicators. */
+.compactStatus .signalBars{justify-self:center;align-self:center;flex:none;width:max-content;min-width:0;max-width:none;height:38px;gap:3px;color:#e5a544}
+.compactStatus .signalBars i{flex:none;width:6px;opacity:1}
+.compactStatus .signalBars[data-state=operational]{color:#6bd49a}
+.compactStatus .signalBars[data-state=maintenance],.compactStatus .signalBars[data-state=degraded],.compactStatus .signalBars[data-state=unknown]{color:#e5a544}
+.compactStatus .signalBars[data-state=outage]{color:#f07d7d}
+@media(min-width:851px){.compactStatus .signalBars{height:42px;gap:4px}.compactStatus .signalBars i{width:7px}}
+@media(max-width:850px){.compactStatus .signalBars{height:28px;gap:3px;width:32px;justify-content:center}.compactStatus .signalBars i{width:4px}}
+
+/* Status levels: attention at midpoint, outage low, healthy full. */
+.compactStatus .signalBars i{opacity:.16}
+.compactStatus .signalBars[data-state=operational] i{opacity:1}
+.compactStatus .signalBars[data-state=maintenance] i:nth-child(-n+3),
+.compactStatus .signalBars[data-state=degraded] i:nth-child(-n+3),
+.compactStatus .signalBars[data-state=unknown] i:nth-child(-n+3){opacity:1}
+.compactStatus .signalBars[data-state=outage] i:first-child{opacity:1}
+.compactStatus .connectionPanel .healthState[data-state=unknown]{color:#e5a544}
+
+.compactStatus .connectionPanel .healthState[data-state] i{background:currentColor}
+
+.compactStatus .connectionPanel .healthState[data-state=setup]{color:#f07d7d}
+.setupIndicator{grid-column:3;grid-row:1/-1;align-self:center;justify-self:center;position:relative;display:block;width:38px;height:38px;color:#a8b4f0}
+.setupIndicator>svg:first-child{width:30px;height:30px;position:absolute;left:0;bottom:0;stroke-width:1.5}
+.setupIndicator>svg:last-child{width:17px;height:17px;position:absolute;right:0;top:0;stroke-width:1.7;background:#303131;border-radius:50%}
+@media(max-width:850px){.setupIndicator{width:30px;height:30px}.setupIndicator>svg:first-child{width:24px;height:24px}.setupIndicator>svg:last-child{width:14px;height:14px}}
+
+/* Mobile pages fill the screen; only the brand bar retains outer insets. */
+@media(max-width:600px){
+ .workspace{padding-inline:0;padding-bottom:env(safe-area-inset-bottom,0px)}
+ .mobileBrandBar{margin-inline:18px}
+}
+@media(max-width:850px){
+ .workspace:has([data-dashboard-calls]){overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
+ .workspace:has([data-dashboard-calls]) .main{height:auto;min-height:0}
+ .workspace:has([data-dashboard-calls]) .content{overflow:visible;flex:none}
+}

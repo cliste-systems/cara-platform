@@ -99,7 +99,7 @@ function voiceSecretNotConfigured() {
     {
       ok: false,
       error:
-        "Set CLISTE_VOICE_WEBHOOK_SECRET in .env.local (same value in your voice worker).",
+        "Voice service is temporarily unavailable.",
     },
     { status: 503 },
   );
@@ -328,6 +328,12 @@ export async function POST(request: Request) {
       { status: 403 },
     );
   }
+
+  // Runs for retries too: a saved call or Stripe timeout must not lose activation.
+  after(async()=>{
+    try {const {checkPhoneConnection}=await import('@/lib/phone-connection-server');await checkPhoneConnection(orgId);}
+    catch(error){await captureObservedError(error,{route:'voice/connection-check',orgId});}
+  });
 
   const knowledgeGaps = parseKnowledgeGaps(body);
 
@@ -850,11 +856,13 @@ async function respondIdempotentCallComplete(input: {
       .is("caller_data_erased_at", null);
     if (patchErr) {
       console.warn("[voice/call-complete] idempotent enrichment patch", patchErr.message);
+      return NextResponse.json({ ok: false, error: "Call enrichment could not be saved. Please retry." }, { status: 503 });
     }
   }
 
   if (
     shouldRunCallCompleteSideEffects(input.outcome) &&
+    !input.callerDataErased &&
     input.knowledgeGaps.length > 0 &&
     input.body.is_test_call !== true &&
     input.body.engineer_test_call !== true

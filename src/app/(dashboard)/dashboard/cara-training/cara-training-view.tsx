@@ -1,4 +1,6 @@
 "use client";
+import { FormFeedback } from "@/components/ui/form-feedback";
+import {detectCanonicalQuestion} from "@/lib/answers-boundary";
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -383,6 +385,7 @@ export function CaraTrainingView({
   );
 
   const selectItem = (id: string) => {
+    setMobileDetailOpen(true);
     setSelectedId(id);
     setMobileDetailOpen(true);
   };
@@ -586,7 +589,7 @@ export function CaraTrainingView({
     <div
       className={cn(
         "flex h-full min-h-0 flex-col overflow-hidden border-[#e2e8e4] bg-[#f8f9fa] max-xl:border-b xl:border-r",
-        mobileDetailOpen && "max-xl:hidden",
+        mobileDetailOpen && "max-lg:hidden",
       )}
     >
       {!embedded ? (
@@ -686,7 +689,7 @@ export function CaraTrainingView({
     <div
       className={cn(
         "flex h-full min-h-0 flex-col overflow-hidden bg-white",
-        !mobileDetailOpen && "max-xl:hidden",
+        !mobileDetailOpen && "max-lg:hidden",
       )}
     >
       <TrainingDetailWorkspace
@@ -715,7 +718,7 @@ export function CaraTrainingView({
   );
 
   const queuePanel = (
-    <ListDetailLayout
+    <ListDetailLayout hideDetail={!selected} mobileDetailOpen={mobileDetailOpen}
       className="min-h-0 flex-1 gap-0 xl:grid-cols-[minmax(300px,340px)_minmax(0,1fr)]"
       list={listPanel}
       detail={detailPanel}
@@ -893,9 +896,7 @@ function TrainingAnswerActionsFooter({
   return (
     <div className="shrink-0 border-t border-[#e2e8e4] bg-white px-4 py-3 sm:px-6">
       {error ? (
-        <p className="mb-2 text-[13px] text-red-600" role="alert">
-          {error}
-        </p>
+        <FormFeedback message={error} />
       ) : null}
       <div className="flex w-full flex-col gap-2">
         <Button
@@ -1049,6 +1050,7 @@ function TrainingDetailWorkspace({
   const isAwaiting = item.status === "awaiting_answer";
   const excerpt = trainingSourceExcerpt(item);
   const question = trainingDisplayQuestion(item);
+  const canonical = detectCanonicalQuestion(question);
   const deferred = trainingItemIsDeferred(item);
   const callViewHref = trainingItemCallHref(item.call_log_id);
 
@@ -1113,6 +1115,8 @@ function TrainingDetailWorkspace({
           />
         ) : null}
 
+        {canonical && (isAwaiting || isDraft) ? <a href={canonical.setupHref} className="mb-3 block shrink-0 rounded-xl border border-[#d9e2dd] bg-white p-4 text-sm leading-6">Keep this answer consistent with your saved business details. <span className="font-semibold no-underline">Update {canonical.setupLabel} →</span></a> : null}
+
         {isApplied && previewPatch ? (
           <CaraTrainingPatchPreview lines={patchPreviewLines(previewPatch)} applied />
         ) : null}
@@ -1150,9 +1154,7 @@ function TrainingDetailWorkspace({
         ) : null}
 
         {error && !(isAwaiting && canManage) ? (
-          <p className="text-[13px] text-red-600" role="alert">
-            {error}
-          </p>
+          <FormFeedback message={error} />
         ) : null}
 
         {!canManage ? (

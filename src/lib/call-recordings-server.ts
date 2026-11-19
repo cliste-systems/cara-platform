@@ -7,6 +7,8 @@ import {
 } from "@/lib/call-recordings";
 import { createAdminClient } from "@/utils/supabase/admin";
 
+import { CALL_MEDIA_RETENTION_MS } from "@/lib/call-media-retention";
+
 const SIGNED_URL_TTL_SECONDS = 300;
 
 export async function createCallRecordingSignedUrl(input: {
@@ -27,6 +29,8 @@ export async function createCallRecordingSignedUrl(input: {
     .eq("id", input.callLogId)
     .eq("organization_id", input.organizationId)
     .eq("audio_storage_path", input.storagePath)
+    .is("caller_data_erased_at", null)
+    .gt("created_at", new Date(Date.now() - CALL_MEDIA_RETENTION_MS).toISOString())
     .maybeSingle();
 
   if (rowError || !row?.id) return null;
@@ -46,16 +50,17 @@ export async function deleteCallRecordingObjects(
   if (paths.length === 0) return 0;
 
   const admin = createAdminClient();
-  const { data, error } = await admin.storage
-    .from(CALL_RECORDINGS_BUCKET)
-    .remove(paths);
-
-  if (error) {
-    console.error("[call-recordings] storage remove failed", error.message);
-    return 0;
+  let deleted = 0;
+  for (let offset = 0; offset < paths.length; offset += 100) {
+    const batch = paths.slice(offset, offset + 100);
+    const { error } = await admin.storage.from(CALL_RECORDINGS_BUCKET).remove(batch);
+    if (error) {
+      console.error("[call-recordings] storage remove failed", error.message);
+      throw new Error("Recording deletion failed. Please retry.");
+    }
+    deleted += batch.length;
   }
-
-  return data?.length ?? paths.length;
+  return deleted;
 }
 
 export async function uploadCallRecordingFromWorker(input: {
@@ -83,14 +88,21 @@ export async function uploadCallRecordingFromWorker(input: {
     return false;
   }
 
-  const { error: patchError } = await admin
+  const { data: patched, error: patchError } = await admin
     .from("call_logs")
     .update({ audio_storage_path: input.storagePath })
     .eq("id", input.callLogId)
-    .eq("organization_id", input.organizationId);
+    .eq("organization_id", input.organizationId)
+    .is("caller_data_erased_at", null)
+    .select("id");
 
-  if (patchError) {
-    console.error("[call-recordings] call_logs patch failed", patchError.message);
+  if (patchError || !patched?.length) {
+    const { error: cleanupError } = await admin.storage.from(CALL_RECORDINGS_BUCKET).remove([input.storagePath]);
+    if (cleanupError) {
+      const { error: queueError } = await admin.from("call_recording_cleanup").upsert({storage_path:input.storagePath,organization_id:input.organizationId},{onConflict:"storage_path",ignoreDuplicates:true});
+      if (queueError) console.error("[call-recordings] CRITICAL cleanup could not be queued");
+    }
+    console.error("[call-recordings] call_logs patch failed", patchError?.message ?? "Call erased or unavailable");
     return false;
   }
 

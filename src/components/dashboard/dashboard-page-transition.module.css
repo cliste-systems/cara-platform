@@ -1,0 +1,4 @@
+/* A short app-style content shift; the rail and panel dimensions stay fixed. */
+:global(.cara-workspace) .frame{opacity:1!important;transform:none!important;animation:workspacePageEnter .32s cubic-bezier(.22,1,.36,1) both}
+@keyframes workspacePageEnter{from{translate:12px 0}to{translate:0 0}}
+@media(prefers-reduced-motion:reduce){:global(.cara-workspace) .frame{animation:none}}

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { processPendingCallAnalyses } from "@/lib/call-analysis-server";
 import { captureObservedError } from "@/lib/observability";
@@ -19,6 +19,8 @@ async function run(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  after(async()=>{try{const {retryConnectedTrials}=await import('@/lib/phone-connection-server');await retryConnectedTrials();}catch(error){await captureObservedError(error,{route:'cron/connection-trial-retry'});}});
+  after(async()=>{try{const {expireAbandonedSignupSetups,enrollLegacySignupSetupHolds}=await import('@/lib/signup-setup-maintenance');await enrollLegacySignupSetupHolds();await expireAbandonedSignupSetups();}catch(error){await captureObservedError(error,{route:'cron/signup-setup-expiry'});}});
   try {
     const result = await processPendingCallAnalyses({ limit: 2 });
     return NextResponse.json({ ok: true, ...result });

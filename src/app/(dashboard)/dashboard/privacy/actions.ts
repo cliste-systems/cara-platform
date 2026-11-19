@@ -302,18 +302,29 @@ export async function eraseCustomerData(
   // use the admin client BUT scope every UPDATE to this org's rows.
   const admin = createAdminClient();
 
-  const { data: recordingRows } = await admin
-    .from("call_logs")
-    .select("audio_storage_path")
-    .eq("organization_id", session.organizationId)
-    .eq("caller_number", phoneE164)
-    .not("audio_storage_path", "is", null);
+  const recordingRows: {id:string;audio_storage_path:string|null}[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const {data, error} = await admin.from("call_logs").select("id,audio_storage_path")
+      .eq("organization_id",session.organizationId).eq("caller_number",phoneE164)
+      .order("id").range(offset,offset+499);
+    if (error) return {ok:false,message:"Could not load caller recordings. Please retry."};
+    recordingRows.push(...(data??[]));
+    if ((data?.length??0)<500) break;
+  }
 
   const recordingPaths = (recordingRows ?? [])
     .map((row) => String(row.audio_storage_path ?? "").trim())
     .filter(Boolean);
   if (recordingPaths.length > 0) {
-    await deleteCallRecordingObjects(recordingPaths);
+    try { await deleteCallRecordingObjects(recordingPaths); }
+    catch { return { ok: false, message: "Recording deletion failed. No recording references were removed; please retry." }; }
+  }
+
+  const callIds = (recordingRows ?? []).map(row => row.id);
+  if (callIds.length) {
+    const { error: contextError } = await admin.from("cara_training_items")
+      .update({ caller_context: null }).eq("organization_id", session.organizationId).in("call_log_id", callIds);
+    if (contextError) return { ok: false, message: "Could not erase linked caller context. Please retry." };
   }
 
   const apptsRes = await anonymiseAppointmentsForErasure(
@@ -358,7 +369,7 @@ export async function eraseCustomerData(
       .select("id"),
   ]);
 
-  if (callsRes.error || ticketsRes.error || blockedRes.error) {
+  if ((apptsRes.skipped && apptsRes.skipReason !== "table_unavailable") || callsRes.error || ticketsRes.error || blockedRes.error) {
     console.error("[gdpr] erasure error", {
       a: apptsRes.skipped ? apptsRes.skipReason : undefined,
       c: callsRes.error?.message,
@@ -460,7 +471,7 @@ async function anonymiseAppointmentsForErasure(
     .select("id");
   if (error) {
     console.warn("[gdpr] appointments erasure skipped", error.message);
-    return { count: 0, skipped: true, skipReason: error.message };
+    return { count: 0, skipped: true, skipReason: ["42P01", "PGRST205"].includes(error.code) ? "table_unavailable" : error.message };
   }
   return { count: data?.length ?? 0 };
 }

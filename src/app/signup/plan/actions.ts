@@ -43,7 +43,7 @@ export async function preparePublicCheckout() {
   if(!isPlanTier(account.plan_tier) || !planSupportsSelfServeCheckout(account.plan_tier)) redirect("/signup/plan");
   const launchTier = account.launch_tier === "remote" ? "remote" : account.launch_tier === "onsite" ? "onsite_dublin" : "diy";
   const trialEnd = await beginSignupBilling(session.accountId, session.organizationId);
-  const result=await createPlatformElementsCheckout({organizationId:session.organizationId,accountId:session.accountId,userEmail:session.user.email??"",planTier:account.plan_tier,launchTier,interval:account.billing_interval==="year"?"year":"month",signupFlow:PUBLIC_SIGNUP_FLOW,trialEnd,idempotencyKey:`signup-elements-${session.accountId}-${account.plan_tier}-${account.billing_interval}-${launchTier}`});
+  const result=await createPlatformElementsCheckout({organizationId:session.organizationId,accountId:session.accountId,userEmail:session.user.email??"",planTier:account.plan_tier,launchTier,interval:account.billing_interval==="year"?"year":"month",signupFlow:PUBLIC_SIGNUP_FLOW,trialEnd,idempotencyKey:`signup-elements-connection-v3-${session.accountId}-${account.plan_tier}-${account.billing_interval}-${launchTier}`});
   if(!result.ok) return {ok:false as const,message:"Payment setup is temporarily unavailable. Please try again."};
   const origin=await resolveCheckoutReturnOrigin();
   return {...result,returnUrl:`${origin}/signup/complete?subscription_id=${result.subscriptionId}`};

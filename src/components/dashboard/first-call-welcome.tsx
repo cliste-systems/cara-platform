@@ -1,35 +1,45 @@
 "use client";
 import {useCallback,useEffect,useId,useLayoutEffect,useRef,useState,useSyncExternalStore,useTransition,type ReactNode} from "react";
 import Image from "next/image";
+import {SignupConfirmation} from "@/components/onboarding/signup-confirmation";
+import businessStyles from "./setup-business-step.module.css";
+import signupInteractions from "@/components/onboarding/signup-interactions.module.css";
+import {SetupBusinessStep} from "./setup-business-step";
 import setupAlignment from "./first-call-alignment.module.css";
 import {motion,useReducedMotion} from "motion/react";
 import Link from "next/link";
 import type {ServiceNavigation} from "./first-call-services-fields";
 import type {IndustryNavigation} from "./business-classification-picker";
+import {defaultVoiceGreetingIntro} from "@/lib/voice-greeting";
 import {classificationFromFields} from "@/lib/business-classification";
 import {firstCallResumeStep,readFirstCallCursor,firstCallConfigurationStep} from "@/lib/first-call-progress";
 import {SetupActionsProvider} from "./setup-actions";
 import {FirstCallTest} from "./first-call-test";
 import {FirstCallComplete} from "./first-call-complete";
+import {SetupFinished} from "./setup-finished";
 import {CustomerSetupPreviewBackdrop} from "./customer-setup-preview-backdrop";
 import {SetupConfirmationMark} from "./setup-confirmation-mark";
 import {SetupSceneArt,isSetupScene} from "./setup-scene-art";
 import {SetupSectionTransition} from "./setup-section-transition";
 import {FormFeedback,type FeedbackTone} from "@/components/ui/form-feedback";
 const primary=`${setupPrimary} mx-auto flex w-fit`;
-import {useRouter} from "next/navigation";
+import {useRouter,useSearchParams} from "next/navigation";
 import {ArrowLeft,ArrowRight,Check,Clock3,Mail,RefreshCw,MessageCircle} from "lucide-react";
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from "@/components/ui/dialog";
-import {firstCallSteps,firstCallSetupComplete,firstCallTestComplete,nextFirstCallReceipts,validateVerificationDetails,type FirstCallSetupState,type FirstCallSection} from "@/lib/first-call-setup";
+import {firstCallSteps,firstCallSetupComplete,firstCallTestComplete,firstCallConfigurationReady,nextFirstCallReceipts,validateVerificationDetails,type FirstCallSetupState,type FirstCallSection} from "@/lib/first-call-setup";
 import {FIRST_CALL_SECTIONS,firstCallConfigPatch} from "@/lib/first-call-config";
-import {dismissFirstCallWelcome,saveFirstCallBusiness,saveFirstCallSection} from "@/app/(dashboard)/dashboard/first-call-actions";
+import {saveFirstCallBusiness,saveFirstCallSection} from "@/app/(dashboard)/dashboard/first-call-actions";
 import {FirstCallSectionForm,SETUP_PRIMARY as setupPrimary,SETUP_SECONDARY} from "./first-call-section-form";
 import {FirstCallBusinessForm,type BusinessVerificationNavigation} from "./first-call-business-form";
+import {ForwardingConnection} from "./forwarding-connection";
 import {IrishForwardingGuide,SetupHelp} from "./irish-forwarding-guide";
 const descriptions:Record<string,string>={email:"A secure start for your workspace.",business:"Legal details for your Irish phone number.",profile:"Give Cara a clear picture of your business.",hours:"The hours Cara should give to callers.",services:"Add the services your business offers.",greeting:"A familiar welcome for your customers.",test:"Call the number below from your phone.",forwarding:"Keep your number. Let Cara answer."};
 function subscribeToSetupCursor(change:()=>void){window.addEventListener("storage",change);return ()=>window.removeEventListener("storage",change);}
-export function FirstCallWelcome({state:initialState,initialOpen,readOnly=false,requiredSetup=false,billingSetupComplete=false,previewScreen,dashboardAction}:{state:FirstCallSetupState;initialOpen:boolean;readOnly?:boolean;requiredSetup?:boolean;billingSetupComplete?:boolean;previewScreen?:"forwarding"|"welcome";dashboardAction?:ReactNode}){
+export function FirstCallWelcome({state:initialState,initialOpen,readOnly=false,requiredSetup=false,localTestMode=false,billingSetupComplete=false,previewScreen,previewTestComplete=false,previewNumberUnavailable=false,previewCompletion=false,dashboardAction}:{state:FirstCallSetupState;initialOpen:boolean;readOnly?:boolean;requiredSetup?:boolean;localTestMode?:boolean;billingSetupComplete?:boolean;previewTestComplete?:boolean;previewNumberUnavailable?:boolean;previewCompletion?:boolean;previewScreen?:"forwarding"|"welcome"|"business"|"profile"|"hours"|"greeting"|"test";dashboardAction?:ReactNode}){
  const progressId=useId(),reducedMotion=useReducedMotion();
+ const params=useSearchParams();
+ const startBusiness=params.get("setup")==="business"&&initialState.emailVerified;
+ const requestedWelcome=params.get("welcome")==="1"&&!startBusiness;
  const [actionDock,setActionDock]=useState<HTMLDivElement|null>(null);
  const [bodyNode,setBodyNode]=useState<HTMLDivElement|null>(null),[needsActionDock,setNeedsActionDock]=useState(false);
  const [formDrafts,setFormDrafts]=useState<Record<string,{version:string;values:Record<string,string>}>>({});
@@ -40,7 +50,7 @@ export function FirstCallWelcome({state:initialState,initialOpen,readOnly=false,
  const [businessNavigation,setBusinessNavigation]=useState<BusinessVerificationNavigation>(null);
  const [serviceNavigation,setServiceNavigation]=useState<ServiceNavigation>(null);
  const [industryNavigation,setIndustryNavigation]=useState<IndustryNavigation>(null);
- const [previewState,setPreviewState]=useState(initialState),[draft,setDraft]=useState(initialState.configuration??{}),[previewFinished,setPreviewFinished]=useState(false),[forwardingReady,setForwardingReady]=useState(false),[completionScreen,setCompletionScreen]=useState(false),[help,setHelp]=useState(false),[editBusiness,setEditBusiness]=useState(false);
+ const [previewState,setPreviewState]=useState(initialState),[draft,setDraft]=useState(initialState.configuration??{}),[previewFinished,setPreviewFinished]=useState(false),[forwardingReady,setForwardingReady]=useState(false),[completionScreen,setCompletionScreen]=useState(previewCompletion),[completionConnection,setCompletionConnection]=useState(initialState.connection??null),[completionConnected,setCompletionConnected]=useState(Boolean(initialState.connection?.verified_at&&initialState.connection?.trial_activated_at)),[help,setHelp]=useState(false);
  const [pending,start]=useTransition(),bodyRef=useRef<HTMLDivElement>(null);
  const bindBody=useCallback((node:HTMLDivElement|null)=>{bodyRef.current=node;setBodyNode(node);},[]);
  useLayoutEffect(()=>{
@@ -52,13 +62,16 @@ export function FirstCallWelcome({state:initialState,initialOpen,readOnly=false,
  },[bodyNode]);
  const cursorKey=initialState.progressKey?`cara:first-call-cursor:v1:${readOnly?'preview:':''}${initialState.progressKey}`:null;
  const storedCursor=readFirstCallCursor(useSyncExternalStore(subscribeToSetupCursor,()=>{try{return cursorKey?window.localStorage.getItem(cursorKey):null;}catch{return null;}},()=>null));
- const [selectedOverride,setSelected]=useState<string|null|undefined>(readOnly&&previewScreen==="welcome"?null:readOnly&&previewScreen==="forwarding"?"forwarding":undefined);
- const selected=selectedOverride===undefined?(readOnly?(storedCursor??(firstCallSetupComplete(initialState)?"forwarding":null)):firstCallResumeStep(initialState,storedCursor)):selectedOverride;
+ const [selectedOverride,setSelected]=useState<string|null|undefined>(readOnly&&previewScreen==="test"?"test":readOnly&&previewScreen==="greeting"?"greeting":readOnly&&previewScreen==="hours"?"hours":readOnly&&previewScreen==="profile"?"profile":readOnly&&previewScreen==="business"?"business":readOnly&&previewScreen==="welcome"?null:readOnly&&previewScreen==="forwarding"?"forwarding":!readOnly&&startBusiness?"business":undefined);
+ const selected=selectedOverride===undefined?(readOnly?(storedCursor??(firstCallSetupComplete(initialState)?"forwarding":null)):(firstCallResumeStep(initialState,storedCursor)??(requestedWelcome?null:"business"))):selectedOverride;
  useEffect(()=>{
   if(selectedOverride===undefined||!cursorKey)return;
   try{if(selectedOverride)window.localStorage.setItem(cursorKey,JSON.stringify({version:1,step:selectedOverride}));else window.localStorage.removeItem(cursorKey);}catch{/* Browser storage is optional; it never controls completion. */}
  },[selectedOverride,cursorKey]);
- const s=readOnly?previewState:initialState,testComplete=firstCallTestComplete(s),canContinueToForwarding=readOnly||testComplete,guide=selected==="forwarding",steps=firstCallSteps(s).map(step=>readOnly?{...step,unlocked:true}:step),finished=firstCallSetupComplete(s)||(readOnly&&previewFinished),next=steps.find(v=>!v.complete&&v.unlocked&&!(v.id==="business"&&s.verificationStatus==="submitted"))??steps.find(v=>!v.complete&&v.unlocked),completed=finished?steps.length:steps.filter(v=>v.unlocked&&v.complete).length;
+ const s=readOnly?previewState:initialState,testComplete=firstCallTestComplete(s)||(readOnly&&previewScreen==="test"&&previewTestComplete),canContinueToForwarding=readOnly||testComplete||(localTestMode&&firstCallConfigurationReady(s)),guide=selected==="forwarding",steps=firstCallSteps(s).map(step=>readOnly||(localTestMode&&step.id==="forwarding"&&firstCallConfigurationReady(s))?{...step,unlocked:true}:step),finished=firstCallSetupComplete(s)||(readOnly&&previewFinished),next=steps.find(v=>!v.complete&&v.unlocked&&!(v.id==="business"&&s.verificationStatus==="submitted"))??steps.find(v=>!v.complete&&v.unlocked),completed=finished?steps.length:steps.filter(v=>v.unlocked&&v.complete).length;
+ const [awaitingStep,setAwaitingStep]=useState<string|null>(null);
+ const awaitingUnlocked=Boolean(awaitingStep&&steps.some(step=>step.id===awaitingStep&&step.unlocked));
+ useEffect(()=>{if(!awaitingUnlocked||!awaitingStep)return;const frame=requestAnimationFrame(()=>{setSelected(awaitingStep);setAwaitingStep(null);});return ()=>cancelAnimationFrame(frame);},[awaitingStep,awaitingUnlocked]);
  const active=steps.find(v=>v.id===selected&&v.unlocked);
  const configurationNext=firstCallConfigurationStep(s);
  const savedConfiguration=readOnly?draft:s.configuration??{};
@@ -67,7 +80,7 @@ export function FirstCallWelcome({state:initialState,initialOpen,readOnly=false,
  const businessVersion=JSON.stringify(s.details);
  const businessDraft=formDrafts.business?.version===businessVersion?formDrafts.business.values:undefined;
  useLayoutEffect(()=>{bodyRef.current?.scrollTo({top:0});},[selected,guide,help]);
- const awaitingVerification=open&&!guide&&!help&&((selected==="email"&&!s.emailVerified)||(selected==="business"&&s.verificationStatus==="submitted"&&!editBusiness)||(selected==="test"&&!s.hadConversation));
+ const awaitingVerification=open&&!guide&&!help&&((selected==="email"&&!s.emailVerified)||(selected==="business"&&s.verificationStatus==="submitted")||(selected==="test"&&!s.hadConversation));
  useEffect(()=>{
   if(readOnly||!awaitingVerification)return;
   const check=()=>{if(document.visibilityState==="visible")router.refresh();};
@@ -83,27 +96,36 @@ export function FirstCallWelcome({state:initialState,initialOpen,readOnly=false,
   if(!canContinueToForwarding||!forwardingReady||selected!=="forwarding"){setMessage("Complete your test call and forwarding setup first.");return;}
   setHelp(false);setMessage("");setCompletionScreen(true);
  }
- function openDashboard(){
-  if(!completionScreen||!canContinueToForwarding||!forwardingReady||selected!=="forwarding"){setMessage("Complete your test call before opening your dashboard.");return;}
-  if(readOnly){setPreviewFinished(true);setOpen(false);setMessage("");return;}
-  start(async()=>{try{const result=await dismissFirstCallWelcome();if(result.ok){setOpen(false);router.refresh();}else setMessage("We could not finish setup. Please try again.");}catch{setMessage("We could not finish setup. Please try again.");}});
+ async function prepareDashboard(){
+  if(!completionScreen||!canContinueToForwarding||selected!=="forwarding"){setMessage("Complete your test call before opening your dashboard.");return false;}
+  if(readOnly)return true;
+  try{const response=await fetch("/api/setup/complete",{method:"POST",signal:AbortSignal.timeout(20000)});const result=await response.json();if(response.ok&&result.ok)return true;}catch{}
+  setMessage("We could not finish setup. Please try again.");return false;
  }
+ function revealDashboard(){
+  if(readOnly){setPreviewFinished(true);setOpen(false);setMessage("");return;}
+  // Keep the completion scene mounted until the destination document is ready.
+  // A document navigation also discards the cached pre-completion auth/layout tree.
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+  window.location.assign("/dashboard");
+ }
+ function openDashboard(){start(async()=>{if(await prepareDashboard())revealDashboard();});}
  function businessSubmit(form:FormData){
   setMessage("");
-  if(readOnly){const result=validateVerificationDetails(Object.fromEntries(form));if(result.error){setMessage(result.error);return;}setPreviewState(v=>({...v,details:result.details!,verificationStatus:"submitted"}));setEditBusiness(false);return;}
-  start(async()=>{try{const result=await saveFirstCallBusiness(Object.fromEntries(form),form.get("authority")==="on");if(result.ok){setEditBusiness(false);router.refresh();}else setMessage(result.message,"error","Details not submitted");}catch{setMessage("We could not submit your details. Please try again.","error","Details not submitted");}});
+  if(readOnly){const result=validateVerificationDetails(Object.fromEntries(form));if(result.error){setMessage(result.error);return;}setPreviewState(v=>({...v,details:result.details!,verificationStatus:"submitted"}));return;}
+  start(async()=>{try{const result=await saveFirstCallBusiness(Object.fromEntries(form),form.get("authority")==="on");if(result.ok){router.refresh();}else setMessage(result.message,"error","Details not submitted");}catch{setMessage("We could not submit your details. Please try again.","error","Details not submitted");}});
  }
  function saveSection(section:FirstCallSection,data:Record<string,string>){
   setMessage("");
   const parsed=firstCallConfigPatch(section,data,s.businessName,classificationFromFields(readOnly?draft:s.configuration??{}));if(!parsed.ok){setMessage(parsed.message);return;}
   const following=section==="greeting"?"test":steps[steps.findIndex(v=>v.id===section)+1]?.id??"test";
   if(readOnly){setDraft(v=>({...v,...data,configurationVersion:new Date().toISOString(),...(section==="services"?{servicesConfigured:"true"}:{})}));const keys={profile:"profileReady",hours:"hoursReady",services:"servicesReady",greeting:"greetingReady"} as const;setPreviewState(v=>{const patch=Object.fromEntries(FIRST_CALL_SECTIONS.slice(FIRST_CALL_SECTIONS.indexOf(section)).map(id=>[keys[id],id===section]));return {...v,...patch,completedSections:nextFirstCallReceipts(v.completedSections??{},section,new Date().toISOString())};});setPreviewFinished(false);setSelected(following);return;}
-  start(async()=>{try{const result=await saveFirstCallSection(section,data);if(result.ok){setSelected(following);router.refresh();}else setMessage(result.message,"error","Changes not saved");}catch{setMessage("Your section could not be saved. Please try again.","error","Changes not saved");}});
+  start(async()=>{try{const result=await saveFirstCallSection(section,data);if(result.ok){setAwaitingStep(following);router.refresh();}else setMessage(result.message,"error","Changes not saved");}catch{setMessage("Your section could not be saved. Please try again.","error","Changes not saved");}});
  }
  const activeIndex=steps.findIndex(step=>step.id===active?.id);
- const businessForm=active?.id==="business"&&!guide&&!help&&(s.verificationStatus==="not_submitted"||s.verificationStatus==="needs_information"||editBusiness);
+ const businessForm=active?.id==="business"&&!guide&&!help&&(s.verificationStatus==="not_submitted"||s.verificationStatus==="needs_information");
  const welcome=!active&&!guide&&!help&&!finished;
- const screenKey=completionScreen?"complete":help?"help":guide?"forwarding":active?.id==="business"?`business-${s.verificationStatus}-${editBusiness}`:active?.id==="email"?`email-${s.emailVerified}`:active?.id??"welcome";
+ const screenKey=completionScreen?"complete":help?"help":guide?"forwarding":active?.id==="business"?`business-${s.verificationStatus}`:active?.id==="email"?`email-${s.emailVerified}`:active?.id??"welcome";
  const fullScene=!help&&!completionScreen&&isSetupScene(active?.id)?active.id:null;
  const heading=help?"A hand with setup":guide?"Set up call forwarding":active?.title??"Let’s get ready for your first call.";
  function back(){
@@ -118,10 +140,35 @@ export function FirstCallWelcome({state:initialState,initialOpen,readOnly=false,
   const previous=steps[activeIndex-1];
   setSelected(previous?.unlocked?previous.id:null);
  }
+ if(open&&welcome) return <SignupConfirmation onContinue={()=>{enter(next?.id??"business");if(!readOnly)router.replace("/dashboard?setup=business",{scroll:false});}}/>;
+ if(open&&guide&&completionScreen) return <SetupFinished connected={completionConnected} pending={pending} onDashboard={revealDashboard} onPrepareDashboard={prepareDashboard} dashboardAction={readOnly?dashboardAction:undefined} feedback={notice?<FormFeedback message={notice.message} title={notice.title} tone={notice.tone}/>:undefined}/>;
+ if(open&&guide&&!completionScreen) return <SetupBusinessStep step={6} onBack={back} pending={pending} title="Connect your business number." description="Keep your number. Let Cara answer.">
+  <div className={`${businessStyles.profileForm} ${businessStyles.forwardingForm}`}>
+   {localTestMode&&<button type="button" className={`${SETUP_SECONDARY} mb-4 w-full`} onClick={()=>{setCompletionConnected(false);setCompletionScreen(true);}}>Skip phone connection for local testing<ArrowRight size={16}/></button>}
+   <ForwardingConnection number={s.lineEnabled&&!s.isTestNumber?s.number:null} connection={completionConnection??s.connection} preview={readOnly} instructions={forwardingReady} onReadyChange={setForwardingReady} onContinue={(connected,connection)=>{setCompletionConnection(connection);setCompletionConnected(connected);setMessage('');setCompletionScreen(true);}}/>
+  </div>
+ </SetupBusinessStep>;
+ if(open&&active?.id==="test"&&!guide&&!help&&!completionScreen) return <SetupBusinessStep step={5} onBack={back} pending={pending} title="Let’s try your first call." description="Call Cara and hear your business come to life." feedback={notice?<FormFeedback message={notice.message} title={notice.title} tone={notice.tone} focusOnError/>:undefined}>
+  <div className={businessStyles.profileForm}><FirstCallTest previewUnavailable={previewNumberUnavailable} localTestMode={localTestMode} number={s.number} ready={s.lineEnabled} previewNumber={s.isTestNumber} preview={readOnly} complete={testComplete} pending={pending} onContinue={()=>{if(canContinueToForwarding)enter("forwarding");}}/></div>
+ </SetupBusinessStep>;
+ if(open&&active?.id==="greeting"&&!guide&&!help&&!completionScreen) return <SetupBusinessStep step={4} onBack={back} pending={pending} title="How should Cara greet your callers?" description="Make your callers’ first hello your own." feedback={notice?<FormFeedback message={notice.message} title={notice.title} tone={notice.tone} focusOnError/>:undefined}>
+  <div className={businessStyles.profileForm}><FirstCallSectionForm key="greeting" section="greeting" values={{...sectionValues,intro:sectionValues.intro||defaultVoiceGreetingIntro(s.businessName),reviewBusinessName:s.businessName,reviewPreview:readOnly?"true":"false"}} pending={pending} onSave={data=>saveSection("greeting",data)} onDraft={rememberDraft}/></div>
+ </SetupBusinessStep>;
+ if(open&&active?.id==="hours"&&!guide&&!help&&!completionScreen) return <SetupBusinessStep step={3} onBack={back} pending={pending} title="When are you open?" description="Set your hours and how Cara handles calls outside them." feedback={notice?<FormFeedback message={notice.message} title={notice.title} tone={notice.tone} focusOnError/>:undefined}>
+  <div className={`${businessStyles.profileForm} ${businessStyles.hoursForm}`}><FirstCallSectionForm key="hours" section="hours" values={sectionValues} pending={pending} onSave={data=>saveSection("hours",data)} smsPricing={s.smsPricing} onDraft={rememberDraft}/></div>
+ </SetupBusinessStep>;
+ if(open&&active?.id==="profile"&&!guide&&!help&&!completionScreen) return <SetupBusinessStep step={2} onBack={back} pending={pending} title="What does your business do?" description="Choose your industry, then your specialities." feedback={notice?<FormFeedback message={notice.message} title={notice.title} tone={notice.tone} focusOnError/>:undefined}>
+  <div className={businessStyles.profileForm}><FirstCallSectionForm section="profile" values={sectionValues} pending={pending} onSave={data=>saveSection("profile",data)} onIndustryNavigation={setIndustryNavigation} onDraft={rememberDraft}/></div>
+ </SetupBusinessStep>;
+ if(open&&active?.id==="business"&&!guide&&!help&&!completionScreen) return <SetupBusinessStep accountEmail={s.email} submittedBusiness={!businessForm} onBack={businessForm&&businessNavigation?back:undefined} title={businessForm?undefined:s.verificationStatus==="verified"?"Business verified":"Details submitted"} description={businessForm?undefined:s.verificationStatus==="verified"?"You’re ready to keep setting up Cara.":"We’ll review these while you finish setting up Cara."} pending={pending} feedback={notice?<FormFeedback message={notice.message} title={notice.title} tone={notice.tone} focusOnError/>:undefined}>
+  {businessForm?<FirstCallBusinessForm onDraft={rememberDraft} draftVersion={businessVersion} initialPage={Number(businessDraft?.draftPage??0)} authorityChecked={businessDraft?.authority==="on"} onNavigation={setBusinessNavigation} state={{...s,details:{...s.details,...businessDraft}}} pending={pending} onSubmit={businessSubmit}/>:<div className={businessStyles.receipt}>
+   <button type="button" className={`${businessStyles.primary} ${signupInteractions.primary}`} onClick={()=>enter(configurationNext??"test")}>Continue<ArrowRight size={16}/></button>
+  </div>}
+ </SetupBusinessStep>;
  return <>
  {open&&(readOnly||requiredSetup)&&<CustomerSetupPreviewBackdrop businessName={s.businessName} setupComplete={finished}/>}
  {readOnly&&!open&&<div className="fixed right-6 top-16 z-[45] flex gap-3 rounded-xl border border-[#d9e2dd] bg-white p-3 shadow-sm"><button className={SETUP_SECONDARY} onClick={()=>setOpen(true)}>Review setup</button><Link href="/admin/customers" className={SETUP_SECONDARY}>Return to admin</Link></div>}
- {!requiredSetup&&<section className="flex shrink-0 flex-wrap items-center justify-between gap-4 rounded-xl border border-[#d9e2dd] bg-white px-5 py-4"><div><h2 className="text-sm font-semibold text-[#11181d]">{finished?"Your first-call setup":"Get Cara ready for your first call"}</h2><p className="mt-1 text-xs text-[#5b6b65]">{completed} of {steps.length} sections complete</p></div><button onClick={()=>setOpen(true)} className="inline-flex min-h-11 items-center gap-2 text-sm font-medium">{finished?"View setup":"Continue setup"}<ArrowRight size={16}/></button></section>}
+ {!requiredSetup&&<section className="flex shrink-0 flex-wrap items-center justify-between gap-4 rounded-xl border border-[#d9e2dd] bg-white px-5 py-4"><div><h2 className="text-sm font-semibold text-[#11181d]">{s.dashboardUnlocked&&!s.connection?.verified_at?"Connection pending":finished?"Your number is connected":"Get Cara ready for your first call"}</h2><p className="mt-1 text-xs text-[#5b6b65]">{s.dashboardUnlocked&&!s.connection?.verified_at?"Your workspace is ready. Your phone connection is pending.":`${completed} of ${steps.length} sections complete`}</p></div><button onClick={()=>{if(s.dashboardUnlocked)setSelected("forwarding");setOpen(true);}} className="inline-flex min-h-11 items-center gap-2 text-sm font-medium">{s.dashboardUnlocked&&!s.connection?.verified_at?"Continue connecting your number":finished?"View setup":"Continue setup"}<ArrowRight size={16}/></button></section>}
  <Dialog open={open} onOpenChange={value=>value?setOpen(true):close()}>
  <SetupActionsProvider target={actionDock} forceDock={needsActionDock}><DialogContent showCloseButton={false} data-full-setup-scene={fullScene||undefined} className={`${setupAlignment.flow} ${setupAlignment.entrance} flex h-[min(820px,calc(100dvh_-_3rem))] w-[calc(100vw_-_3rem)] max-w-[1060px] flex-col gap-0 overflow-hidden rounded-[24px] bg-white p-0 shadow-2xl ring-1 ring-black/5 max-sm:h-[calc(100dvh_-_1rem)] max-sm:w-[calc(100vw_-_1rem)] max-sm:rounded-[20px] sm:max-w-[1060px]`} overlayClassName={`${setupAlignment.backdropEntrance} bg-[#11181d]/20 backdrop-blur-md`}>
  {fullScene&&<SetupSceneArt scene={fullScene}/>}
@@ -153,10 +200,10 @@ export function FirstCallWelcome({state:initialState,initialOpen,readOnly=false,
   </header>}
  {businessForm?<FirstCallBusinessForm onDraft={rememberDraft} draftVersion={businessVersion} initialPage={Number(businessDraft?.draftPage??0)} authorityChecked={businessDraft?.authority==="on"} onNavigation={setBusinessNavigation} state={{...s,details:{...s.details,...businessDraft}}} pending={pending} onSubmit={businessSubmit}/>:<div className={`px-5 pb-2 text-center sm:px-8 ${guide&&!help?"max-sm:px-2 pt-2 max-sm:pt-2 max-sm:pb-0":""} ${help?"pt-5 space-y-5":active?.id==="hours"||active?.id==="services"?"pt-3 space-y-3":guide?"pt-2 space-y-4":active?.id==="test"?"pt-4 space-y-4":"pt-6 space-y-6"}`}>
  {help?<SetupHelp preview={readOnly} forwarding={guide} context={guide?"Call forwarding":"Cara setup"}/>:guide?<IrishForwardingGuide number={s.lineEnabled&&!s.isTestNumber?s.number:null} displayNumber={s.number} preview={readOnly} instructions={forwardingReady} onReadyChange={setForwardingReady} completionAction={forwardingReady?<button type="button" disabled={pending||!canContinueToForwarding} onClick={finishSetup} className={`${setupPrimary} max-sm:w-full`}>Finish setup<ArrowRight size={16}/></button>:undefined}/>:active?<> {active.id==="email"&&<><div className={`rounded-xl border border-[#d9e2dd] p-5 ${s.emailVerified?"bg-white py-7":""}`}>{s.emailVerified?<SetupConfirmationMark/>:<Mail size={22} className="text-[#5b6b65] mx-auto"/>}<h3 className="mt-4 text-base font-semibold">{s.emailVerified?"Email confirmed":"Check your inbox"}</h3><p className="mt-2 break-words text-sm text-[#5b6b65]">{s.email}</p><p className="mt-3 text-sm leading-6 text-[#5b6b65]">{s.emailVerified?"Your email is verified. Continue to your business details.":"Follow the link in your confirmation email, then return here. This screen checks automatically and will show your next step. Check spam or junk if you can’t find the email."}</p></div>{s.emailVerified?<button className={primary} onClick={()=>enter("business")}>Continue to business details<ArrowRight size={16}/></button>:<button className={primary} onClick={refresh}>Check email status<RefreshCw size={15}/></button>}{readOnly&&!s.emailVerified&&<button onClick={()=>{setPreviewState(v=>({...v,emailVerified:true}));setMessage("");}} className="block min-h-11 text-xs text-[#5b6b65] underline underline-offset-4 mx-auto">Preview confirmed email</button>}</>}
- {active.id==="business"&&<><div className="rounded-xl border border-[#d9e2dd] bg-white p-5"><SetupConfirmationMark/><p className="mt-4 text-sm font-semibold text-[#11181d]">Business details received</p><p className="mt-3 text-sm leading-6 text-[#5b6b65]">{configurationNext?"Continue setting up Cara for your business.":"Your business settings are ready. Try Cara, then connect your number."}</p>{s.reviewNote&&<p className="mt-3 text-xs leading-5 text-[#5b6b65]">{s.reviewNote}</p>}</div><div className="flex flex-col items-center justify-center gap-3 sm:flex-row"><button className={`${setupPrimary} max-sm:w-full`} onClick={()=>enter(configurationNext??"test")}>{configurationNext?"Continue to Cara setup":"Try Cara"}<ArrowRight size={16}/></button>{s.verificationStatus!=="verified"&&<button onClick={()=>setEditBusiness(true)} className={`${SETUP_SECONDARY} max-sm:w-full`}>Update business details</button>}</div></>}
+ {active.id==="business"&&<><div className="rounded-xl border border-[#d9e2dd] bg-white p-5"><SetupConfirmationMark/><p className="mt-4 text-sm font-semibold text-[#11181d]">Business details received</p><p className="mt-3 text-sm leading-6 text-[#5b6b65]">{configurationNext?"Continue setting up Cara for your business.":"Your business settings are ready. Try Cara, then connect your number."}</p>{s.reviewNote&&<p className="mt-3 text-xs leading-5 text-[#5b6b65]">{s.reviewNote}</p>}</div><div className="flex flex-col items-center justify-center gap-3 sm:flex-row"><button className={`${setupPrimary} max-sm:w-full`} onClick={()=>enter(configurationNext??"test")}>{configurationNext?"Continue to Cara setup":"Try Cara"}<ArrowRight size={16}/></button></div></>}
 
  {FIRST_CALL_SECTIONS.includes(active.id as FirstCallSection)&&<FirstCallSectionForm onDraft={rememberDraft} draftKey={`${readOnly?"preview:":""}${s.progressKey??""}`} onIndustryNavigation={setIndustryNavigation} onServiceNavigation={setServiceNavigation} smsPricing={s.smsPricing} key={active.id} section={active.id as FirstCallSection} values={sectionValues} pending={pending} onSave={data=>saveSection(active.id as FirstCallSection,data)}/>}
- {active.id==="test"&&<FirstCallTest number={s.number} ready={s.lineEnabled} previewNumber={s.isTestNumber} preview={readOnly} complete={testComplete} pending={pending} onContinue={()=>{if(canContinueToForwarding)enter("forwarding");}}/>}
+ {active.id==="test"&&<FirstCallTest previewUnavailable={previewNumberUnavailable} localTestMode={localTestMode} number={s.number} ready={s.lineEnabled} previewNumber={s.isTestNumber} preview={readOnly} complete={testComplete} pending={pending} onContinue={()=>{if(canContinueToForwarding)enter("forwarding");}}/>}
 
  </>:null}
  </div>}

@@ -45,6 +45,7 @@ export async function completeOpenRouterChat(input: {
       response_format: { type: "json_object" },
     }),
     cache: "no-store",
+    signal: AbortSignal.timeout(12_000),
   });
 
   if (!response.ok) {

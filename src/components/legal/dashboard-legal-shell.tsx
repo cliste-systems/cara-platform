@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkspaceSectionNav } from "@/components/dashboard/workspace-section-nav";
 import { Shield } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -18,10 +19,11 @@ export function DashboardLegalShell({ children }: DashboardLegalShellProps) {
       <ClistePageHeader
         tone="account"
         icon={Shield}
-        title="Legal & privacy"
+        title="Privacy & legal"
         description="GDPR data requests for your customers, plus Cliste legal documents for your records."
       />
 
+      <WorkspaceSectionNav group="account" />
       <div className="shrink-0">
         <DashboardLegalTabs />
       </div>

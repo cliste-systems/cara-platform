@@ -392,9 +392,9 @@ function catalogPricingLine(
     !ownerSaysNeverQuote;
 
   if (shouldQuote) {
-    return 'When someone asks about price and a service has a price listed above, I quote it with "from" or "about" — I never invent prices that are not listed.';
+    return 'When someone asks about price and a service has a price listed above, I use the stated pricing type exactly: fixed, starting from, range, per hour/day, or explicitly free. I explain any stated conditions and never invent prices, taxes or fees.';
   }
-  return "I do not quote prices on the phone from this menu — I offer to text the booking link or take their details for the team.";
+  return "I do not quote prices on the phone from this menu — I take their details for the team to provide a quote.";
 }
 
 function serviceCatalogCoreSection(
@@ -403,13 +403,14 @@ function serviceCatalogCoreSection(
   quotePricesOnCalls?: boolean,
 ): string {
   const lines = services
+    .filter((s) => s.details?.status !== "archived")
     .map((s) => compileServiceCatalogKnowledgeLine(s))
     .filter(Boolean);
 
   const parts = [
     "Services menu:",
     bulletBlock(lines),
-    "When someone asks how long a service takes, I use the durations above when listed.",
+    "When someone asks how long a service takes, I use the durations above when listed. A duration is not an appointment slot, arrival promise or confirmed booking.",
     catalogPricingLine(services, businessRules, quotePricesOnCalls),
     "An unlisted service is unknown, not unavailable. Match meanings to the approved menu; for related unconfirmed work, offer to take a message for the team to check.",
   ];

@@ -26,6 +26,7 @@ export function isBusinessNavPath(pathname: string): boolean {
 }
 
 export function businessNavChildLabel(pathname: string): string | null {
+  if (pathname === "/dashboard/business/hours") return "Hours & availability";
   if (
     pathname === DASHBOARD_ROUTES.businessAnswers ||
     pathname.startsWith(`${DASHBOARD_ROUTES.businessAnswers}/`)

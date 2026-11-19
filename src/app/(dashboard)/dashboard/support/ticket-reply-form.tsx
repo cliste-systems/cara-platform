@@ -1,4 +1,5 @@
 "use client";
+import { FormFeedback } from "@/components/ui/form-feedback";
 
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
@@ -81,9 +82,7 @@ export function TicketReplyForm({ ticketId, ticketStatus }: TicketReplyFormProps
         </Button>
       </div>
       {msg ? (
-        <p className="text-[12px] text-red-600" role="alert">
-          {msg}
-        </p>
+        <FormFeedback message={msg} />
       ) : null}
     </div>
   );

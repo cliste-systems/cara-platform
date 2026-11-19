@@ -101,6 +101,9 @@ export function CheckoutFormInner({
   const [submitPhase, setSubmitPhase] = useState<CheckoutSubmitPhase>("idle");
   const [error, setError] = useState<Feedback | null>(initialFeedback ?? null);
   useEffect(() => { onBusyChange?.(submitPhase !== "idle"); }, [onBusyChange, submitPhase]);
+  const submitting = useRef(false);
+  const successTimer = useRef<number | null>(null);
+  useEffect(() => () => { if (successTimer.current) clearTimeout(successTimer.current); }, []);
   const confirmedIntentId = useRef<string | null>(null);
   const paymentFieldsRef = useRef<HTMLDivElement>(null);
   const [paymentInvalid, setPaymentInvalid] = useState(false);
@@ -111,7 +114,8 @@ export function CheckoutFormInner({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!stripe || !elements || setupBusy || submitPhase !== "idle") return;
+    if (submitting.current || !stripe || !elements || !elementReady || setupBusy || openingSetup || submitPhase !== "idle") return;
+    submitting.current = true;
 
     setSubmitPhase("loading");
     setError(null);
@@ -146,12 +150,15 @@ export function CheckoutFormInner({
       }
       await onPersist?.(subscriptionId, confirmedIntentId.current);
       setSubmitPhase("success");
-      window.setTimeout(() => {
+      successTimer.current = window.setTimeout(() => {
         onActivated();
       }, SUCCESS_HOLD_MS);
     } catch {
       setError(checkoutFeedback(confirmedIntentId.current ? "workspace" : "connection"));
       setSubmitPhase("idle");
+    } finally {
+      // Keep the lock after success until navigation; release it on recoverable failure.
+      if (!successTimer.current) submitting.current = false;
     }
   }
 
@@ -196,9 +203,10 @@ export function CheckoutFormInner({
       }} />
 
       <ClisteCheckoutSubmitButton
+        successLabel={summary.trialStartsOnConnection?"Payment details saved":undefined}
         phase={openingSetup ? "loading" : submitPhase}
-        idleLabel={error?.retryLabel}
-        loadingLabel={openingSetup ? "Opening Cara setup…" : cardSaved ? "Finishing your signup…" : undefined}
+        idleLabel={error?.retryLabel??(summary.trialStartsOnConnection?"Save payment details":undefined)}
+        loadingLabel={openingSetup ? "Opening Cara setup…" : cardSaved ? "Finishing your signup…" : summary.trialStartsOnConnection?"Saving payment details…":undefined}
         trialDays={summary.trialDays}
         disabled={!stripe || !elements || !elementReady || setupBusy || openingSetup}
       />
@@ -213,12 +221,13 @@ export function CheckoutFormInner({
 export function CheckoutPaymentSummary({summary}:{summary:PlatformElementsCheckoutSummary}) {
   const [setupName, setupCharge] = summary.setupLabel?.split(" · ") ?? [];
   const setupPrice = setupCharge?.split(",")[0]?.replace(/ once$/, "");
+  const total = summary.recurringAmountCents === undefined ? null : new Intl.NumberFormat("en-IE", {style:"currency",currency:"EUR",maximumFractionDigits:2,minimumFractionDigits:0}).format((summary.recurringAmountCents+(summary.setupAmountCents??0))/100);
   return (
     <section data-checkout-payment-summary aria-label="Your billing summary" className="rounded-[20px] bg-[#f5f5f5] px-4 pt-4 pb-3 text-left text-[#292929]">
       <dl className="space-y-2.5 text-[13px]">
         <div className="flex items-baseline justify-between gap-4">
           <dt className="font-medium">{summary.planName} plan</dt>
-          <dd className="shrink-0 text-right"><span className="text-base font-semibold">{summary.amountLabel}</span><span className="ml-1 text-xs text-[#626262]">/ {summary.intervalLabel}</span></dd>
+          <dd className="shrink-0 text-right"><span className="text-base font-semibold">{summary.amountLabel}</span><span className="ml-1 text-xs text-[#626262]">per {summary.intervalLabel}</span></dd>
         </div>
         {setupName && (
           <div className="flex items-baseline justify-between gap-4">
@@ -226,9 +235,13 @@ export function CheckoutPaymentSummary({summary}:{summary:PlatformElementsChecko
             <dd className="shrink-0 text-right"><span className="text-base font-semibold">{setupPrice}</span><span className="ml-1 text-xs text-[#626262]">one-off</span></dd>
           </div>
         )}
+        {total && <div className="flex items-baseline justify-between gap-4 border-t border-[#dedede] pt-3">
+          <dt className="font-medium">Total due after your free trial</dt>
+          <dd className="shrink-0 text-base font-semibold">{total}</dd>
+        </div>}
       </dl>
       <div className="mt-3 border-t border-[#dedede] pt-3 text-xs leading-5">
-        <p>{setupName ? "Both charges are" : "Your first payment is"} due when your {summary.trialDays}-day free trial ends.</p>
+        <p>{summary.trialStartsOnConnection?`Your ${summary.trialDays}-day free trial starts when your business number is connected. ${setupName?"Both charges are":"Your first payment is"} due when it ends.`:<>{setupName ? "Both charges are" : "Your first payment is"} due when your {summary.trialDays}-day free trial ends.</>}</p>
       </div>
     </section>
   );
@@ -250,7 +263,7 @@ export function CheckoutPlanSummary({
             {summary.planName}
           </p>
           <p className="mt-1 text-[13px] leading-snug text-slate-500">
-            {summary.amountLabel}/{summary.intervalLabel} after your trial
+            {summary.amountLabel} per {summary.intervalLabel} after your trial
           </p>
         </div>
         <span className="shrink-0 rounded-full border border-slate-200/80 bg-slate-50 px-2.5 py-1 text-[11px] font-medium leading-none text-[#0b1220]">

@@ -1,5 +1,7 @@
 "use server";
 
+import {checkSignupPassword} from "@/lib/signup-password-security";
+
 import { headers } from "next/headers";
 
 import { requireDashboardAdmin } from "@/lib/dashboard-admin";
@@ -41,10 +43,10 @@ export async function changeSignInPassword(payload: {
   if (!currentPassword || !newPassword || !confirmPassword) {
     return { ok: false, message: "All password fields are required." };
   }
-  if (newPassword.length < MIN_PASSWORD_LEN) {
+  if (newPassword.length < MIN_PASSWORD_LEN || newPassword.length > 128) {
     return {
       ok: false,
-      message: `New password must be at least ${MIN_PASSWORD_LEN} characters.`,
+      message: `New password must be ${MIN_PASSWORD_LEN}–128 characters.`,
     };
   }
   if (newPassword !== confirmPassword) {
@@ -80,6 +82,9 @@ export async function changeSignInPassword(payload: {
       message: "Current password is incorrect.",
     };
   }
+
+  const passwordCheck=await checkSignupPassword(newPassword);
+  if(!passwordCheck.ok)return {ok:false,message:passwordCheck.message};
 
   const nextMeta = {
     ...(session.user.user_metadata ?? {}),

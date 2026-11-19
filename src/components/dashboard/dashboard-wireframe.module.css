@@ -1,0 +1,257 @@
+.board{display:grid;grid-template-columns:minmax(0,1.95fr) minmax(300px,1fr);grid-template-rows:minmax(230px,1.1fr) minmax(210px,1fr) minmax(180px,.85fr) 72px;gap:16px;width:100%;min-height:740px;height:calc(100dvh - 40px);padding:0;color:#171717}
+.leftPanel{grid-column:1;grid-row:1/-1;display:flex;flex-direction:column;min-width:0;overflow:hidden;border-radius:24px;background:radial-gradient(ellipse at 90% 70%,#3b3c3c 0%,#272828 45%,#222323 80%);color:#fff}
+.hero{position:relative;isolation:isolate;min-height:340px;flex:0 0 46%;padding:28px 30px 18px;display:flex;flex-direction:column;background:transparent;overflow:hidden}
+.hero:before{content:"";position:absolute;inset:0;z-index:-1;background:url('/cara-welcome-desktop-v2.webp') center top/cover no-repeat;mask-image:linear-gradient(#000 72%,transparent 100%)}
+.heroWelcome{width:59%}.heroWelcome h1{font-size:clamp(25px,2.4vw,38px);font-weight:500;letter-spacing:-.04em;line-height:1.15;margin:0;text-wrap:balance}.heroWelcome p{font-size:12px;line-height:1.5;color:#dedede;margin-top:9px;max-width:380px}
+.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:55%;flex:1;min-height:180px;margin-top:18px}.metric{display:flex;flex-direction:column;justify-content:center;gap:6px;padding:12px 18px 12px 0;min-width:0}.metric:nth-child(even){border-left:1px solid #ffffff30;padding-left:24px}.metric:nth-child(n+3){border-top:1px solid #ffffff30}.metric svg{width:20px;height:20px;stroke-width:1.5;color:#ddd}.metric strong{font-size:clamp(27px,2.5vw,40px);font-weight:400;letter-spacing:-.04em;line-height:1.1}.metric span{font-size:12px;color:#ddd;line-height:1.4}
+.shape{background:#e9e9e9;border-radius:20px;padding:22px;display:flex;flex-direction:column;gap:16px;min-width:0;overflow:hidden}.shape header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0}.shape h2{font-size:clamp(17px,1.45vw,22px);font-weight:500;letter-spacing:-.035em;line-height:1.25;margin:0}.shape header>a{display:flex;align-items:center;justify-content:center;gap:12px;padding:7px 10px;border-radius:24px;background:#00000005;min-height:38px;flex:none}.shape header>a span{font-size:14px;min-width:15px;text-align:center}.shape svg{width:18px;height:18px;stroke-width:1.5}.shape a:focus-visible,.analyticsTabs button:focus-visible{outline:2px solid #888;outline-offset:3px}.shape a:hover{background:#00000007}
+.follow{grid-column:2;grid-row:1}.training{grid-column:2;grid-row:2}.recent{grid-column:2;grid-row:3}.statusGroup{grid-column:2;grid-row:4;min-width:0}
+.liveRows{display:flex;flex-direction:column;flex:1;min-height:0;overflow:auto;scrollbar-width:thin;scrollbar-color:#aaa transparent}.liveRows>a{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 0;min-height:68px;border-bottom:1px solid #00000012;font-size:14px;line-height:1.5}.liveRows>a:last-child{border:0}.liveRows>a>span{min-width:0;flex:1}.liveRows strong{font-size:13px;font-weight:500;display:block}.liveRows small{font-size:12px;color:#686868;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:4px}.liveRows svg{flex:none}.emptyCopy{font-size:13px;line-height:1.65;text-align:center;color:#707070;margin:auto;max-width:310px;padding:20px 0}
+.analyticsPanel{flex:1;min-height:300px;background:transparent;color:#fff;border-radius:0;padding:8px 30px 28px;gap:24px}.analyticsPanel[hidden]{display:none}.analyticsPanel h2{font-size:clamp(22px,2vw,30px);color:#fff}.analyticsPanel .emptyCopy{color:#ccc}.analyticsPanel header{flex-wrap:wrap}.analyticsTabs{display:flex;gap:3px;padding:3px;border:1px solid #ffffff15;border-radius:24px;background:#ffffff0a}.analyticsTabs button{font-size:11px;padding:8px 14px;border-radius:20px;color:#c9c9c9;cursor:pointer;min-height:34px}.analyticsTabs button[aria-selected=true]{background:#fff;color:#222}
+.liveBars{display:flex;flex:1;align-items:stretch;gap:10px;min-height:160px;padding-top:10px;background:repeating-linear-gradient(to top,transparent 0,transparent 49px,#ffffff16 49px,#ffffff16 50px)}.liveBars>div{position:relative;flex:1;display:flex;align-items:flex-end;padding-bottom:26px;min-width:0}.liveBars i{background:linear-gradient(#e2e2e2,#8f8f8f);width:100%;border-radius:6px 6px 0 0}.liveBars small{position:absolute;bottom:0;left:50%;transform:translateX(-50%);font-size:9px;color:#ccc;white-space:nowrap}
+.chart>.emptyCopy{max-width:none;width:100%;flex:1;display:grid;place-items:center;background:repeating-linear-gradient(to top,transparent 0,transparent calc(25% - 1px),#ffffff14 calc(25% - 1px),#ffffff14 25%);border-left:1px solid #ffffff25;border-bottom:1px solid #ffffff25;padding:30px 20px}
+.outcomeLayout{display:flex;align-items:center;gap:36px;flex:1;min-height:0;max-width:620px;width:100%;margin:auto}.outcomeRing{width:130px;height:130px;border:20px solid #ddd;border-right-color:#999;border-bottom-color:#777;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none}.outcomeRing strong{font-size:28px;font-weight:500}.outcomeRing span{font-size:12px}.outcomeRows{display:flex;flex-direction:column;gap:22px;flex:1}.outcomeRows>div{position:relative;display:flex;justify-content:space-between;gap:10px;padding-bottom:12px;border-bottom:1px solid #ffffff25;font-size:13px}.outcomeRows strong{font-weight:400}.outcomeRows i{position:absolute;left:0;bottom:-1px;height:2px;background:#ddd}.durationPlot{width:100%;flex:1;min-height:0;max-height:280px;color:#ddd}.meta{font-size:11px;color:#ccc}
+@media(min-width:851px) and (max-height:800px){.board{min-height:650px;grid-template-rows:minmax(190px,1.1fr) minmax(170px,1fr) minmax(160px,.85fr) 68px}.hero{min-height:300px;padding:22px 26px 12px}.heroWelcome h1{font-size:27px}.metrics{margin-top:12px}.metric{padding-block:8px}.metric strong{font-size:29px}.analyticsPanel{padding-inline:26px;min-height:270px}.shape{padding:18px}}
+@media(max-width:1100px) and (min-width:851px){.board{grid-template-columns:minmax(0,1.65fr) minmax(290px,1fr);gap:14px}.hero{padding-inline:22px}.heroWelcome{width:62%}.heroWelcome h1{font-size:26px}.metrics{width:61%}.metric:nth-child(even){padding-left:16px}.analyticsPanel{padding-inline:22px}.analyticsTabs button{padding-inline:10px}.shape{padding:18px}.shape h2{font-size:17px}}
+@media(max-width:850px){.board{height:auto;min-height:0;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:auto;gap:16px}.leftPanel{grid-column:1/-1;grid-row:auto}.hero{height:350px;flex:none}.analyticsPanel{min-height:300px}.follow,.training,.recent,.statusGroup{grid-column:auto;grid-row:auto;min-height:220px}.recent,.statusGroup{grid-column:1/-1}.statusGroup{min-height:72px}}
+@media(max-width:600px){.board{display:flex;flex-direction:column;gap:14px}.leftPanel{border-radius:22px}.hero{height:440px;min-height:440px;padding:24px 22px 0}.hero:before{background-image:url('/cara-welcome-mobile-v2.webp');background-size:100% auto;background-position:center top;mask-image:linear-gradient(#000 75%,transparent 100%)}.heroWelcome{width:58%}.heroWelcome h1{font-size:26px;line-height:1.12}.heroWelcome p{font-size:11px;line-height:1.5;max-width:185px}.metrics{position:absolute;left:22px;right:22px;bottom:10px;width:auto;height:180px;min-height:0;margin:0}.metric{padding:10px 12px 10px 0;gap:6px}.metric:nth-child(even){padding-left:22px}.metric strong{font-size:30px}.metric span{font-size:11px}.metric svg{width:18px;height:18px}.analyticsPanel{padding:20px 22px 26px;min-height:300px;gap:20px}.analyticsPanel header{gap:14px}.analyticsPanel h2{font-size:23px}.analyticsTabs{width:100%}.analyticsTabs button{flex:1;font-size:12px;padding:8px 10px}.shape{border-radius:20px;padding:20px;min-height:180px}.shape h2{font-size:19px}.follow,.training,.recent{max-height:300px}.liveRows{max-height:220px}.liveRows strong{font-size:14px}.liveRows small{font-size:12px}.shape header>a{min-height:40px}.analyticsPanel{border-radius:0}.statusGroup{min-height:76px}.outcomeLayout{gap:20px}.outcomeRing{width:100px;height:100px;border-width:15px}.liveBars{gap:5px}.liveBars small{font-size:8px}}
+@media(min-width:851px){.board{height:calc(100dvh - 56px)}}
+
+/* The three work lists share the same visual weight. */
+@media(min-width:851px){.board{grid-template-rows:repeat(3,minmax(190px,1fr)) 72px}}
+@media(max-width:850px){.follow,.training,.recent{min-height:220px}}
+
+/* Show at most three rows; the header arrow opens the complete list. */
+.liveRows{overflow:hidden;scrollbar-width:none}
+.liveRows>a{flex:0 1 auto;min-height:0;padding:12px 0}
+.liveRows>a>span{overflow:hidden}
+.liveRows strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.liveRows small{-webkit-line-clamp:2}
+@media(max-width:850px){.follow,.training,.recent{height:auto;min-height:220px;max-height:none}.liveRows{max-height:none}}
+
+/* Shared row anatomy reserves a fixed lane for timestamps and navigation. */
+.liveRows>a{display:grid;grid-template-columns:30px minmax(0,1fr) 44px 16px;gap:10px;padding:11px 0;align-items:center;flex:1;min-height:0}
+.liveRows>a>.rowIcon{position:relative;display:grid;place-items:center;width:30px;height:30px;background:#ffffffa0;border:1px solid #00000006;border-radius:50%;overflow:visible}
+.rowIcon svg{width:16px;height:16px;color:#555}
+
+.liveRows>a>.rowCopy{display:block;min-width:0;overflow:hidden}
+.liveRows .rowCopy strong,.liveRows .rowCopy small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+.liveRows .rowCopy strong{font-size:13px;font-weight:500}
+.liveRows .rowCopy small{font-size:11px;margin-top:4px;color:#6b6b6b}
+.liveRows time{font-size:11px;color:#666;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.liveRows>a>svg{width:16px;height:16px;color:#555}
+@media(max-width:1100px){.liveRows>a{grid-template-columns:26px minmax(0,1fr) 40px 14px;gap:7px}.liveRows>a>.rowIcon{width:26px;height:26px}.liveRows .rowCopy strong{font-size:12px}.liveRows time{font-size:10px}}
+@media(max-width:600px){.liveRows>a{grid-template-columns:30px minmax(0,1fr) 42px 16px;gap:9px;padding:14px 0}.liveRows>a>.rowIcon{width:30px;height:30px}.liveRows .rowCopy strong{font-size:13px}.liveRows time{font-size:11px}.follow,.training,.recent{min-height:250px}}
+.liveRows time{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis}
+/* Shared, restrained motion for the overview. */
+.board{--ease-out:cubic-bezier(.22,1,.36,1)}
+.leftPanel,.follow,.training,.recent,.statusGroup{animation:panelEnter .5s var(--ease-out) both}
+.follow{animation-delay:45ms}.training{animation-delay:90ms}.recent{animation-delay:135ms}.statusGroup{animation-delay:170ms}
+@keyframes panelEnter{from{opacity:.94;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.shape header>a,.liveRows>a,.analyticsTabs button{transition:background-color .18s ease,box-shadow .18s ease,transform .18s var(--ease-out),color .18s ease}
+.shape header>a svg,.liveRows>a>svg{transition:transform .2s var(--ease-out),color .18s ease}
+.liveRows>a{border-radius:7px}
+.shape header>a:active,.analyticsTabs button:active{transform:scale(.96)}
+.liveRows>a:active{background:#0000000a;transform:scale(.99)}
+.analyticsTabs button[aria-selected=true]{box-shadow:0 2px 7px #00000015}
+.analyticsPanel:not([hidden]){animation:analyticsEnter .25s var(--ease-out) both}
+@keyframes analyticsEnter{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.liveBars i{transform-origin:bottom;animation:barEnter .45s var(--ease-out) both}
+@keyframes barEnter{from{transform:scaleY(.1);opacity:.4}to{transform:scaleY(1);opacity:1}}
+@media(hover:hover) and (pointer:fine){
+.shape header>a:hover{background:#0000000c;box-shadow:0 2px 6px #00000006;transform:translateY(-1px)}
+.shape header>a:hover svg,.liveRows>a:hover>svg{transform:translate(2px,-2px);color:#111}
+.liveRows>a:hover{background:transparent}
+.analyticsTabs button:not([aria-selected=true]):hover{background:#ffffff12;color:#fff}
+}
+@media(prefers-reduced-motion:reduce){
+.leftPanel,.follow,.training,.recent,.statusGroup,.analyticsPanel:not([hidden]),.liveBars i{animation:none}
+.shape header>a,.liveRows>a,.analyticsTabs button,.shape header>a svg,.liveRows>a>svg{transition:none}
+.shape header>a:hover,.shape header>a:active,.analyticsTabs button:active,.liveRows>a:active,.shape header>a:hover svg,.liveRows>a:hover>svg{transform:none}
+}
+
+.liveRows>a:hover,.liveRows>a:active{background:transparent}
+/* Soft pill highlight, inset content keeps the row from feeling rectangular. */
+.liveRows>a{border-radius:999px;padding-inline:8px}
+@media(hover:hover) and (pointer:fine){.liveRows>a:hover{background:#fff}}
+.liveRows>a:active{background:#ffffffb3}
+/* Keep separators straight, independent of the rounded hover surface. */
+.liveRows>a{position:relative;border-bottom:0}
+.liveRows>a:not(:last-child):after{content:"";position:absolute;bottom:0;left:8px;right:8px;height:1px;background:#00000012;pointer-events:none}
+@media(hover:hover) and (pointer:fine){.liveRows>a:hover:after{opacity:0}.liveRows>a:has(+a:hover):after{opacity:0}}
+.liveRows>a:after{transition:opacity .18s ease}
+@media(prefers-reduced-motion:reduce){.liveRows>a:after{transition:none}}
+
+/* Stable row dimensions let old rows leave without moving the card itself. */
+.liveRows{position:relative;display:grid;grid-template-rows:repeat(3,minmax(0,1fr));align-content:start}
+.liveRows>.emptyCopy{grid-row:1/-1}
+@media(max-width:850px){.liveRows{grid-auto-rows:minmax(60px,auto)}}
+@media(min-width:851px) and (max-height:800px){.board{min-height:740px}.hero{flex-basis:42%}}
+
+/* Clipping must not create a hidden scroll area when a chart gains focus. */
+.leftPanel,.hero{overflow:clip}
+@media(max-width:850px){.leftPanel{height:auto;flex-shrink:0}}
+
+/* Preserve the complete timestamp; only the title and description truncate. */
+.liveRows>a{grid-template-columns:30px minmax(0,1fr) max-content 16px}
+.liveRows time{min-width:44px;max-width:none;overflow:visible;text-overflow:clip;white-space:nowrap}
+@media(max-width:1100px){.liveRows>a{grid-template-columns:26px minmax(0,1fr) max-content 14px}}
+@media(max-width:600px){.liveRows>a{grid-template-columns:30px minmax(0,1fr) max-content 16px}}
+
+/* Keep list rows clean; navigation uses the same white hover as the rows. */
+.liveRows>a,.liveRows>a:not(:last-child){border-bottom:0}
+.liveRows>a:not(:last-child):after{content:none}
+@media(hover:hover) and (pointer:fine){.shape header>a:hover{background:#fff}}
+
+/* Center the complete two-line content block inside the hover pill. */
+.liveRows>a{padding-block:8px;align-items:center}
+.liveRows>a>.rowCopy{display:flex;flex-direction:column;justify-content:center;gap:4px}
+.liveRows .rowCopy strong,.liveRows .rowCopy small{margin:0;flex:none;line-height:1.4}
+@media(max-width:600px){.liveRows>a{padding-block:12px}}
+
+/* One continuous surface for the three work lists. */
+.workPanel{grid-column:2;grid-row:1/4;display:grid;grid-template-rows:repeat(3,minmax(0,1fr));min-width:0;min-height:0;border-radius:24px;background:radial-gradient(ellipse at 90% 70%,#3b3c3c 0%,#272828 45%,#222323 80%);overflow:clip;animation:panelEnter .5s var(--ease-out) both}
+.workPanel>.shape{grid-column:auto;grid-row:auto;background:transparent;border-radius:0;animation:none}
+@media(max-width:850px){.workPanel{grid-column:1/-1;grid-row:auto;grid-template-rows:repeat(3,minmax(250px,auto))}}
+@media(max-width:600px){.workPanel{border-radius:22px;flex:none}.workPanel>.shape{min-height:250px}}
+@media(prefers-reduced-motion:reduce){.workPanel{animation:none}}
+
+/* Inset section rules keep the shared surface continuous. */
+.workPanel>.shape{position:relative}
+.workPanel>.shape+.shape:before{content:"";position:absolute;top:0;left:22px;right:22px;height:1px;background:#00000020;pointer-events:none}
+.workPanel .rowCopy small,.workPanel time,.workPanel .emptyCopy{color:#555}
+@media(max-width:1100px) and (min-width:851px){.workPanel>.shape+.shape:before{left:18px;right:18px}}
+@media(max-width:600px){.workPanel>.shape+.shape:before{left:20px;right:20px}}
+
+/* Carry the welcome panel's neutral charcoal into the work panel. */
+.workPanel{color:#f5f5f5}
+.workPanel>.shape+.shape:before{background:#ffffff20}
+.workPanel .rowCopy small,.workPanel time,.workPanel .emptyCopy{color:#ccc}
+.workPanel header>a{background:#ffffff0b;color:#eee}
+.workPanel .liveRows>a>.rowIcon{background:#ffffff12;border-color:#ffffff0a}
+.workPanel .rowIcon svg,.workPanel .liveRows>a>svg{color:#ccc}
+.workPanel .liveRows>a:active{color:#222}
+.workPanel .liveRows>a:active small,.workPanel .liveRows>a:active time,.workPanel .liveRows>a:active svg{color:#555}
+@media(hover:hover) and (pointer:fine){
+.workPanel header>a:hover{background:#fff;color:#222}
+.workPanel .liveRows>a:hover{background:#fff;color:#222}
+.workPanel .liveRows>a:hover small,.workPanel .liveRows>a:hover time,.workPanel .liveRows>a:hover svg{color:#555}
+}
+
+/* A calmer desktop scale, without shrinking readable list copy. */
+@media(min-width:851px){
+.board{height:min(820px,calc(100dvh - 72px));min-height:740px;gap:16px;grid-template-rows:repeat(3,minmax(190px,1fr)) 64px}
+.hero{min-height:300px;flex-basis:43%;padding:24px 26px 12px}
+.heroWelcome h1{font-size:clamp(25px,2vw,32px)}
+.metric strong{font-size:32px}.metric svg{width:18px;height:18px}
+.metrics{margin-top:14px;min-height:160px}
+.workPanel>.shape{padding:20px;gap:12px}.shape h2{font-size:19px}
+.shape header>a{min-height:34px;padding:6px 10px}
+.workPanel>.shape+.shape:before{left:20px;right:20px}
+}
+@media(max-width:600px){.heroWelcome h1{font-size:24px}.metric strong{font-size:28px}.shape h2{font-size:18px}}
+
+/* Room for the compact status cards’ supporting copy. */
+@media(min-width:851px){.board{grid-template-rows:repeat(3,minmax(190px,1fr)) 88px}}
+.statusGroup{min-height:88px}
+
+@media(min-width:851px){.board{grid-template-rows:repeat(3,minmax(190px,1fr)) 72px}}
+.statusGroup{min-height:72px}
+
+@media(min-width:851px){.board{grid-template-rows:repeat(3,minmax(190px,1fr)) 86px}}
+.statusGroup{min-height:86px}
+
+/* Periwinkle identifies work requiring input; recent activity stays neutral. */
+.workPanel header>a[data-attention=true]>span{color:inherit}
+.workPanel .liveRows>a>.needsAction{background:#a8b4f016;border-color:#a8b4f030}
+.workPanel .needsAction svg{color:#a8b4f0}
+/* A deliberately short preview leaves a clear lane for timestamps/actions. */
+.workPanel .liveRows>a>.rowCopy{width:100%;max-width:30ch;padding-right:18px;box-sizing:border-box;min-width:0;justify-self:start}
+.workPanel .rowCopy strong,.workPanel .rowCopy small{display:block;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workPanel .rowCopy small{color:#b9bbbb}
+.workPanel .liveRows time{font-variant-numeric:tabular-nums}
+@media(max-width:600px){.workPanel .liveRows>a>.rowCopy{max-width:26ch;padding-right:12px}}
+
+/* The shared workspace crossfades as one surface; no panel or chart expansion. */
+.leftPanel,.follow,.training,.recent,.statusGroup,.workPanel,.liveBars i{animation:none}
+
+/* Consistent attention colours: follow-ups amber, knowledge periwinkle. */
+.workPanel .follow .liveRows>a>.needsAction{color:#d8b574;background:#d8b57414;border-color:#d8b57438}
+.workPanel .follow .needsAction svg{color:#d8b574}
+.workPanel .training .liveRows>a>.needsAction{color:#a8b4e0;background:#a8b4e014;border-color:#a8b4e038}
+.workPanel .training .needsAction svg{color:#a8b4e0}
+.workPanel .follow header>a[data-attention=true]:not(:hover){color:#d8b574;background:#d8b57412}
+.workPanel .training header>a[data-attention=true]:not(:hover){color:#a8b4e0;background:#a8b4e012}
+@media(hover:hover){.workPanel .follow .liveRows>a:hover .needsAction svg{color:#795a24}.workPanel .training .liveRows>a:hover .needsAction svg{color:#56638c}}
+
+/* Cara is seated at a real desk; blend the scene below her hands, not her torso. */
+.hero:before{background-image:url('/cara-home-grounded-v3.jpg');background-size:auto 100%;background-position:right top;mask-image:linear-gradient(90deg,transparent 22%,#000 48%),linear-gradient(#000 82%,transparent 100%);mask-composite:intersect}
+@media(max-width:600px){.hero:before{height:260px;bottom:auto;background-image:url('/cara-home-grounded-v3.jpg');background-size:auto 100%;background-position:right top;mask-image:linear-gradient(90deg,transparent 12%,#000 44%),linear-gradient(#000 82%,transparent 100%);mask-composite:intersect}}
+
+.workPanel .training .rowCopy strong,.workPanel .training .rowCopy small{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+.workPanel .training .liveRows>a{min-height:78px}
+
+/* Three independent cards, with the same spacing as the rest of the dashboard. */
+.workPanel{gap:16px;background:transparent;border-radius:0;overflow:visible}
+.workPanel>.shape{border-radius:24px;background:radial-gradient(ellipse at 90% 70%,#343535 0%,#272828 55%,#222323 100%);overflow:hidden}
+.workPanel>.shape+.shape:before{display:none}
+@media(max-width:600px){.workPanel{gap:14px;border-radius:0;overflow:visible}.workPanel>.shape{border-radius:22px}}
+
+/* Mobile-only composition brings the desk into the unused area under the greeting. */
+@media(max-width:600px){.hero:before{height:280px;background-image:url('/cara-home-grounded-mobile-v4.jpg');background-size:100% auto;background-position:center top;mask-image:linear-gradient(#000 80%,transparent 100%);mask-composite:add}}
+
+.statusGroup{display:flex;flex-direction:column;gap:14px;padding:20px;border-radius:24px;background:radial-gradient(ellipse at 90% 70%,#343535 0%,#272828 55%,#222323 100%);color:#f5f5f5;min-height:150px;overflow:hidden}
+.statusGroup>h2{font-size:19px;font-weight:500;letter-spacing:-.035em;line-height:1.25;margin:0}
+.statusGroup>section{flex:1;min-height:0}
+@media(min-width:851px){.board{grid-template-rows:repeat(3,minmax(170px,1fr)) 150px}}
+@media(max-width:850px){.statusGroup{min-height:160px}}
+@media(max-width:600px){.statusGroup{border-radius:22px 22px 0 0;padding:20px 20px max(20px,env(safe-area-inset-bottom));min-height:160px}.statusGroup>h2{font-size:18px}}
+.statusGroup{min-height:174px}
+@media(min-width:851px){.board{grid-template-rows:repeat(3,minmax(170px,1fr)) 174px}}
+
+/* Keep all three rows readable instead of squeezing them into a clipped scroller. */
+.workPanel .liveRows{overflow:visible;max-height:none;flex:none;gap:2px}
+.workPanel .liveRows>a{flex-shrink:0;height:auto;min-height:52px;padding-block:8px;align-items:center}
+.workPanel .training .liveRows>a{min-height:58px}
+.workPanel>.shape{overflow:visible;min-height:0}
+.workPanel .liveRows>a>.rowCopy{max-width:none;padding-right:8px}
+@media(min-width:851px){
+ .board{min-height:940px;height:max(940px,calc(100dvh - 72px));grid-template-rows:repeat(3,minmax(220px,1fr)) 174px}
+ .workPanel{grid-template-rows:repeat(3,minmax(220px,1fr))}
+ .workPanel>.shape{padding:18px;gap:10px}
+ .workPanel .rowCopy strong{font-size:12px}.workPanel .rowCopy small{font-size:11px}
+ .workPanel .liveRows>a{min-height:50px}
+ .workPanel .training .liveRows>a{min-height:58px}
+}
+@media(max-width:850px){.workPanel{grid-template-rows:repeat(3,minmax(250px,auto))}.workPanel>.shape{max-height:none;min-height:250px}}
+@media(min-width:851px){
+ .board{height:820px;min-height:820px;grid-template-rows:repeat(3,minmax(0,1fr)) 174px}
+ .workPanel{grid-template-rows:repeat(3,minmax(0,1fr))}
+ .workPanel>.shape{padding:14px 18px;gap:6px}
+ .workPanel .shape header>a{min-height:30px;padding-block:4px}
+ .workPanel .liveRows{gap:0}
+ .workPanel .liveRows>a,.workPanel .training .liveRows>a{min-height:44px;padding-block:4px}
+ .workPanel .rowCopy small{margin-top:2px}
+}
+
+/* Fade the image's own left edge, rather than a percentage of the wider hero. */
+@media(min-width:601px){.hero:before{left:auto;right:0;top:0;bottom:0;width:auto;height:100%;aspect-ratio:1672 / 941;background-size:100% 100%;mask-image:linear-gradient(90deg,transparent 0%,#000 30%),linear-gradient(#000 82%,transparent 100%);mask-composite:intersect}}
+
+/* A full-width desktop scene removes the composited left edge altogether. */
+@media(min-width:601px){.hero:before{inset:0;width:100%;height:100%;aspect-ratio:auto;background-image:url('/cara-home-desktop-panorama-v4.jpg');background-size:cover;background-position:right top;mask-image:linear-gradient(#000 88%,transparent 100%);mask-composite:add}}
+.updatesSlot{grid-column:2;grid-row:4;min-width:0;min-height:174px}
+@media(max-width:850px){.updatesSlot{grid-column:1/-1;grid-row:auto}}
+
+/* Quietly soften the scene behind the metrics, keeping Cara crisp. */
+@media(min-width:601px){
+ .hero:before{z-index:-2}
+ .hero:after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:#11151577;backdrop-filter:blur(2px);mask-image:linear-gradient(90deg,#000 0%,#000 36%,#0009 50%,transparent 69%)}
+}
+@media(min-width:601px){.hero:before{background-image:url('/cara-home-desktop-reference-v5.jpg')}}
+@media(min-width:601px){.hero:after{mask-image:linear-gradient(90deg,#000 0%,#000 36%,#0009 50%,transparent 69%),linear-gradient(#000 76%,transparent 100%);mask-composite:intersect}}
+
+/* Restore the original desktop portrait and its simple, continuous bottom blend. */
+@media(min-width:601px){
+ .hero:before{inset:0;width:auto;height:auto;aspect-ratio:auto;z-index:-1;background:url('/cara-welcome-desktop-v2.webp') center top/cover no-repeat;mask-image:linear-gradient(#000 72%,transparent 100%);mask-composite:add;filter:none}
+ .hero:after{display:none}
+}

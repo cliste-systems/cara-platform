@@ -15,7 +15,7 @@ export function businessNameLabel(name: string): string {
 }
 
 export function defaultVoiceGreetingIntro(businessName: string): string {
-  return `You're through to ${businessNameLabel(businessName)} —`;
+  return `You're through to ${businessNameLabel(businessName)}.`;
 }
 
 /** Fixed GDPR / AI Act disclosure — callers always hear this; platform staff can edit the template. */

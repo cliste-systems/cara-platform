@@ -16,6 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 
 type Props = {
+  trialStartsOnConnection?:boolean;
   trialDays: number;
   continueHref: string;
   continueLabel?: string;
@@ -24,6 +25,7 @@ type Props = {
 };
 
 export function ClisteCheckoutSuccess({
+  trialStartsOnConnection,
   trialDays,
   continueHref,
   continueLabel = "Continue to dashboard",
@@ -49,7 +51,7 @@ export function ClisteCheckoutSuccess({
 
           <OnboardingEnter tone="profile" className="w-full">
             <p className="mt-2 text-[14px] font-medium leading-snug text-[#0b1220]">
-              Your {trialDays}-day trial has started.
+              {trialStartsOnConnection?"Your payment details are saved.":`Your ${trialDays}-day trial has started.`}
             </p>
           </OnboardingEnter>
 

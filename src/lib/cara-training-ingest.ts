@@ -51,6 +51,9 @@ export async function ingestCallKnowledgeGaps(
   gaps: KnowledgeGapPayload[],
 ): Promise<void> {
   if (gaps.length === 0) return;
+  const { data: call, error: callError } = await admin.from("call_logs").select("caller_data_erased_at").eq("id", callLogId).eq("organization_id", organizationId).single();
+  if (callError) throw new Error("Knowledge source call could not be loaded.");
+  if (call.caller_data_erased_at) return;
 
   const { data: org } = await admin
     .from("organizations")
@@ -83,7 +86,7 @@ export async function ingestCallKnowledgeGaps(
     });
     if (!admission.admit) continue;
 
-    await createTrainingItem(admin, {
+    const result = await createTrainingItem(admin, {
       organizationId,
       source: "call_gap",
       gapSummary: topic,
@@ -92,6 +95,7 @@ export async function ingestCallKnowledgeGaps(
       callLogId,
       notify: true,
     });
+    if (!result.ok) throw new Error(result.message);
   }
 }
 

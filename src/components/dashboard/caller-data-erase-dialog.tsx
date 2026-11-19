@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Select } from "@base-ui/react/select";
+import { Check, ChevronDown } from "lucide-react";
 
 import {
   DASHBOARD_INPUT_CLASS,
@@ -20,8 +22,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import styles from "./service-privacy-dialog.module.css";
+
+const deletionReasons = [
+  {value:"Customer requested deletion",label:"Customer requested deletion"},
+  {value:"Wrong number",label:"Wrong number"},
+  {value:"Duplicate caller record",label:"Duplicate caller record"},
+  {value:"Spam or abusive caller",label:"Spam or abusive caller"},
+  {value:"Data no longer needed",label:"Data no longer needed"},
+  {value:"other",label:"Other — enter a reason"},
+];
 
 type CallerDataEraseDialogProps = {
+  serviceTheme?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   phoneDisplay: string;
@@ -76,6 +89,7 @@ export function ErasureReviewCard({
 
 export function CallerDataEraseDialog({
   open,
+  serviceTheme = false,
   onOpenChange,
   phoneDisplay,
   callerName = null,
@@ -84,6 +98,7 @@ export function CallerDataEraseDialog({
 }: CallerDataEraseDialogProps) {
   const [step, setStep] = useState<"details" | "confirm">("details");
   const [reason, setReason] = useState("");
+  const [reasonChoice, setReasonChoice] = useState<string | null>(null);
   const [performedBy, setPerformedBy] = useState("");
   const [eraseConfirmText, setEraseConfirmText] = useState("");
 
@@ -91,6 +106,7 @@ export function CallerDataEraseDialog({
     if (!open) {
       setStep("details");
       setReason("");
+      setReasonChoice(null);
       setPerformedBy("");
       setEraseConfirmText("");
     }
@@ -105,6 +121,7 @@ export function CallerDataEraseDialog({
     if (!nextOpen) {
       setStep("details");
       setReason("");
+      setReasonChoice(null);
       setPerformedBy("");
       setEraseConfirmText("");
     }
@@ -115,7 +132,8 @@ export function CallerDataEraseDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
         showCloseButton
-        className="gap-0 overflow-hidden border border-slate-200 bg-white p-0 sm:max-w-xl"
+        overlayClassName={serviceTheme ? styles.backdrop : undefined}
+        className={cn("gap-0 overflow-hidden border border-slate-200 bg-white p-0 sm:max-w-xl", serviceTheme && styles.popup)}
       >
         <DialogHeader className="space-y-0 border-b border-slate-100 px-6 pb-5 pt-6 text-left sm:px-8">
           <DialogTitle className="pr-8 text-[18px] font-semibold tracking-tight text-[#0b1220]">
@@ -158,11 +176,19 @@ export function CallerDataEraseDialog({
                 <Label htmlFor="erase-caller-reason" className="text-[13px] text-slate-700">
                   Reason for deletion
                 </Label>
-                <Textarea
-                  id="erase-caller-reason"
+                {serviceTheme && <Select.Root value={reasonChoice} items={deletionReasons} onValueChange={value => { setReasonChoice(value); setReason(value && value !== "other" ? value : ""); }}>
+                  <Select.Trigger id="erase-caller-reason" className={styles.reasonTrigger} aria-label="Reason for deletion"><Select.Value placeholder="Choose a reason"/><Select.Icon><ChevronDown aria-hidden="true"/></Select.Icon></Select.Trigger>
+                  <Select.Portal><Select.Positioner sideOffset={8} collisionPadding={14} alignItemWithTrigger={false} className={styles.reasonPositioner}><Select.Popup className={styles.reasonPopup}><Select.List>
+                    {deletionReasons.map(option => <Select.Item key={option.value} value={option.value} className={styles.reasonItem}><Select.ItemText>{option.label}</Select.ItemText><Select.ItemIndicator><Check aria-hidden="true"/></Select.ItemIndicator></Select.Item>)}
+                  </Select.List></Select.Popup></Select.Positioner></Select.Portal>
+                </Select.Root>}
+                {(!serviceTheme || reasonChoice === "other") && <>
+                  {serviceTheme && <Label htmlFor="erase-caller-custom-reason" className="text-[13px] text-slate-700">Your reason</Label>}
+                  <Textarea
+                  id={serviceTheme ? "erase-caller-custom-reason" : "erase-caller-reason"}
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
-                  placeholder="e.g. Customer requested erasure by phone"
+                  placeholder="Enter the reason for deletion"
                   rows={4}
                   className={cn(
                     DASHBOARD_INPUT_CLASS,
@@ -170,6 +196,8 @@ export function CallerDataEraseDialog({
                   )}
                   required
                 />
+                </>}
+
               </div>
             </div>
           ) : (

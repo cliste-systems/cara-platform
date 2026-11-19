@@ -35,6 +35,7 @@ import {
   VOICE_ASSISTANT_DEFAULT_NAME,
 } from "@/lib/voice-greeting";
 
+import { dashboardHoursError } from "@/lib/dashboard-hours-validation";
 import { saveAgentSetup } from "../agent-setup/actions";
 import type { AgentFaq } from "../agent-setup/agent-faqs";
 import type { AgentSetupInitial } from "../agent-setup/agent-setup-helpers";
@@ -76,6 +77,9 @@ type FormSnapshot = {
 };
 
 type CaraSetupFormContextValue = {
+  captureFields:CaraCaptureField[];
+  setCaptureFields:(fields:CaraCaptureField[])=>void;
+  canManage:boolean;
   businessName: string;
   niche: string;
   verticalId: VerticalId;
@@ -161,11 +165,13 @@ function snapshotFromState(
 }
 
 export function CaraSetupFormProvider({
+  canManage = false,
   initial,
   businessFiles,
   promptExtras,
   children,
 }: {
+  canManage?:boolean;
   initial: AgentSetupInitial;
   businessFiles: BusinessFileListItem[];
   promptExtras: Pick<
@@ -174,6 +180,7 @@ export function CaraSetupFormProvider({
   >;
   children: ReactNode;
 }) {
+  const [version, setVersion] = useState(initial.version);
   const defaultIntro = defaultVoiceGreetingIntro(initial.businessName);
   const parsedGreeting = parseGreetingParts(
     initial.greeting,
@@ -243,6 +250,7 @@ export function CaraSetupFormProvider({
   const [faqs, setFaqs] = useState<AgentFaq[]>(initial.faqs);
   const [businessFilesState, setBusinessFiles] = useState(businessFiles);
   const [pending, startTransition] = useTransition();
+  const [feedbackSnapshot, setFeedbackSnapshot] = useState<string | null>(null);
   const [status, setStatus] = useState<
     { kind: "ok" | "error"; message: string } | null
   >(null);
@@ -500,6 +508,7 @@ export function CaraSetupFormProvider({
   const buildSavePayload = useCallback(() => {
     const hasHours = weekScheduleHasOpenDay(openingHoursSchedule);
     return {
+      version,
       assistantDisplayName: assistantDisplayName,
       greetingIntro,
       greetingClosing,
@@ -513,8 +522,8 @@ export function CaraSetupFormProvider({
       open24_7,
       hoursNote,
       bankHolidays,
-      serviceArea: "",
-      serviceAreaExclusions: "",
+      serviceArea: formatAgentKnowledgeList(serviceAreaItems),
+      serviceAreaExclusions: formatAgentKnowledgeList(serviceAreaExclusionItems),
       servicesDepartments: formatAgentKnowledgeList(
         dedupeServiceChips(servicesItems),
       ),
@@ -533,6 +542,8 @@ export function CaraSetupFormProvider({
       rawBusinessDescription,
     };
   }, [
+    version,
+    assistantDisplayName,
     greetingIntro,
     greetingClosing,
     faqs,
@@ -556,10 +567,17 @@ export function CaraSetupFormProvider({
   ]);
 
   const saveAsync = useCallback(async (): Promise<boolean> => {
+    if(!canManage)return false;
     setStatus(null);
-    const res = await saveAgentSetup(buildSavePayload());
+    setFeedbackSnapshot(currentSnapshot);
+    const payload = buildSavePayload();
+    const hoursError = dashboardHoursError(payload.businessHours, payload.open24_7, payload.bankHolidays);
+    if (hoursError) { setStatus({kind:"error",message:hoursError}); return false; }
+    let res;
+    try { res = await saveAgentSetup(payload); } catch { setStatus({kind:"error",message:"We couldn’t save your changes. Your draft is still here. Please try again."}); return false; }
     if (res.ok) {
-      baselineRef.current = currentSnapshot;
+      setVersion(res.version);
+      baselineRef.current = JSON.stringify({...JSON.parse(currentSnapshot), hoursNeverConfigured:false});
       setHoursNeverConfigured(false);
       setStatus({ kind: "ok", message: "Changes saved." });
       return true;
@@ -567,6 +585,7 @@ export function CaraSetupFormProvider({
     setStatus({ kind: "error", message: res.message });
     return false;
   }, [
+    canManage,
     buildSavePayload,
     currentSnapshot,
   ]);
@@ -578,6 +597,9 @@ export function CaraSetupFormProvider({
   }, [saveAsync]);
 
   const value: CaraSetupFormContextValue = {
+    canManage,
+    captureFields,
+    setCaptureFields:(fields)=>{setCaptureFields(fields);setDetailsToCollectItems(fields.map(f=>f.label));},
     businessName: initial.businessName,
     niche: initial.niche,
     verticalId: initial.verticalId,
@@ -639,7 +661,7 @@ export function CaraSetupFormProvider({
     setFaqs,
     isDirty,
     pending,
-    status,
+    status: status?.kind === "error" && feedbackSnapshot !== currentSnapshot ? null : status,
     save,
     saveAsync,
     markSavedBaseline,

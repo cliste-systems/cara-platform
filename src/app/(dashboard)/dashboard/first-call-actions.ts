@@ -1,4 +1,6 @@
 "use server";
+import {cookies,headers} from "next/headers";
+import {isLocalSetupTestEnabled,LOCAL_SETUP_COMPLETION_COOKIE,localSetupCompletionValue} from "@/lib/onboarding-dev";
 import { revalidatePath } from "next/cache";
 import { requireDashboardAdmin } from "@/lib/dashboard-admin";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -9,9 +11,13 @@ export async function saveFirstCallBusiness(raw: unknown, authority: boolean) {
  if(!s.user.email_confirmed_at)return {ok:false,message:"Confirm your email before submitting business details."};
  const parsed=validateVerificationDetails(raw);
  if(parsed.error) return {ok:false,message:parsed.error};
+ const admin=createAdminClient();
+ const {data:existing,error:statusError}=await admin.from("customer_first_call_setup").select("verification_status").eq("organization_id",s.organizationId).maybeSingle();
+ if(statusError)return {ok:false,message:"We could not check your submission. Please try again."};
+ if(existing&&!['not_submitted','needs_information'].includes(existing.verification_status))return {ok:false,message:"Your business details have already been submitted and cannot be edited."};
  const d=parsed.details!;
  const body="Business details submitted for phone-number verification. Review these details and the applicable Twilio requirements separately from Cara setup. This is not a Twilio approval.\n\n"+Object.entries(d).map(([key,value])=>`${key}: ${value}`).join("\n");
- const {error}=await createAdminClient().rpc("submit_first_call_business",{p_org:s.organizationId,p_user:s.user.id,p_details:d,p_body:body});
+ const {error}=await admin.rpc("submit_first_call_business",{p_org:s.organizationId,p_user:s.user.id,p_details:d,p_body:body});
  if(error) return {ok:false,message:"We could not submit your details. Please retry, or contact support if your details were already verified."};
  revalidatePath("/dashboard"); revalidatePath("/admin/support"); revalidatePath("/admin"); revalidatePath(`/admin/customers/${s.organizationId}`);
  return {ok:true,message:"Details received. Our team will review them and contact you if anything else is needed."};
@@ -19,12 +25,15 @@ export async function saveFirstCallBusiness(raw: unknown, authority: boolean) {
 export async function dismissFirstCallWelcome() {
  const s=await requireDashboardAdmin();
  const {loadFirstCallSetup}=await import("@/lib/load-first-call-setup");
- const {firstCallTestComplete}=await import("@/lib/first-call-setup");
+ const {firstCallTestComplete,firstCallConfigurationReady}=await import("@/lib/first-call-setup");
  const state=await loadFirstCallSetup(s);
+ if(isLocalSetupTestEnabled(await headers())&&firstCallConfigurationReady(state)){
+  (await cookies()).set(LOCAL_SETUP_COMPLETION_COOKIE,localSetupCompletionValue(s.user.id,s.organizationId),{httpOnly:true,sameSite:"strict",path:"/",maxAge:3600});
+  revalidatePath("/dashboard");return {ok:true};
+ }
  if(!state.dashboardUnlocked&&!firstCallTestComplete(state))return {ok:false};
- const at=new Date().toISOString();
- const {error}=await createAdminClient().from("customer_first_call_setup").upsert({organization_id:s.organizationId,welcome_seen_at:at,completed_sections:{...state.completedSections,forwarding:at,dashboard:at}},{onConflict:"organization_id"});
- if(error) return {ok:false};
+ const {data:unlocked,error}=await createAdminClient().rpc("unlock_first_call_dashboard",{p_org:s.organizationId});
+ if(error||!unlocked) return {ok:false};
  revalidatePath("/dashboard"); return {ok:true};
 }
 
@@ -52,7 +61,7 @@ export async function retryFirstCallNumber(){
 export async function saveFirstCallSection(section:string,raw:Record<string,string>){
  const session=await requireDashboardAdmin();
  const {FIRST_CALL_SECTIONS,firstCallConfigPatch}=await import("@/lib/first-call-config");
- const {canEditFirstCallSection,nextFirstCallReceipts}=await import("@/lib/first-call-setup");
+ const {canEditFirstCallSection}=await import("@/lib/first-call-setup");
  const {loadFirstCallSetup}=await import("@/lib/load-first-call-setup");
  const state=await loadFirstCallSetup(session);
  if(state.dashboardUnlocked)return {ok:false,message:"Your first-call setup is complete. Make further changes in your dashboard’s business settings."};
@@ -60,6 +69,15 @@ export async function saveFirstCallSection(section:string,raw:Record<string,stri
  const {classificationFromFields}=await import("@/lib/business-classification");
  const parsed=firstCallConfigPatch(section as import("@/lib/first-call-setup").FirstCallSection,raw,state.businessName,classificationFromFields(state.configuration??{}));
  if(!parsed.ok)return parsed;
+ if(section==='greeting'){
+  const {reserveVoiceApiRequest,voiceApiFingerprint,voiceApiRateLimitMessage}=await import('@/lib/voice-api-rate-limit');
+  const limit=await reserveVoiceApiRequest('greeting_review',voiceApiFingerprint(`first-call-greeting:${session.user.id}:${session.organizationId}`));
+  if(!limit.allowed)return {ok:false,message:voiceApiRateLimitMessage(limit.retryAfterSeconds)};
+  const {reviewVoiceGreetingSafe}=await import('@/lib/voice-greeting-review');
+  const checked=await reviewVoiceGreetingSafe({businessName:state.businessName,greetingIntro:raw.intro??'',greetingClosing:raw.closing??''});
+  if(checked.status==='blocked')return {ok:false,message:checked.suggestion.summary};
+ }
+
  const {data:org,error:readError}=await session.supabase.from("organizations").select("name,niche,business_classification,service_starter_state,agent_business_type,raw_business_description,agent_services_departments,agent_services_not_offered,agent_opening_hours,agent_service_area,agent_details_to_collect,agent_business_rules,agent_faqs,business_hours,greeting,notification_email,notification_phone,business_knowledge_summary,updated_at").eq("id",session.organizationId).single();
  if(section==="profile"&&org?.niche==="retail")return {ok:false,message:"Retail setup is managed by our team."};
  if(readError||!org)return {ok:false,message:"Your business settings could not be loaded. Please try again."};
@@ -74,28 +92,100 @@ export async function saveFirstCallSection(section:string,raw:Record<string,stri
  const {parseAgentBusinessRules}=await import("@/lib/agent-business-rules");
  const updated={...org,...parsed.patch};
  const patch={...parsed.patch,...(["profile","hours","services"].includes(section)?{business_knowledge_summary:buildKnowledgeSummaryFromAgentState({businessName:org.name,rawBusinessDescription:String(updated.raw_business_description??""),servicesOffered:String(updated.agent_services_departments??""),servicesNotOffered:String(updated.agent_services_not_offered??""),openingHours:String(updated.agent_opening_hours??""),serviceArea:org.agent_service_area??"",detailsToCollect:org.agent_details_to_collect??"",businessRules:parseAgentBusinessRules(org.agent_business_rules),faqs:parseAgentFaqs(org.agent_faqs)})}:{})};
- const stamp=new Date().toISOString();
- // Invalidate this and all later receipts before changing settings. A failed
- // save cannot leave an old test call authorising a newly edited setup.
- const sectionIndex=FIRST_CALL_SECTIONS.indexOf(section as import("@/lib/first-call-setup").FirstCallSection);
- const earlier=Object.fromEntries(FIRST_CALL_SECTIONS.slice(0,sectionIndex).flatMap(key=>state.completedSections?.[key]?[[key,state.completedSections[key]]]:[]));
- const {error:beginError}=await createAdminClient().from("customer_first_call_setup").upsert({organization_id:session.organizationId,completed_sections:earlier},{onConflict:"organization_id"});
- if(beginError)return {ok:false,message:"We could not start saving this section. Please try again."};
- let write=session.supabase.from("organizations").update({...patch,updated_at:stamp}).eq("id",session.organizationId);
- if(org.updated_at)write=write.eq("updated_at",org.updated_at);
- const {error}=await write.select("id").single();
- if(error)return {ok:false,message:"We could not save this section. Please try again."};
  const {regenerateCaraCustomPrompt}=await import("@/lib/cara-prompt-from-org");
- let compiled:{ok:boolean};
- try{compiled=await regenerateCaraCustomPrompt(session.supabase,session.organizationId);}catch{compiled={ok:false};}
- if(!compiled.ok){
-  const previous=Object.fromEntries(Object.keys(patch).map(key=>[key,(org as Record<string,unknown>)[key]??null]));
-  await session.supabase.from("organizations").update({...previous,updated_at:new Date().toISOString()}).eq("id",session.organizationId).eq("updated_at",stamp);
-  return {ok:false,message:"Cara’s instructions could not be prepared. This section has not been completed; please retry."};
- }
- const {error:progressError}=await createAdminClient().from("customer_first_call_setup").upsert({organization_id:session.organizationId,completed_sections:nextFirstCallReceipts(state.completedSections??{},section as import("@/lib/first-call-setup").FirstCallSection,stamp)},{onConflict:"organization_id"});
- if(progressError)return {ok:false,message:"Your settings were saved, but section completion could not be recorded. Please save again before continuing."};
+ const compiled=await regenerateCaraCustomPrompt(session.supabase,session.organizationId,{dryRun:true,orgPatch:patch}).catch(()=>null);
+ if(!compiled?.ok||!compiled.prompt)return {ok:false,message:"Cara’s instructions could not be prepared. Your settings have not changed; please retry."};
+ const {data:saved,error}=await createAdminClient().rpc("save_first_call_configuration",{p_org:session.organizationId,p_version:org.updated_at,p_section:section,p_patch:{...patch,custom_prompt:compiled.prompt,prompt_compile_warnings:compiled.warnings??null}});
+ if(error||!saved)return {ok:false,message:"These settings changed while saving. Your draft is kept; refresh and try again."};
  revalidatePath("/dashboard");
  revalidatePath(`/admin/customers/${session.organizationId}`);
  return {ok:true,message:"Section saved."};
+}
+
+export async function savePhoneConnection(input:{businessNumber:string;phoneType:string;provider:string}) {
+ const session=await requireDashboardAdmin();
+ const {loadFirstCallSetup}=await import('@/lib/load-first-call-setup');
+ const {firstCallTestComplete,firstCallConfigurationReady}=await import('@/lib/first-call-setup');
+ const {normalizeConnectionNumber,connectionNumberIssue,CONNECTION_PHONE_TYPES,CONNECTION_PROVIDERS}=await import('@/lib/phone-connection');
+ const state=await loadFirstCallSetup(session);
+ if(!firstCallTestComplete(state)&&!(isLocalSetupTestEnabled(await headers())&&firstCallConfigurationReady(state)))return {ok:false as const,message:'Complete your test call first.'};
+ const issue=connectionNumberIssue(String(input.businessNumber??''),input.phoneType,state.number);
+ if(issue)return {ok:false as const,message:issue};
+ const number=normalizeConnectionNumber(String(input.businessNumber??''));
+ if(!number||number===state.number)return {ok:false as const,message:'Enter your existing Irish business number, not your Cara number.'};
+ if(!CONNECTION_PHONE_TYPES.some(v=>v===input.phoneType)||!CONNECTION_PROVIDERS.some(v=>v===input.provider))return {ok:false as const,message:'Choose your phone type and provider.'};
+ const admin=createAdminClient();
+ const {data:existing,error:readError}=await admin.from('customer_phone_connections').select('*').eq('organization_id',session.organizationId).maybeSingle();
+ if(readError)return {ok:false as const,message:'Your connection details could not be loaded.'};
+ if(existing?.verified_at)return {ok:false as const,message:'Your connection is already confirmed. Contact support to change your number.'};
+ const changed=existing?.business_number!==number;
+ const payload={business_number:number,phone_type:input.phoneType,provider:input.provider,...(changed?{requested_at:new Date().toISOString(),support_ticket_id:null}:{} )};
+ const result=existing?await admin.from('customer_phone_connections').update(payload).eq('organization_id',session.organizationId).is('verified_at',null).select('*').single():await admin.from('customer_phone_connections').insert({organization_id:session.organizationId,...payload}).select('*').single();
+ if(result.error)return {ok:false as const,message:'Your connection details could not be saved. Please try again.'};
+ // The caller applies the returned connection without replacing the active setup tree.
+ // Refreshing this layout here can reset the instruction state while confirmation is resolving.
+ return {ok:true as const,connection:result.data as import('@/lib/phone-connection').PhoneConnection};
+}
+export async function checkMyPhoneConnection() {
+ const session=await requireDashboardAdmin();
+ const {reserveVoiceApiRequest,voiceApiFingerprint}=await import('@/lib/voice-api-rate-limit');
+ const limit=await reserveVoiceApiRequest('greeting_review',voiceApiFingerprint(`connection:${session.organizationId}`));
+ if(!limit.allowed)return {ok:false as const,message:'Please wait a moment before checking again.'};
+ try {
+  const {checkPhoneConnection}=await import('@/lib/phone-connection-server');
+  const result=await checkPhoneConnection(session.organizationId);
+  revalidatePath('/dashboard');
+  return {ok:true as const,...result};
+ }catch{return {ok:false as const,message:'We could not confirm the connection yet. Your trial will wait until it is confirmed. Please retry or request help.'};}
+}
+export async function requestPhoneConnectionHelp() {
+ const session=await requireDashboardAdmin(),admin=createAdminClient();
+ const {data:connection,error}=await admin.from('customer_phone_connections').select('*').eq('organization_id',session.organizationId).single();
+ if(error||!connection)return {ok:false as const,message:'Save your business phone details first.'};
+ const {reserveVoiceApiRequest,voiceApiFingerprint}=await import('@/lib/voice-api-rate-limit');
+ const rate=await reserveVoiceApiRequest('greeting_review',voiceApiFingerprint(`connection-help:${session.organizationId}`));
+ if(!rate.allowed)return {ok:false as const,message:'Please wait before requesting help again.'};
+ const {error:updateError}=await admin.rpc('request_connection_support',{p_org:session.organizationId,p_user:session.user.id});
+ if(updateError)return {ok:false as const,message:'Your help request could not be sent. Please retry.'};
+ revalidatePath('/dashboard/support');revalidatePath('/admin/support');revalidatePath('/admin');
+ revalidatePath('/dashboard');return {ok:true as const};
+}
+
+/** Free formatting/range lookup only: never claims a live line or customer ownership. */
+export async function inspectPhoneConnectionNumber(raw:string,phoneType:string) {
+ const session=await requireDashboardAdmin();
+ const {connectionNumberDetails,connectionNumberIssue,CONNECTION_PHONE_TYPES}=await import('@/lib/phone-connection');
+ if(typeof raw!=='string'||raw.length>64||!CONNECTION_PHONE_TYPES.some(v=>v===phoneType))return {ok:false as const,message:'Enter your number and choose your phone type.'};
+ const {data:org,error}=await session.supabase.from('organizations').select('phone_number').eq('id',session.organizationId).single();
+ if(error)return {ok:false as const,message:'Your phone details could not be checked. Please retry.'};
+ const issue=connectionNumberIssue(raw,phoneType,org?.phone_number??null);
+ if(issue)return {ok:false as const,message:issue};
+ const details=connectionNumberDetails(raw)!;
+ const {reserveVoiceApiRequest,voiceApiFingerprint}=await import('@/lib/voice-api-rate-limit');
+ const rate=await reserveVoiceApiRequest('greeting_review',voiceApiFingerprint(`phone-lookup:${session.organizationId}`));
+ if(!rate.allowed)return {ok:false as const,message:'Please wait a moment before checking another number.'};
+ const {lookupConnectionNumber}=await import('@/lib/phone-number-lookup');
+ const status=await lookupConnectionNumber(details.number);
+ if(status==='invalid')return {ok:false as const,message:'This number did not pass the number check. Please check the digits and area code.'};
+ return {ok:true as const,details,lookup:status};
+}
+
+/** Number provisioning can need assistance before a forwarding record exists. */
+export async function requestSetupNumberHelp(){
+ const session=await requireDashboardAdmin();
+ const {loadFirstCallSetup}=await import('@/lib/load-first-call-setup');
+ const {firstCallConfigurationReady}=await import('@/lib/first-call-setup');
+ const state=await loadFirstCallSetup(session);
+ if(!firstCallConfigurationReady(state))return {ok:false as const,message:'Complete your business details, hours and greeting first.'};
+ const {reserveVoiceApiRequest,voiceApiFingerprint}=await import('@/lib/voice-api-rate-limit');
+ const limit=await reserveVoiceApiRequest('greeting_review',voiceApiFingerprint(`number-help:${session.organizationId}`));
+ if(!limit.allowed)return {ok:false as const,message:'Please wait a moment before requesting help again.'};
+ const admin=createAdminClient(),subject='Cara number setup assistance';
+ const {data:existing,error:readError}=await admin.from('support_tickets').select('id').eq('organization_id',session.organizationId).eq('subject',subject).neq('status','closed').limit(1).maybeSingle();
+ if(readError)return {ok:false as const,message:'Your help request could not be sent. Please try again.'};
+ if(existing)return {ok:true as const};
+ const {error}=await admin.from('support_tickets').insert({organization_id:session.organizationId,created_by:session.user.id,subject,body:'The customer needs help preparing their Cara phone line for the first test call. Their setup is saved. Please review number availability and line activation, then reply in this support conversation.',status:'open'});
+ if(error)return {ok:false as const,message:'Your help request could not be sent. Please try again.'};
+ revalidatePath('/dashboard/support');revalidatePath('/admin/support');revalidatePath('/admin');
+ return {ok:true as const};
 }

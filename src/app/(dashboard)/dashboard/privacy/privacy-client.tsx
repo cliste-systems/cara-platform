@@ -1,4 +1,5 @@
 "use client";
+import { FormFeedback } from "@/components/ui/form-feedback";
 
 import { useState, useTransition } from "react";
 import { Download, FileJson, Trash2 } from "lucide-react";
@@ -210,9 +211,7 @@ export function PrivacyToolsClient({
           </Button>
         </form>
         {exportState.status === "error" ? (
-          <p className="text-[13px] text-red-600" role="alert">
-            {exportState.message}
-          </p>
+          <FormFeedback message={exportState.message} />
         ) : null}
         {exportState.status === "ready" ? (
           <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 text-[13px] leading-relaxed text-slate-700">
@@ -278,9 +277,7 @@ export function PrivacyToolsClient({
           </Button>
         </div>
         {portabilityState.status === "error" ? (
-          <p className="text-[13px] text-red-600" role="alert">
-            {portabilityState.message}
-          </p>
+          <FormFeedback message={portabilityState.message} />
         ) : null}
         {portabilityState.status === "ready" ? (
           <p className="text-[13px] text-slate-600">
@@ -402,9 +399,7 @@ export function PrivacyToolsClient({
           )}
         </form>
         {eraseState.status === "error" ? (
-          <p className="text-[13px] text-red-700" role="alert">
-            {eraseState.message}
-          </p>
+          <FormFeedback message={eraseState.message} />
         ) : null}
         {eraseState.status === "done" ? (
           <div className="rounded-xl border border-slate-200 bg-white/80 p-4 text-[13px] leading-relaxed text-slate-700">

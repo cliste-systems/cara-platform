@@ -1,4 +1,5 @@
 "use client";
+import { FormFeedback } from "@/components/ui/form-feedback";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { CheckCircle2, Loader2, MessageSquare, Sparkles } from "lucide-react";
@@ -324,7 +325,7 @@ export function CallerTextBackDialog({
                   </div>
                 ) : null}
 
-                {error ? <p className="text-[13px] text-red-600">{error}</p> : null}
+                {error ? <FormFeedback message={error} /> : null}
               </div>
             </DialogHeader>
 

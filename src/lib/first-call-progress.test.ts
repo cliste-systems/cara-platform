@@ -50,7 +50,7 @@ test('verification continuation resumes unfinished configuration instead of rest
 });
 
 test('a pending review never sends configured customers backwards or blocks dashboard completion',()=>{
- const configured={...progress,verificationStatus:'submitted',greetingReady:true,number:'+35312345678',hadConversation:true,forwardingReviewed:true};
+ const configured={...progress,verificationStatus:'submitted',greetingReady:true,number:'+35312345678',hadConversation:true,forwardingReviewed:true,dashboardUnlocked:true};
  assert.equal(firstCallResumeStep(configured),'forwarding');
  assert.equal(needsFirstCallSetup(configured),false);
  assert.equal(needsFirstCallSetup({...configured,verificationStatus:'needs_information'}),false);

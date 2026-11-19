@@ -1,0 +1,14 @@
+.journey { display:contents; }
+.rules { position:fixed; z-index:10; pointer-events:none; inset:0; width:calc(100% - 32px); max-width:840px; margin-inline:auto; border-inline:1px solid #e8e8e8; padding-block:24px; }
+.rules > div { height:100%; border-block:1px solid #e8e8e8; }
+.rules > span { position:absolute; top:73px; inset-inline:0; border-top:1px solid #e8e8e8; }
+.wide { max-width:1200px; }
+.journey [data-signup-frame],.journey [data-journey-panel],.journey [data-journey-nav] { border-color:transparent; }
+.journey:has([data-signup-confirmation]) > .rules { display:none; }
+@media(min-width:640px) { .rules { width:calc(100% - 64px); padding-block:40px; } .rules > span { top:89px; } }
+
+/* Shared desktop interaction affordances across the journey. */
+.journey :is(button, [role="button"], a[href], summary, select, input[type="checkbox"], input[type="radio"]) { cursor:pointer; }
+.journey :is(button:disabled, [aria-disabled="true"], fieldset:disabled button) { cursor:not-allowed; }
+.journey button { transition:background-color 200ms ease,color 200ms ease,border-color 200ms ease; }
+@media(prefers-reduced-motion:reduce) { .journey button { transition:none; } }

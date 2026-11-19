@@ -8,7 +8,6 @@ import {
 } from "@/lib/service-policy-presets";
 import { formatAgentKnowledgeList } from "@/lib/agent-knowledge-format";
 import {
-  catalogHasExtractedPrices,
   resolveQuotePricesOnCalls,
   dedupeCatalogDrafts,
   findCatalogNameConflict,
@@ -42,10 +41,12 @@ type ServiceRow = {
   ai_voice_notes: string | null;
   policy_flags?: unknown;
   source: ServiceCatalogSource | null;
+  details?: ServiceCatalogItem["details"];
+  updated_at?: string;
 };
 
 const SERVICE_SELECT_WITH_POLICY_FLAGS =
-  "id, name, category, price, duration_minutes, description, ai_voice_notes, policy_flags, source";
+  "id, name, category, price, duration_minutes, description, ai_voice_notes, policy_flags, source, details, updated_at";
 const SERVICE_SELECT_LEGACY =
   "id, name, category, price, duration_minutes, description, ai_voice_notes, source";
 
@@ -103,9 +104,10 @@ async function queryServicesForOrg(
 }
 
 export function syncServiceNamesToBoundary(
-  services: Pick<ServiceCatalogItem, "name">[],
+  services: Pick<ServiceCatalogItem, "name" | "details">[],
 ): string {
   const names = services
+    .filter(s=>s.details?.status!=="archived")
     .map((s) => s.name.trim())
     .filter(Boolean);
   return formatAgentKnowledgeList(names);
@@ -122,6 +124,8 @@ export function rowToServiceCatalogItem(row: ServiceRow): ServiceCatalogItem {
     aiVoiceNotes: row.ai_voice_notes?.trim() || null,
     policyFlags: normalizeServicePolicyFlags(row.policy_flags),
     source: row.source ?? "manual",
+    details: row.details,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -148,6 +152,7 @@ function normalizeDraft(
     aiVoiceNotes: sanitizeServiceVoiceNote(draft.aiVoiceNotes),
     policyFlags: normalizeServicePolicyFlags(draft.policyFlags),
     source: draft.source ?? "manual",
+    ...(draft.details ? { details: draft.details } : {}),
   };
 }
 
@@ -187,6 +192,7 @@ export async function upsertServiceForOrg(
     description: normalized.description,
     ai_voice_notes: normalized.aiVoiceNotes,
     source: normalized.source,
+    ...(normalized.details ? { details: normalized.details } : {}),
     updated_at: new Date().toISOString(),
   };
   attachPolicyFlagsToRow(row, normalized.policyFlags);

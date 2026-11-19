@@ -35,7 +35,7 @@ import {
   type CaraCompileMeta,
   type CaraSetupPromptInput,
 } from "@/lib/compile-cara-prompt";
-import { loadPlatformCaraRules } from "@/lib/platform-cara-rules";
+import { loadInternalCaraRuntimeConfig } from "@/lib/internal-cara-runtime-config";
 import { verticalPackForNiche } from "@/lib/verticals";
 import {
   assistantNameLabel,
@@ -65,6 +65,7 @@ import {
 } from "@/lib/cara-knowledge-temporal-prompt";
 import { resolveBusinessTimezone } from "@/lib/cara-knowledge-temporal";
 import { loadEffectiveTemporalUpdatesForOrg } from "@/lib/cara-knowledge-temporal-store";
+import type { ServiceCatalogItem } from "@/lib/service-catalog-format";
 import { listServicesForOrg } from "@/lib/service-catalog";
 import { parseStoredServiceCatalogSupplement } from "@/lib/service-catalog-supplement";
 import { formatRetailFacilitiesForPrompt } from "@/lib/retail-store-types";
@@ -74,7 +75,7 @@ import {
 } from "@/lib/supervalu-national-knowledge";
 
 const PROMPT_ORG_COLUMNS =
-  "name, assistant_display_name, greeting, business_classification, agent_business_type, business_knowledge_summary, agent_opening_hours, business_hours, agent_service_area, agent_service_area_exclusions, agent_base_town, agent_services_departments, agent_services_not_offered, agent_service_catalog_supplement, agent_details_to_collect, agent_details_collect_mode, agent_business_rules, agent_cara_rules, agent_cara_conduct, agent_faqs, agent_location_address, agent_location_eircode, agent_location_county, agent_extra_notes, routing_links, fallback_number, call_routing_mode, quote_prices_on_calls, niche, retail_banner, retail_loyalty_program, retail_facilities, retail_delivery, retail_click_collect_url, store_public_number, offers_synced_at, admin_notes";
+  "name, assistant_display_name, greeting, business_classification, agent_business_type, business_knowledge_summary, agent_opening_hours, business_hours, agent_service_area, agent_service_area_exclusions, agent_base_town, agent_services_departments, agent_services_not_offered, agent_service_catalog_supplement, agent_details_to_collect, agent_details_collect_mode, agent_business_rules, agent_cara_rules, agent_cara_conduct, agent_faqs, agent_location_address, agent_location_eircode, agent_location_county, agent_extra_notes, routing_links, fallback_number, call_routing_mode, quote_prices_on_calls, niche, retail_banner, retail_loyalty_program, retail_facilities, retail_delivery, retail_click_collect_url, store_public_number, offers_synced_at";
 
 export type PromptCompileWarnings = CaraCompileMeta & {
   trimmedAt: string;
@@ -273,14 +274,16 @@ export function buildCaraSetupPromptInputFromOrg(
 export async function regenerateCaraCustomPrompt(
   supabase: SupabaseClient,
   organizationId: string,
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const { data: org, error: readError } = await supabase
+  options?: { dryRun?: boolean; services?: ServiceCatalogItem[]; orgPatch?: Record<string, unknown> },
+): Promise<{ ok: true; prompt?: string; warnings?: PromptCompileWarnings | null } | { ok: false; message: string }> {
+  const { data: storedOrg, error: readError } = await supabase
     .from("organizations")
     .select(PROMPT_ORG_COLUMNS)
     .eq("id", organizationId)
     .maybeSingle();
 
-  if (readError) return { ok: false, message: readError.message };
+  if (readError || !storedOrg) return { ok: false, message: "We couldn’t load your business details. Please try again." };
+  const org = { ...storedOrg, ...options?.orgPatch };
 
   const businessFiles = await listBusinessFilesForOrg(
     supabase,
@@ -289,9 +292,9 @@ export async function regenerateCaraCustomPrompt(
 
   const niche = String((org as PromptOrgRow | null)?.niche ?? "");
   const useCatalog = verticalPackForNiche(niche).capabilities.usesServiceCatalog;
-  const serviceCatalog = useCatalog
+  const serviceCatalog = (options?.services ?? (useCatalog
     ? await listServicesForOrg(supabase, organizationId)
-    : [];
+    : [])).filter(s => s.details?.status !== "archived");
   const serviceCatalogSupplement = parseStoredServiceCatalogSupplement(
     (org as PromptOrgRow | null)?.agent_service_catalog_supplement,
   );
@@ -353,9 +356,13 @@ export async function regenerateCaraCustomPrompt(
     });
   }
 
-  const adminNotes = String((org as PromptOrgRow | null)?.admin_notes ?? "").trim();
-
-  const platformRules = await loadPlatformCaraRules(supabase);
+  let internalConfig: Awaited<ReturnType<typeof loadInternalCaraRuntimeConfig>>;
+  try {
+    internalConfig = await loadInternalCaraRuntimeConfig(supabase, organizationId);
+  } catch {
+    return { ok: false, message: "We couldn’t load Cara’s call configuration. Please try again." };
+  }
+  const { adminNotes, platformRules } = internalConfig;
 
   const retailBanner = String((org as PromptOrgRow | null)?.retail_banner ?? "").trim();
   const isSupervaluRetail = isRetail && retailBanner === "supervalu";
@@ -416,6 +423,9 @@ export async function regenerateCaraCustomPrompt(
   const promptCompileWarnings: PromptCompileWarnings | null = compileMeta.wasTrimmed
     ? { ...compileMeta, trimmedAt: new Date().toISOString() }
     : null;
+
+  if (options?.dryRun && compileMeta.wasTrimmed) return {ok:false,message:"Cara’s call information is too long. Shorten the notes or answers before saving; nothing has been published."};
+  if (options?.dryRun) return { ok: true, prompt, warnings: promptCompileWarnings };
 
   const { error } = await supabase
     .from("organizations")

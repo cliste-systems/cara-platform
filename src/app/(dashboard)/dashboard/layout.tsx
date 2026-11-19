@@ -1,3 +1,4 @@
+import {isLocalSetupTestEnabled,LOCAL_SETUP_COMPLETION_COOKIE,localSetupCompletionValue} from "@/lib/onboarding-dev";
 import { usesSimpleSignup } from "@/lib/public-signup-flow";
 import { cookies, headers } from "next/headers";
 import {FirstCallWelcome} from "@/components/dashboard/first-call-welcome";
@@ -47,6 +48,7 @@ import { DASHBOARD_CONTENT_COLUMN, DASHBOARD_INTERACTIVE_CURSOR, DASHBOARD_REBUI
 import { cn } from "@/lib/utils";
 
 import { DashboardViewportLock } from "./dashboard-viewport-lock";
+import { ServiceDashboardShell } from "@/components/dashboard/service-dashboard-shell";
 
 const navItems: {
   href: string;
@@ -146,7 +148,9 @@ export default async function DashboardLayout({
   ) {
     redirect(usesSimpleSignup(user) ? "/signup/voice" : "/onboarding");
   }
-  if (lifecycleStatus === "suspended") {
+  const currentPath = (await headers()).get("x-pathname") ?? "/dashboard";
+  const recoveryRoute = ["/dashboard/usage", "/dashboard/billing", "/dashboard/support", "/dashboard/legal"].some(path => currentPath === path || currentPath.startsWith(`${path}/`));
+  if (lifecycleStatus === "suspended" && !recoveryRoute) {
     redirect("/dashboard/usage?suspended=1");
   }
 
@@ -157,7 +161,9 @@ export default async function DashboardLayout({
     const accountHelp=["/dashboard/usage","/dashboard/support","/dashboard/legal"].some(path=>pathname===path||pathname.startsWith(`${path}/`));
     if(!accountHelp){
       const setup=await loadFirstCallSetup(session);
-      if(setup.canManage&&needsFirstCallSetup(setup))return <FirstCallWelcome state={setup} initialOpen requiredSetup billingSetupComplete={Boolean(accountBilling?.platformSubscriptionId&&lifecycleStatus==="active")}/>;
+      const localTestMode=isLocalSetupTestEnabled(await headers());
+      const localComplete=localTestMode&&cookieStore.get(LOCAL_SETUP_COMPLETION_COOKIE)?.value===localSetupCompletionValue(user.id,organizationId);
+      if(setup.canManage&&needsFirstCallSetup(setup)&&!localComplete)return <FirstCallWelcome state={setup} initialOpen requiredSetup localTestMode={localTestMode} billingSetupComplete={Boolean(accountBilling?.platformSubscriptionId&&lifecycleStatus==="active")}/>;
     }
   }
 
@@ -177,10 +183,7 @@ export default async function DashboardLayout({
   const accountNav = resolvedNavItems
     .filter((i) => i.section === "account")
     .map((item) => toNavItem(item, navBadges));
-  const mobileNavItems: DashboardSidebarNavItem[] = [
-    ...coreNav,
-    ...accountNav,
-  ];
+
 
   const accountSummary = buildDashboardAccountSummary(profile, user, {
     name: accountBilling?.name ?? orgRow?.name ?? null,
@@ -192,6 +195,7 @@ export default async function DashboardLayout({
       accountBilling?.name ?? orgRow?.name,
       orgRow?.slug,
     ) || "Your business";
+  const statusConnection = vertical.id !== "retail" ? await session.supabase.from("customer_phone_connections").select("business_number,phone_type,provider,requested_at,verified_at,verified_call_sid,trial_activated_at,support_ticket_id").eq("organization_id",organizationId).maybeSingle() : null;
   const versionDisplay = dashboardVersionDisplay({
     experienceLabel: vertical.selection.label,
     packVersion: vertical.packVersion,
@@ -211,9 +215,16 @@ export default async function DashboardLayout({
           null
         }
       >
-        <div
+        {vertical.id !== "retail" ? (
+          <ServiceDashboardShell phoneConnection={statusConnection?.data ?? null} coreNav={coreNav} accountNav={accountNav} account={accountSummary}
+            locations={locations} activeOrganizationId={organizationId} viewAllLocations={viewAllLocations}
+            locationLabel={locationLabel} accountName={accountName}
+            dateLabel={new Intl.DateTimeFormat("en-IE",{weekday:"short",day:"numeric",month:"long",timeZone:"Europe/Dublin"}).format(new Date())}>
+            {children}
+          </ServiceDashboardShell>
+        ) : (<div
           className={cn(
-            "fixed inset-0 z-10 flex w-full max-w-[100vw] flex-col overflow-hidden bg-[#f3f6f4] text-[#11181d] lg:flex-row",
+            "cara-workspace fixed inset-0 z-10 flex w-full max-w-[100vw] flex-col overflow-hidden bg-[#f3f6f4] text-[#11181d] lg:flex-row",
             DASHBOARD_INTERACTIVE_CURSOR,
           )}
         >
@@ -238,19 +249,19 @@ export default async function DashboardLayout({
               <div className="shrink-0 border-b border-[#d9e2dd] bg-[#f3f6f4] py-3 lg:hidden">
                 <div className={DASHBOARD_CONTENT_COLUMN}>
                   <DashboardMobileNav
-                    items={mobileNavItems}
+                    items={coreNav}
                     accountNav={accountNav}
                   />
                 </div>
               </div>
             ) : null}
             <main className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden overscroll-y-none bg-[#f3f6f4]">
-              <div className="relative z-[1] mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col overflow-y-auto bg-[#f3f6f4] px-6 py-6 sm:px-8 has-[data-dashboard-fill]:min-h-0 has-[data-dashboard-fill]:overflow-hidden has-[data-dashboard-fill]:p-0 [scrollbar-gutter:stable]">
+              <div className="relative z-[1] mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col overflow-y-auto bg-[#f3f6f4] px-4 py-5 sm:px-8 has-[[data-dashboard-fill]]:min-h-0 has-[[data-dashboard-fill]]:overflow-hidden has-[[data-dashboard-fill]]:p-0 [scrollbar-gutter:stable]">
                 {children}
               </div>
             </main>
           </div>
-        </div>
+        </div>)}
       </DashboardVerticalProvider>
       <DashboardNavSeenSync />
       <DashboardLiveRefresh organizationId={organizationId} />

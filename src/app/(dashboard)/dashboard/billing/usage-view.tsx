@@ -1,3 +1,6 @@
+import {WorkspaceSectionNav} from "@/components/dashboard/workspace-section-nav";
+import {BillingAccountSummary} from "@/components/dashboard/billing-account-summary";
+import {FormFeedback} from "@/components/ui/form-feedback";
 import { AlertTriangle, Gauge } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -15,11 +18,9 @@ import { OpenBillingPortalButton } from "./portal-button";
 import { SetupBillingButton } from "./setup-billing-button";
 import {
   buildUsageSummary,
-  formatBillingPeriodRenewal,
+
   formatDate,
   formatDateTime,
-  formatStripeSyncStatus,
-  formatEuro,
   formatEuroFromCents,
   formatMinutes,
   type UsagePageData,
@@ -29,6 +30,7 @@ type UsageViewProps = {
   data: UsagePageData;
   className?: string;
   billingReady?: boolean;
+  billingPending?: boolean;
   checkoutCancelled?: boolean;
 };
 
@@ -36,14 +38,15 @@ export function UsageView({
   data,
   className,
   billingReady = false,
+  billingPending = false,
   checkoutCancelled = false,
 }: UsageViewProps) {
   const summary = buildUsageSummary(data);
-  const renewalDate = formatBillingPeriodRenewal(data.periodStart);
+  const renewalDate = formatDate(data.periodEnd);
   const estimatedExtra = formatEuroFromCents(data.projectedOverageCents);
 
   const portalButtonClass =
-    "[&_button]:h-10 [&_button]:rounded-xl [&_button]:bg-[#0b1220] [&_button]:px-4 [&_button]:text-[13px] [&_button]:font-medium [&_button]:hover:bg-[#0b1220]/90";
+    "w-full sm:w-auto";
 
   return (
     <div
@@ -57,9 +60,9 @@ export function UsageView({
       <div className="shrink-0">
       <DashboardPageHeader
         eyebrow="Usage"
-        title="Usage"
+        title="Plan & billing"
         icon={Gauge}
-        description="Minutes used this billing period and what your plan includes."
+        description="Your plan, payment details and usage in one place."
         actions={
           data.canManageBilling ? (
             <OpenBillingPortalButton className={portalButtonClass} />
@@ -67,10 +70,13 @@ export function UsageView({
         }
       />
 
+      <div className="mt-4"><WorkspaceSectionNav group="account"/></div>
       </div>
 
       <DashboardPageScrollBody scrollClassName="flex flex-col gap-4 pt-4">
 
+      <FormFeedback message={data.loadError}/>
+      {data.billingDetails&&<BillingAccountSummary details={data.billingDetails} planName={data.planName} setupChoice={data.setupChoice??"Self-service"}/>}
       {data.suspended ? (
         <UsageAlert tone="warning" icon={AlertTriangle}>
           <p className="font-semibold">Your subscription is paused.</p>
@@ -81,11 +87,13 @@ export function UsageView({
         </UsageAlert>
       ) : null}
 
+      {billingPending ? <UsageAlert tone="neutral">Payment confirmation is still pending. Refresh shortly or contact support if it does not update.</UsageAlert> : null}
+
       {billingReady ? (
         <UsageAlert tone="success">
           <p className="font-semibold">Billing is connected.</p>
           <p className="mt-1 leading-relaxed opacity-90">
-            Manage payment methods and invoices below.
+            Your payment details and invoices are ready to view.
           </p>
         </UsageAlert>
       ) : null}
@@ -96,6 +104,7 @@ export function UsageView({
         </UsageAlert>
       ) : null}
 
+      {!data.loadError&&<>
       <div className="grid shrink-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
           <section className={DASHBOARD_HOME_CARD}>
             <h2 className="shrink-0 text-[15px] font-semibold tracking-tight text-[#0b1220]">
@@ -147,19 +156,12 @@ export function UsageView({
               </div>
             </div>
 
-            <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-4">
+            <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-3">
               <PeriodFact label="Period start" value={formatDate(data.periodStart)} />
               <PeriodFact label="Renews" value={renewalDate} />
               <PeriodFact
                 label="Last call counted"
                 value={formatDateTime(data.lastCallAt)}
-              />
-              <PeriodFact
-                label="Stripe sync"
-                value={formatStripeSyncStatus(
-                  data.lastStripeSync,
-                  data.hasBillingPortal,
-                )}
               />
             </dl>
 
@@ -216,24 +218,11 @@ export function UsageView({
 
         <section className={DASHBOARD_HOME_CARD}>
           <h2 className="shrink-0 text-[15px] font-semibold tracking-tight text-[#0b1220]">
-            Your plan
+            Allowances & extra usage
           </h2>
 
           {data.plan ? (
             <>
-              <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3.5">
-                <p className="text-[16px] font-semibold tracking-tight text-[#0b1220]">
-                  {data.plan.name}
-                </p>
-                <p className="mt-2 text-[22px] font-semibold tabular-nums text-[#0b1220]">
-                  {formatEuro(data.plan.monthlyCents)}
-                  <span className="text-[13px] font-medium text-slate-500">
-                    {" "}
-                    / month
-                  </span>
-                </p>
-              </div>
-
               <dl className="mt-3 space-y-2.5">
                 <PlanRow
                   label="Included minutes"
@@ -264,33 +253,12 @@ export function UsageView({
             </p>
           )}
 
-          <div className="mt-4 border-t border-slate-100 pt-4">
-            <h3 className="text-[14px] font-semibold tracking-tight text-[#0b1220]">
-              Billing
-            </h3>
-            {data.canManageBilling ? (
-              <>
-                <p className="mt-1.5 text-[13px] leading-snug text-slate-600">
-                  Update your payment method, view invoices, and manage your
-                  subscription in Stripe.
-                </p>
-                <OpenBillingPortalButton
-                  className={cn(
-                    "mt-3",
-                    "[&_button]:h-10 [&_button]:w-full",
-                    portalButtonClass,
-                  )}
-                />
-              </>
-            ) : (
-              <>
-                <p className="mt-1.5 text-[13px] leading-snug text-slate-600">
-                  Connect billing for your {data.planName} plan on Stripe.
-                </p>
-                <SetupBillingButton className="mt-3" label="Set up billing" />
-              </>
-            )}
-          </div>
+          {!data.canManageBilling && (
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              {data.canSetUpBilling ? <SetupBillingButton label="Set up billing" /> :
+                <p className="text-sm text-slate-600">The account owner manages payment details and invoices.</p>}
+            </div>
+          )}
         </section>
       </div>
 
@@ -331,6 +299,7 @@ export function UsageView({
           </div>
         </section>
       ) : null}
+      </>}
       </DashboardPageScrollBody>
       </DashboardAnimatedPageSections>
     </div>

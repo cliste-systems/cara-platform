@@ -92,14 +92,11 @@ async function upsertCards(cards: any[], job: CategoryJob, batchId: string) {
     last_seen_at: now,
     updated_at: now,
   }));
-  const { error: pe } = await retryCatalogWrite(() => supabase.from("retail_catalog_products")
-    .upsert(productRows, { onConflict: "retail_banner,sku" }));
+  const { data: ids, error: pe } = await retryCatalogWrite(() => supabase.from("retail_catalog_products")
+    .upsert(productRows, { onConflict: "retail_banner,sku" }).select("id,sku"));
   if (pe) throw new Error("product upsert: " + pe.message);
 
   const skus = [...new Set(cards.map((c) => c.sku))];
-  const { data: ids, error: ie } = await supabase.from("retail_catalog_products")
-    .select("id,sku").eq("retail_banner", "supervalu").in("sku", skus);
-  if (ie) throw new Error("product id lookup: " + ie.message);
   const idBySku = new Map<string, string>((ids ?? []).map((r:any) => [String(r.sku), String(r.id)]));
   if (idBySku.size !== skus.length) throw new Error("Incomplete product ID lookup");
 
@@ -121,14 +118,11 @@ async function upsertCards(cards: any[], job: CategoryJob, batchId: string) {
       updated_at: now,
     }];
   });
-  const { error: le } = await retryCatalogWrite(() => supabase.from("retail_store_products")
-    .upsert(listings.sort((a,b) => a.product_id.localeCompare(b.product_id)), { onConflict: "source_store_id,product_id" }));
+  const { data: storeRows, error: le } = await retryCatalogWrite(() => supabase.from("retail_store_products")
+    .upsert(listings.sort((a,b) => a.product_id.localeCompare(b.product_id)), { onConflict: "source_store_id,product_id" }).select("id,product_id"));
   if (le) throw new Error("listing upsert: " + le.message);
 
   const productIds = listings.map((x:any) => x.product_id);
-  const { data: storeRows, error: se } = await supabase.from("retail_store_products")
-    .select("id,product_id").eq("source_store_id", job.source_store_id).in("product_id", productIds);
-  if (se) throw new Error("store listing lookup: " + se.message);
   const spByProduct = new Map<string, string>((storeRows ?? []).map((r:any) => [String(r.product_id), String(r.id)]));
   if (spByProduct.size !== productIds.length) throw new Error("Incomplete store product ID lookup");
   const week = currentOfferWeek();

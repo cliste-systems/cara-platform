@@ -108,18 +108,18 @@ export function ClistePageHeader({
   summaryAside,
   actions,
   className,
-  hideEyebrow = false,
-  plain = false,
+  hideEyebrow = true,
+  plain = true,
 }: ClistePageHeaderProps) {
   const t = HEADER_TONES[tone];
 
   return (
     <header
       className={cn(
-        "relative overflow-hidden rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] px-4 py-4 text-[#0b1220] sm:px-5",
+        "dashboard-page-heading relative shrink-0 text-[#11181d]",
         plain
-          ? "shadow-[0_1px_0_rgba(17,24,29,0.05)]"
-          : "bg-cover bg-right bg-no-repeat shadow-[0_1px_0_rgba(17,24,29,0.05),0_16px_42px_-30px_rgba(17,24,29,0.28)] before:absolute before:inset-y-0 before:left-0 before:w-1.5",
+          ? "border-b border-[#d9e2dd] pb-4"
+          : "rounded-xl border border-[#d9e2dd] bg-[#fbfcfb] px-4 py-4 sm:px-5 bg-cover bg-right bg-no-repeat shadow-[0_1px_0_rgba(17,24,29,0.05),0_16px_42px_-30px_rgba(17,24,29,0.28)] before:absolute before:inset-y-0 before:left-0 before:w-1.5",
         !plain && t.accent,
         className,
       )}
@@ -134,7 +134,7 @@ export function ClistePageHeader({
           />
         </>
       ) : null}
-      <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="relative flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-3.5">
           {!plain ? (
             <span
@@ -156,7 +156,7 @@ export function ClistePageHeader({
               className={cn(
                 "font-semibold leading-tight tracking-tight text-[#0b1220]",
                 hideEyebrow
-                  ? "text-[22px] sm:text-[24px]"
+                  ? "text-[24px] sm:text-[28px]"
                   : "mt-1 text-[25px] sm:text-[28px]",
               )}
             >
@@ -168,7 +168,7 @@ export function ClistePageHeader({
           </div>
         </div>
 
-        {actions ? <div className="shrink-0 lg:pt-1">{actions}</div> : null}
+        {actions ? <div className="dashboard-heading-actions shrink-0 sm:pt-0.5">{actions}</div> : null}
       </div>
 
       {summary && summary.length > 0 ? (

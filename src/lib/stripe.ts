@@ -23,6 +23,8 @@ export function getStripeClient(): Stripe {
     // (Stripe advances its Basil series through 2025→2026; see docs.)
     apiVersion: "2026-03-25.dahlia",
     typescript: true,
+    timeout: 20_000,
+    maxNetworkRetries: 2,
     appInfo: {
       name: CLISTE_COMPANY.legalName,
       url: MARKETING_SITE_URL,

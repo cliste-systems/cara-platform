@@ -440,6 +440,7 @@ export type ReviewVoiceGreetingResult =
       introIssue?: boolean;
       closingIssue?: boolean;
       rateLimited?: boolean;
+      blocked?: boolean;
     };
 
 export type ValidateVoicePreviewResult =
@@ -527,6 +528,7 @@ export async function reviewVoiceGreetingStep(
     greetingClosing: prepared.greetingClosing,
   });
 
+  if(outcome.status==='blocked')return {ok:false,message:outcome.suggestion.summary,blocked:true,introIssue:true,closingIssue:true};
   if (outcome.status === "approved") {
     return { ok: true, status: "approved" };
   }

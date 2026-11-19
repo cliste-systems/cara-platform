@@ -39,6 +39,7 @@ import { DashboardSignOutButton } from "./dashboard-sign-out-button";
 const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard": LayoutDashboard,
   "/dashboard/activity": Activity,
+  "/dashboard/services": LayoutGrid,
   "/dashboard/calls": Phone,
   "/dashboard/call-history": Phone,
   "/dashboard/routing": Share2,

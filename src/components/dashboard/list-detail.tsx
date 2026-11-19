@@ -16,7 +16,13 @@ export function ListDetailLayout({
   list,
   detail,
   className,
+  mobileDetailOpen,
+  onMobileBack,
+  hideDetail = false,
 }: {
+  hideDetail?: boolean;
+  mobileDetailOpen?: boolean;
+  onMobileBack?: () => void;
   list: ReactNode;
   detail: ReactNode;
   className?: string;
@@ -26,10 +32,15 @@ export function ListDetailLayout({
       className={cn(
         "grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden max-lg:grid-rows-[minmax(0,42vh)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,420px)] lg:grid-rows-[minmax(0,1fr)] lg:gap-4",
         className,
+        mobileDetailOpen !== undefined && "max-lg:grid-rows-[minmax(0,1fr)]",
+        hideDetail && "grid-cols-1 grid-rows-1 lg:grid-cols-1 xl:grid-cols-1",
       )}
     >
-      {list}
-      <div className="flex h-full min-h-0 flex-col overflow-hidden">{detail}</div>
+      <div className={cn("flex min-h-0 flex-col overflow-hidden", mobileDetailOpen && "max-lg:hidden")}>{list}</div>
+      {!hideDetail && <div className={cn("flex h-full min-h-0 flex-col overflow-hidden", mobileDetailOpen === false && "max-lg:hidden")}>
+        {mobileDetailOpen && onMobileBack && <button type="button" onClick={onMobileBack} className="m-3 inline-flex min-h-11 shrink-0 cursor-pointer items-center self-start rounded-lg border border-[#d9e2dd] bg-white px-4 text-sm font-medium transition-colors hover:bg-[#f0f4f1] lg:hidden">← Back to list</button>}
+        {detail}
+      </div>}
     </div>
   );
 }
@@ -279,7 +290,7 @@ export function DetailActionButton({
   className?: string;
 }) {
   const styles = cn(
-    "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#b9c8c1] bg-[#fbfcfb] px-3 text-[13px] font-medium text-[#35443f] transition-colors hover:bg-white",
+    "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-[#b9c8c1] bg-[#fbfcfb] px-3 text-[13px] font-medium text-[#35443f] transition-colors hover:bg-white",
     disabled && "pointer-events-none opacity-40",
     className,
   );

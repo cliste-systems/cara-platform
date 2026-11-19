@@ -26,6 +26,10 @@ import { isEngineerTestCallRow, ENGINEER_TEST_CALL_CALLER_LABEL, ADMIN_DEMO_ROOM
 import { resolveCallLogIdForTicket } from "@/lib/resolve-ticket-call-log";
 import type { PostCallStatus } from "@/lib/post-call-processing-types";
 
+import { isServiceFollowUp, type ServiceCall } from "@/lib/service-calls";
+import { loadServiceCallKnowledge } from "@/lib/service-call-knowledge";
+import { CALL_MEDIA_RETENTION_MS } from "@/lib/call-media-retention";
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -94,12 +98,12 @@ export async function fetchCallerHistoryInsight(input: {
     );
   }
 
-  const [{ data: callRows }, { data: ticketRows }, { data: blockedRow }, { data: abuseRow }] =
+  const [{ data: callRows, error: callsError }, { data: ticketRows, error: ticketsError }, { data: blockedRow, error: blockedError }, { data: abuseRow, error: abuseError }] =
     await Promise.all([
     supabase
       .from("call_logs")
       .select(
-        "id, caller_name, outcome, ai_summary, duration_seconds, created_at, post_call_status, caller_data_erased_at",
+        "id, caller_name, outcome, ai_summary, duration_seconds, created_at, post_call_status, caller_data_erased_at, call_resolution, follow_up_completed_at, is_urgent, post_call_expected_ticket",
       )
       .eq("organization_id", organizationId)
       .eq("caller_number", callerE164)
@@ -132,6 +136,18 @@ export async function fetchCallerHistoryInsight(input: {
       .maybeSingle(),
   ]);
 
+  if (callsError || ticketsError || blockedError || abuseError) {
+    throw new Error("Caller history is unavailable. Please try again.");
+  }
+
+  const { data: organization, error: organizationError } = await supabase.from("organizations").select("niche").eq("id", organizationId).single();
+  if (organizationError) throw new Error("Caller history is unavailable.");
+  const service = organization.niche !== "retail";
+  const knowledge = service ? await loadServiceCallKnowledge(supabase, organizationId) : null;
+  if (knowledge?.error) throw new Error("Caller knowledge history is unavailable.");
+  const serviceRequests = (callRows ?? []).filter(row => isServiceFollowUp({ ...row, knowledge_needs_input: knowledge?.questions.get(row.id)?.needsInput } as ServiceCall))
+    .map(row => ({ status: "open", summary: row.ai_summary ?? "Follow-up requested", departmentSlug: null }));
+
   return buildCallerHistoryInsight({
     callerNumber: callerE164,
     calls: (callRows ?? [])
@@ -145,7 +161,7 @@ export async function fetchCallerHistoryInsight(input: {
       durationSeconds: Number(row.duration_seconds ?? 0),
       postCallStatus: (row.post_call_status as PostCallStatus) ?? "complete",
     })),
-    openTickets: (ticketRows ?? []).map((row) => ({
+    openTickets: service ? serviceRequests : (ticketRows ?? []).map((row) => ({
       status: String(row.status ?? ""),
       summary: String(row.summary ?? ""),
       departmentSlug: row.department_slug?.trim() || null,
@@ -197,6 +213,8 @@ export async function fetchCallRecordingPlaybackUrl(
     .select("audio_storage_path, engineer_test_call, caller_number, room_name, is_test_call")
     .eq("id", id)
     .eq("organization_id", organizationId)
+    .is("caller_data_erased_at", null)
+    .gt("created_at", new Date(Date.now() - CALL_MEDIA_RETENTION_MS).toISOString())
     .maybeSingle();
 
   if (error || data?.is_test_call || isEngineerTestCallRow(data ?? {})) {
@@ -280,6 +298,8 @@ async function loadCallDetailRow(callId: string): Promise<CallDetailDialogPayloa
     )
     .eq("id", id)
     .eq("organization_id", organizationId)
+    .is("caller_data_erased_at", null)
+    .gt("created_at", new Date(Date.now() - CALL_MEDIA_RETENTION_MS).toISOString())
     .maybeSingle();
 
   if (error || !data || data.is_test_call) return null;

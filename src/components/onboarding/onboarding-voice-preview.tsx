@@ -17,7 +17,7 @@ export function stopVoicePreview() {
 export async function speakVoicePreview(
   line: string,
   parts?: { greetingIntro: string; greetingClosing: string },
-  options?: { onEnded?: () => void; onTimeUpdate?: (seconds: number) => void },
+  options?: { signal?: AbortSignal; onEnded?: () => void; onTimeUpdate?: (seconds: number) => void },
 ): Promise<
   | { ok: true }
   | {
@@ -40,6 +40,7 @@ export async function speakVoicePreview(
   try {
     const response = await fetch("/api/onboarding/voice-preview", {
       method: "POST",
+      signal: options?.signal,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         text,
@@ -58,13 +59,14 @@ export async function speakVoicePreview(
         | null;
       return {
         ok: false,
-        message: payload?.error ?? "Voice preview failed.",
+        message: response.status===401 ? "Sign in to hear your personalised greeting." : payload?.error ?? "Voice preview failed.",
         introIssue: payload?.introIssue,
         closingIssue: payload?.closingIssue,
       };
     }
 
     const blob = await response.blob();
+    if(options?.signal?.aborted)return {ok:false,message:"Preview cancelled."};
     activeObjectUrl = URL.createObjectURL(blob);
     activeAudio = new Audio(activeObjectUrl);
     activeAudio.ontimeupdate = () => options?.onTimeUpdate?.(activeAudio?.currentTime ?? 0);

@@ -17,4 +17,10 @@ export async function register() {
   }
 }
 
-export const onRequestError = Sentry.captureRequestError;
+export const onRequestError: import("next").Instrumentation.onRequestError = async (error, request, context) => {
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    const { recordApplicationEvent } = await import("@/lib/application-monitoring");
+    await recordApplicationEvent({kind: "error", operation: context.routePath, code: "unhandled_server_error"});
+  }
+  if (process.env.SENTRY_DSN?.trim()) Sentry.captureRequestError(error, request, context);
+};

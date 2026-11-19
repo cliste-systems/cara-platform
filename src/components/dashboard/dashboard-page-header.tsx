@@ -41,16 +41,16 @@ export function DashboardPageHeader({
   summary,
 }: DashboardPageHeaderProps) {
   return (
-    <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <header className="dashboard-page-heading flex shrink-0 flex-col gap-3 border-b border-[#d9e2dd] pb-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="flex min-w-0 max-w-2xl items-start gap-3.5">
         {Icon ? (
-          <span className={cn(DASHBOARD_ICON_CHIP_HEADER, "shrink-0")}>
+          <span className={cn(DASHBOARD_ICON_CHIP_HEADER, "hidden")}>
             <Icon className={DASHBOARD_ICON_GLYPH_LG} aria-hidden />
           </span>
         ) : null}
         <div className="min-w-0">
-          <p className={DASHBOARD_EYEBROW_CLASS}>{eyebrow}</p>
-          <h1 className={cn("mt-2", DASHBOARD_TITLE_CLASS)}>{title}</h1>
+          <p className={cn(DASHBOARD_EYEBROW_CLASS, "sr-only")}>{eyebrow}</p>
+          <h1 className={DASHBOARD_TITLE_CLASS}>{title}</h1>
           <p className={cn("mt-2", DASHBOARD_BODY_CLASS)}>{description}</p>
           {descriptionLine2 ? (
             <p className="mt-1 text-[14px] leading-relaxed text-slate-500">
@@ -63,7 +63,7 @@ export function DashboardPageHeader({
         </div>
       </div>
       {actions ? (
-        <div className="flex shrink-0 items-center lg:pt-1">{actions}</div>
+        <div className="dashboard-heading-actions flex shrink-0 items-center sm:pt-0.5">{actions}</div>
       ) : null}
     </header>
   );

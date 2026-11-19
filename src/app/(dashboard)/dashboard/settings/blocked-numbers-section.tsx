@@ -1,4 +1,5 @@
 "use client";
+import { FormFeedback } from "@/components/ui/form-feedback";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -167,18 +168,7 @@ export function BlockedNumbersSection({ initial }: BlockedNumbersSectionProps) {
           </Button>
         </div>
 
-        {msg ? (
-          <p
-            className={cn(
-              "text-[13px]",
-              msg.includes("blocked") || msg.includes("turned off") || msg.includes("unblocked")
-                ? "text-slate-600"
-                : "text-red-600",
-            )}
-          >
-            {msg}
-          </p>
-        ) : null}
+        <FormFeedback message={msg} tone={msg === "Number blocked." || msg === "Number unblocked." || msg === "Anonymous callers will be blocked." || msg === "Anonymous blocking turned off." ? "success" : "error"} />
 
         {rows.length === 0 ? (
           <EmptyState

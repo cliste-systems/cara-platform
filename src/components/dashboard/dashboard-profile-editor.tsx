@@ -1,4 +1,5 @@
 "use client";
+import { FormFeedback } from "@/components/ui/form-feedback";
 
 import {
   forwardRef,
@@ -246,19 +247,7 @@ export const DashboardProfileEditor = forwardRef<
         />
       </div>
 
-      {message ? (
-        <p
-          className={cn(
-            "text-[12px]",
-            message.includes("saved") || message.includes("removed")
-              ? "text-emerald-600"
-              : "text-red-600",
-          )}
-          role={message.includes("saved") || message.includes("removed") ? "status" : "alert"}
-        >
-          {message}
-        </p>
-      ) : null}
+      <FormFeedback message={message} tone={message?.includes("saved") || message?.includes("removed") ? "success" : "error"} title={message?.includes("saved") || message?.includes("removed") ? "Updated" : "Please check this"} />
 
       {deferSaveToParent ? (
         hasUnsavedProfile ? (

@@ -6,7 +6,8 @@ import { loadAccountBilling } from "@/lib/account-session";
 import { buildDashboardAccountSummary } from "@/lib/dashboard-account-summary";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { signupSegmentLabel } from "@/lib/signup-segment-label";
-import { canManageDashboardConfig } from "@/lib/team-roles";
+import {hasAccountOwnerAccess} from "@/lib/account-owner-access";
+import {FormFeedback} from "@/components/ui/form-feedback";
 
 import { SettingsView } from "./settings-view";
 
@@ -34,7 +35,7 @@ export default async function SettingsPage() {
   ]);
 
   if (error) {
-    return <p className="text-sm text-red-600">{error.message}</p>;
+    return <FormFeedback message="We couldn’t load your settings. Please refresh and try again."/>;
   }
 
   if (!org) {
@@ -65,7 +66,7 @@ export default async function SettingsPage() {
       smsPricing={smsPlanPricing(accountBilling?.planTier)}
       callHandling={parseBusinessHoursBundle(org.business_hours).meta.outsideHours??DEFAULT_OUTSIDE_HOURS}
       signInEmail={user.email ?? ""}
-      canManageAccount={canManageDashboardConfig(profile.role)}
+      canManageAccount={await hasAccountOwnerAccess(supabase,{userId:user.id,accountId,profileRole:profile.role})}
       isLocalPreview={isLocalPreview}
       profileInitial={{
         name:

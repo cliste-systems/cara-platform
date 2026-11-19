@@ -62,7 +62,7 @@ describe("call-media-retention", () => {
     const createdAt = "2026-08-01T12:00:00.000Z";
     assert.equal(
       formatCallMediaRetentionExpiredMessage(createdAt),
-      "Recording and transcript were automatically deleted on 31 Aug 2026 (30-day retention).",
+      "Recording and transcript access expired on 31 Aug 2026 (30-day retention).",
     );
   });
 });

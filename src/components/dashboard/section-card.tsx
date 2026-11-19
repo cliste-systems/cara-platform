@@ -50,7 +50,7 @@ export function SectionCard({
     <section
       id={id}
       className={cn(
-        "flex flex-col",
+        "flex min-w-0 flex-col",
         !flat && DASHBOARD_CARD_SURFACE,
         className,
       )}

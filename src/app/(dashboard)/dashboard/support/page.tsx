@@ -1,3 +1,4 @@
+import { FormFeedback } from "@/components/ui/form-feedback";
 import { DASHBOARD_HOME_CONTENT_COLUMN, DASHBOARD_PAGE_SHELL_FILL_WHITE } from "@/components/dashboard/dashboard-surface";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { cn } from "@/lib/utils";
@@ -39,13 +40,7 @@ export default async function SupportPage() {
     >
       <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
       {error ? (
-        <p className="px-1 py-4 text-[13px] text-red-600">
-          {error.message}
-          {error.message.includes("support_tickets") ||
-          error.message.includes("support_ticket_messages")
-            ? " — apply the latest Supabase migrations (support tables)."
-            : null}
-        </p>
+        <FormFeedback title="Help requests couldn’t load" message="Please refresh to try again. Your existing requests haven’t changed." />
       ) : (
         <SupportView className="min-h-0 flex-1" initialTickets={tickets} />
       )}

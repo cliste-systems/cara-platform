@@ -20,7 +20,7 @@ export function dashboardVersionDisplay(
   pack: VerticalPackVersion,
 ): DashboardVersionDisplay {
   return {
-    experienceLine: `${pack.experienceLabel} v${pack.packVersion}`,
+    experienceLine: `${pack.experienceLabel === "Something else" ? "Business" : pack.experienceLabel} v${pack.packVersion}`,
     caraLine: `Cara v${CARA_VERSION}`,
   };
 }

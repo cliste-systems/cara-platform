@@ -35,8 +35,11 @@ import {
   type CallerSecurityLevel,
 } from "@/lib/caller-security-level";
 import { cn } from "@/lib/utils";
+import privacyStyles from "./service-privacy-dialog.module.css";
+import historyStyles from "./service-caller-history.module.css";
 
 type CallerHistoryDialogProps = {
+  serviceTheme?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   callerNumber: string;
@@ -353,6 +356,7 @@ function CallerHistoryBody({
 }
 
 export function CallerHistoryDialog({
+  serviceTheme = false,
   open,
   onOpenChange,
   callerNumber,
@@ -389,6 +393,7 @@ export function CallerHistoryDialog({
         if (cancelled) return;
         setInsight(result);
       })
+      .catch(() => { if (!cancelled) setInsight(null); })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
@@ -405,12 +410,16 @@ export function CallerHistoryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton
+        overlayClassName={serviceTheme ? privacyStyles.backdrop : undefined}
         className={cn(
           "top-[5vh] flex w-[calc(100%-2rem)] max-h-[min(82vh,760px)] translate-y-0 flex-col gap-0 overflow-hidden",
           "border border-slate-200 bg-white p-0 sm:max-w-3xl",
+          serviceTheme && privacyStyles.popup,
+          serviceTheme && historyStyles.popup,
         )}
       >
         <DialogHeader className="shrink-0 space-y-0 border-b border-slate-100 px-5 pb-4 pt-5 text-left sm:px-7 sm:pt-6">
+          {serviceTheme && <div aria-hidden="true" className={historyStyles.art}/> }
           <div className="flex flex-wrap items-start justify-between gap-3 pr-8">
             <div className="min-w-0">
               <DialogTitle className="text-[18px] font-semibold tracking-tight text-[#0b1220]">
@@ -422,7 +431,7 @@ export function CallerHistoryDialog({
                 </p>
               ) : null}
             </div>
-            {securityLevel ? (
+            {securityLevel && !serviceTheme ? (
               <span
                 className={cn(
                   "rounded-full border px-2.5 py-1 text-[12px] font-semibold",
@@ -448,7 +457,7 @@ export function CallerHistoryDialog({
               onSelectCall={onSelectCall}
             />
           ) : (
-            <p className="text-[14px] text-slate-500">No caller history available.</p>
+            <p className="text-[14px] text-slate-500">Caller history is unavailable. Close and reopen to try again.</p>
           )}
         </div>
 

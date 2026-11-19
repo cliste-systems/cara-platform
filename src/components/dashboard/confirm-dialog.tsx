@@ -16,8 +16,10 @@ import {
   DASHBOARD_SECONDARY_BUTTON_CLASS,
 } from "@/components/dashboard/dashboard-surface";
 import { cn } from "@/lib/utils";
+import styles from "./service-privacy-dialog.module.css";
 
 type ConfirmDialogProps = {
+  serviceTheme?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
@@ -37,6 +39,7 @@ type ConfirmDialogProps = {
 
 export function ConfirmDialog({
   open,
+  serviceTheme = false,
   onOpenChange,
   title,
   description,
@@ -54,7 +57,8 @@ export function ConfirmDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton
-        className="gap-0 overflow-hidden border border-slate-200 bg-white p-0 sm:max-w-md"
+        overlayClassName={serviceTheme ? styles.backdrop : undefined}
+        className={cn("gap-0 overflow-hidden border border-slate-200 bg-white p-0 sm:max-w-md", serviceTheme && styles.popup)}
       >
         <DialogHeader className="space-y-0 px-5 pt-5 text-left">
           <DialogTitle className="text-[17px] font-semibold tracking-tight text-[#0b1220]">

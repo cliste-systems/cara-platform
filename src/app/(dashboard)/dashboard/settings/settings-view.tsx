@@ -1,4 +1,6 @@
 "use client";
+import {WorkspaceSectionNav} from "@/components/dashboard/workspace-section-nav";
+import {FormFeedback} from "@/components/ui/form-feedback";
 import {CallHandlingPreferencesEditor} from "@/components/dashboard/call-handling-preferences-editor";
 import type {OutsideHoursPolicy} from "@/lib/outside-hours-policy";
 
@@ -82,7 +84,7 @@ export function SettingsView({
   className,
 }: SettingsViewProps) {
   const { vertical } = useDashboardVertical();
-  const showCallRoutingSettings = !(vertical.nav?.hiddenHrefs ?? []).includes(
+  const showCallRoutingSettings = vertical.id === "retail" && !(vertical.nav?.hiddenHrefs ?? []).includes(
     DASHBOARD_ROUTES.routing,
   );
   const [notificationEmail, setNotificationEmail] = useState(
@@ -111,6 +113,7 @@ export function SettingsView({
         return;
       }
 
+      if (!canManageAccount) return;
       const result = await saveOrganizationSettings({
         isActive: initial.isActive,
         notificationEmail,
@@ -144,25 +147,18 @@ export function SettingsView({
       <ClistePageHeader
         tone="account"
         icon={SettingsIcon}
-        title="Settings"
+        title={vertical.id==="retail"?"Settings":"Settings & billing"}
         description={settingsPageDescription(vertical.id, canManageAccount)}
         actions={
           <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
             {saveButton}
-            {saveMsg ? (
-              <p
-                className={cn(
-                  "text-[13px]",
-                  saveMsg === "Changes saved." ? "text-slate-600" : "text-red-600",
-                )}
-              >
-                {saveMsg}
-              </p>
-            ) : null}
+
           </div>
         }
       />
 
+      <FormFeedback message={saveMsg&&saveMsg!=="Changes saved."?saveMsg:null}/>
+      <WorkspaceSectionNav group="account"/>
       <DashboardFormScrollRegion
         className="min-h-0 flex-1"
         scrollClassName="divide-y divide-[#dfe7e2] bg-[#fbfcfb]"
@@ -179,13 +175,13 @@ export function SettingsView({
             />
           </SettingsSection>
 
-          {canManageAccount ? (
+          {(
             <AccountSecuritySection
               signInEmail={signInEmail}
               fieldClass={fieldClass}
               isLocalPreview={isLocalPreview}
             />
-          ) : null}
+          )}
 
           {showCallRoutingSettings ? (
             <SettingsSection title="Your number & forwarding">
@@ -200,7 +196,7 @@ export function SettingsView({
             </SettingsSection>
           ) : null}
 
-          <SettingsSection title="Notifications">
+          <SettingsSection title="Notifications"><fieldset disabled={!canManageAccount}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="notification-email">Notification email</Label>
@@ -227,9 +223,9 @@ export function SettingsView({
                 />
               </div>
             </div>
-          </SettingsSection>
+          </fieldset></SettingsSection>
 
-          {canManageAccount&&callHandling&&<SettingsSection title="Call handling & SMS alerts"><CallHandlingPreferencesEditor initial={callHandling} smsPricing={smsPricing}/></SettingsSection>}
+          {canManageAccount&&callHandling&&<SettingsSection title="Call handling & SMS alerts"><span id="call-preferences" className="scroll-mt-4"/><CallHandlingPreferencesEditor initial={callHandling} smsPricing={smsPricing}/></SettingsSection>}
           <BlockedNumbersSection initial={blockedNumbers} />
         </DashboardAnimatedStack>
       </DashboardFormScrollRegion>

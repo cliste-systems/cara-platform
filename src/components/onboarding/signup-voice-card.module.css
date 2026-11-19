@@ -1,6 +1,6 @@
 .card { overflow:hidden; border:1px solid #dedede; border-radius:20px; background:white; }
-.portrait { position:relative; height:160px; overflow:hidden; background:#292929; }
-.portrait img { object-fit:cover; object-position:50% 34%; }
+.portrait { position:relative; aspect-ratio:2.2; overflow:hidden; background:#292929; }
+.portrait img { object-fit:cover; object-position:center; }
 .player { padding:22px; display:flex; flex-direction:column; }
 .eyebrow { font-size:11px; color:#626262; font-weight:500; }
 .quote { margin:12px 0 20px; font-size:18px; line-height:1.55; letter-spacing:-.02em; color:#292929; }
@@ -17,9 +17,9 @@
 .note { min-height:32px; margin-top:12px; font-size:11px; line-height:16px; color:#626262; }
 @keyframes voicePulse { from { transform:scaleY(.4); } to { transform:scaleY(1); } }
 @media(min-width:768px) {
- .card { display:grid; grid-template-columns:38% 1fr; }
- .portrait { height:auto; min-height:360px; }
- .portrait img { object-position:53% 40%; }
+ .card { display:grid; grid-template-columns:minmax(0,40%) minmax(0,1fr); }
+ .portrait { aspect-ratio:auto; height:auto; min-height:360px; }
+ .portrait img { object-position:50% 35%; }
  .player { padding:26px; }
  .quote { font-size:19px; }
 }
