@@ -23,7 +23,31 @@ export function sourceDate(value: unknown): string | null {
 // Parse JSON as data, never evaluate source-page JavaScript. Product data
 // includes the retailer's start/end dates, all simultaneous promotions and
 // authoritative pagination counts, which rendered card badges omit.
-function readJsonAssignment(html: string, pattern: RegExp, sourceName: string): Record<string, any> {
+type SourceFields = Record<string, unknown>;
+type SourceProduct = SourceFields & {
+  defaultCategory?: SourceFields[];
+  categories?: SourceFields[];
+  unitOfPrice?: SourceFields;
+  promotions?: SourceFields[];
+  attributes?: SourceFields;
+};
+type StorefrontState = {
+  search?: {
+    activeCategory?: string;
+    searchTimedOut?: boolean;
+    pagination?: Record<string, SourceFields>;
+    products?: Record<string, string[]>;
+    productCardDictionary?: Record<string, SourceProduct>;
+  };
+  cms?: SourceFields;
+  promotions?: SourceFields;
+  coupons?: SourceFields;
+  couponGallery?: SourceFields;
+  discountsAndCharges?: SourceFields;
+};
+type LeafletManifest = { pages?: { hotspots?: {title?: string; url?: string}[] }[] };
+
+function readJsonAssignment<T>(html: string, pattern: RegExp, sourceName: string): T {
   const marker = pattern.exec(html);
   if (!marker) throw new Error(`${sourceName} missing; refusing an empty successful crawl`);
   const start = marker.index + marker[0].length;
@@ -45,7 +69,7 @@ function readJsonAssignment(html: string, pattern: RegExp, sourceName: string): 
   }
   throw new Error(`${sourceName} incomplete`);
 }
-export function readStorefrontState(html: string): Record<string, any> {
+export function readStorefrontState(html: string): StorefrontState {
   return readJsonAssignment(html, /window\.__PRELOADED_STATE__\s*=\s*/, "Public storefront product state");
 }
 
@@ -55,7 +79,7 @@ export function readLeafletCampaignLinks(html: string, leafletUrl: string) {
   if (source.protocol !== "https:" || source.hostname !== "supervalu.ie" || !/^\/offers\/leaflet\/\d+[a-z]?\/?$/i.test(source.pathname)) {
     throw new Error("Unrecognized official leaflet source");
   }
-  const manifest = readJsonAssignment(html, /(?:var|let|const)\s+manifest\s*=\s*/, "Official leaflet manifest");
+  const manifest = readJsonAssignment<LeafletManifest>(html, /(?:var|let|const)\s+manifest\s*=\s*/, "Official leaflet manifest");
   if (!Array.isArray(manifest.pages) || manifest.pages.length === 0) throw new Error("Official leaflet has no pages");
   const links: Array<{ title: string; url: string; page: number }> = [];
   let hotspotCount = 0;
@@ -88,7 +112,7 @@ export function readStorefrontPage(html: string, input: {
   const pagination = search?.pagination?.[section];
   const ids = search?.products?.[section];
   if (search?.searchTimedOut || pagination?.failedToLoad) throw new Error("Public storefront search timed out");
-  if (!pagination || !Array.isArray(ids)) throw new Error("Public storefront product pagination missing");
+  if (!search || !pagination || !Array.isArray(ids)) throw new Error("Public storefront product pagination missing");
   if (section === "category" && search.activeCategory !== input.categoryId) {
     throw new Error(`Category mismatch: expected ${input.categoryId}, received ${search.activeCategory}`);
   }
@@ -98,8 +122,11 @@ export function readStorefrontPage(html: string, input: {
     throw new Error("Public storefront product count invalid");
   }
   if (Number(pagination.activePage) !== input.page) throw new Error("Public storefront ignored requested page");
-  const products = ids.map((sku: string) => search.productCardDictionary?.[sku]);
-  if (products.some((p: any) => !p?.sku || !p?.name)) throw new Error("Public storefront product dictionary incomplete");
+  const products = ids.map((sku) => {
+    const product = search.productCardDictionary?.[sku];
+    if (!product?.sku || !product.name) throw new Error("Public storefront product dictionary incomplete");
+    return product;
+  });
   if (new Set(ids).size !== ids.length) throw new Error("Duplicate product identities within source page");
   const expected = Math.max(0, Math.min(take, total - input.skip));
   if (products.length !== expected) {
@@ -136,10 +163,10 @@ export function promotionMechanic(label: string) {
   return { multibuy: Boolean(multi) || multiOther, quantity: multi ? Number(multi[1]) : null, totalEur: multi ? Number(multi[2].replace(",", ".")) : null };
 }
 
-export function clean(s: string | null | undefined) {
+export function clean(s: unknown) {
   return String(s ?? "").replace(/\s+/g, " ").trim();
 }
-function eur(s: string | null | undefined): number | null {
+function eur(s: unknown): number | null {
   const text = String(s ?? "");
   const euro = text.match(/€\s*([0-9]+(?:[.,][0-9]{1,2})?)/);
   if (euro) {
@@ -153,7 +180,7 @@ function eur(s: string | null | undefined): number | null {
   }
   return null;
 }
-export function normalizeCards(products: any[], categoryName: string, href: string, html: string) {
+export function normalizeCards(products: SourceProduct[], categoryName: string, href: string, html: string) {
   // Read only observed product links; no DOM or inferred product URL is needed.
   const sourceUrls = new Map<string, string>();
   for (const article of html.matchAll(/<article\b[^>]*data-testid="ProductCardWrapper-([^"]+)"[^>]*>([\s\S]*?)<\/article>/g)) {
@@ -180,16 +207,16 @@ export function normalizeCards(products: any[], categoryName: string, href: stri
       sellBy: clean(product.sellBy) || null,
       priceUnitType: clean(product.unitOfPrice?.type) || null,
       promotions,
-      badges: [...new Set(promotions.map((p: any) => clean(p.name || p.description)).filter(Boolean))],
+      badges: [...new Set(promotions.map((p) => clean(p.name || p.description)).filter(Boolean))],
       isAlcohol: product.attributes?.["Alcohol Restricted"] === true || classification.serviceArea === "off_licence",
-      searchText: clean([product.name, product.brand, department, breadcrumb, sku, ...promotions.map((p: any) => p.name)].filter(Boolean).join(" ")).toLowerCase(),
+      searchText: clean([product.name, product.brand, department, breadcrumb, sku, ...promotions.map((p) => p.name)].filter(Boolean).join(" ")).toLowerCase(),
       ...classification,
     };
   });
 }
-export function promoRows(card: any, storeProductId: string, week: {start:string,end:string}, now: string) {
+export function promoRows(card: ReturnType<typeof normalizeCards>[number], storeProductId: string, week: {start:string,end:string}, now: string) {
   const today = dublinDate(new Date(now));
-  return card.promotions.flatMap((promotion: any) => {
+  return card.promotions.flatMap((promotion) => {
     const label = clean(promotion.name || promotion.description);
     if (!label) return [];
     if ((promotion.startDate && !sourceDate(promotion.startDate)) || (promotion.endDate && !sourceDate(promotion.endDate))) {
@@ -239,10 +266,10 @@ export const UNVERIFIED_OFFER_CHANNELS = [
 ] as const;
 
 /** Preserve source wording and only interpret fields with unambiguous units. */
-export function promotionConditions(promotion: Record<string, any>): string | null {
+export function promotionConditions(promotion: SourceFields): string | null {
   const label = clean(promotion.name || promotion.description);
   const parts: string[] = [];
-  const add = (text: string) => {
+  const add = (text: unknown) => {
     const normalized = clean(text);
     if (normalized && normalized.toLowerCase() !== label.toLowerCase() &&
         !parts.some((part) => part.toLowerCase() === normalized.toLowerCase())) parts.push(normalized);
@@ -280,7 +307,7 @@ export type StorefrontCoverageReport = {
 };
 
 export function storefrontCoverageReport(
-  state: Record<string, any> = {}, products: any[] = [],
+  state: StorefrontState = {}, products: SourceProduct[] = [],
 ): StorefrontCoverageReport {
   const size = (value: unknown) => Array.isArray(value) ? value.length
     : value && typeof value === "object" ? Object.keys(value).length : 0;

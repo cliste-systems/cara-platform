@@ -1,4 +1,6 @@
 "use client";
+import { createElement } from "react";
+
 
 import Link from "next/link";
 import { ChevronRight, Loader2, Phone, type LucideIcon } from "lucide-react";
@@ -296,7 +298,7 @@ function DashboardHomeFirstRowListRow({
       ) : null}
       {DepartmentIcon ? (
         <span className={RETAIL_DEPARTMENT_HOME_ICON_CHIP} aria-hidden>
-          <DepartmentIcon className="size-3.5" />
+          {createElement(DepartmentIcon, { className: "size-3.5" })}
         </span>
       ) : null}
       <span className="min-w-0 flex-1">

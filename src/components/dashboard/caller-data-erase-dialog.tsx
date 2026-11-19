@@ -102,7 +102,9 @@ export function CallerDataEraseDialog({
   const [performedBy, setPerformedBy] = useState("");
   const [eraseConfirmText, setEraseConfirmText] = useState("");
 
-  useEffect(() => {
+  const [previousOpen, setPreviousOpen] = useState(open);
+  if (previousOpen !== open) {
+    setPreviousOpen(open);
     if (!open) {
       setStep("details");
       setReason("");
@@ -110,7 +112,7 @@ export function CallerDataEraseDialog({
       setPerformedBy("");
       setEraseConfirmText("");
     }
-  }, [open]);
+  }
 
   const trimmedReason = reason.trim();
   const trimmedPerformedBy = performedBy.trim();

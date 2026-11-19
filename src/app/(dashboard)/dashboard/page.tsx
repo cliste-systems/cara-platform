@@ -49,12 +49,21 @@ export default async function DashboardHomePage({
     organizationSlug: orgRow?.slug,
   });
 
-  if (orgRow?.niche !== "retail") return <DashboardWireframeLive key={`${session.organizationId}:${viewAllLocations}`} initialSnapshot={isLocalSetupTestEnabled(await headers()) ? withLocalAnalyticsSample(snapshot) : snapshot} phoneConnection={setup?.connection} businessName={orgRow?.name} metricRange={metricRange} organizationId={session.organizationId}/>;
-
-  if (orgRow?.niche !== "retail") return <div className="flex min-h-full flex-col gap-4">
-    {setup?.canManage && !localComplete ? <FirstCallWelcome state={setup} initialOpen={false}/> : null}
-    <DashboardHomeLive metricRange={metricRange} organizationId={session.organizationId} initialSnapshot={snapshot} greeting={setup?.configuration ? {intro:setup.configuration.intro??"",closing:setup.configuration.closing??""}:undefined}/>
-  </div>;
+  if (orgRow?.niche !== "retail") {
+    return (
+      <>
+        {setup?.canManage && !localComplete ? <FirstCallWelcome state={setup} initialOpen={false} /> : null}
+        <DashboardWireframeLive
+          key={`${session.organizationId}:${viewAllLocations}`}
+          initialSnapshot={isLocalSetupTestEnabled(await headers()) ? withLocalAnalyticsSample(snapshot) : snapshot}
+          phoneConnection={setup?.connection}
+          businessName={orgRow?.name}
+          metricRange={metricRange}
+          organizationId={session.organizationId}
+        />
+      </>
+    );
+  }
   return (
     <div
       className={cn(DASHBOARD_PAGE_SHELL_FILL_WHITE, "min-h-0")}

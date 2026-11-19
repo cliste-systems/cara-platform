@@ -6,7 +6,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   useTransition,
   type ReactNode,
@@ -254,7 +253,7 @@ export function CaraSetupFormProvider({
   const [status, setStatus] = useState<
     { kind: "ok" | "error"; message: string } | null
   >(null);
-  const baselineRef = useRef(
+  const [baseline, setBaseline] = useState(() =>
     snapshotFromState(
       {
         assistantDisplayName: initial.assistantDisplayName,
@@ -288,9 +287,11 @@ export function CaraSetupFormProvider({
     ),
   );
 
-  useEffect(() => {
+  const [previousFiles, setPreviousFiles] = useState(businessFiles);
+  if (previousFiles !== businessFiles) {
+    setPreviousFiles(businessFiles);
     setBusinessFiles(businessFiles);
-  }, [businessFiles]);
+  }
 
   const initialSig = useMemo(
     () =>
@@ -326,7 +327,9 @@ export function CaraSetupFormProvider({
   );
 
   // Chat-to-Cara saves server-side; merge into form without clobbering dirty fields.
-  useEffect(() => {
+  const [previousInitial, setPreviousInitial] = useState(initialSig);
+  if (previousInitial !== initialSig) {
+    setPreviousInitial(initialSig);
     const currentSnap = snapshotFromState(
       {
         assistantDisplayName,
@@ -358,77 +361,77 @@ export function CaraSetupFormProvider({
       },
       openingHoursLegacy,
     );
-    const isDirtyNow = currentSnap !== baselineRef.current;
+    const isDirtyNow = currentSnap !== baseline;
 
-    if (isDirtyNow) return;
+    if (!isDirtyNow) {
 
-    const nextParsed = parseGreetingParts(
-      initial.greeting,
-      initial.assistantDisplayName,
-      defaultVoiceGreetingIntro(initial.businessName),
-    );
-    setAssistantDisplayName(initial.assistantDisplayName);
-    setGreetingIntro(nextParsed.intro);
-    setGreetingClosing(nextParsed.closing);
-    setBusinessType(initial.businessType);
-    setLocationAddress(initial.locationAddress);
-    setLocationEircode(initial.locationEircode);
-    setBaseTown(initial.baseTown);
-    setLocationCounty(initial.locationCounty);
-    setOpeningHoursSchedule(initial.openingHoursSchedule);
-    setOpeningHoursLegacy(initial.openingHoursLegacy ?? "");
-    setHoursNeverConfigured(initial.hoursNeverConfigured);
-    setOpen24_7(initial.open24_7);
-    setHoursNote(initial.hoursNote);
-    setBankHolidays(initial.bankHolidays);
-    setServiceAreaItems(initial.serviceAreaItems);
-    setServiceAreaExclusionItems(initial.serviceAreaExclusionItems);
-    setServicesItems(initial.servicesItems);
-    setServicesNotOfferedItems(initial.servicesNotOfferedItems);
-    setServiceCatalog(initial.serviceCatalog);
-    setServiceCatalogSupplement(initial.serviceCatalogSupplement);
-    setQuotePricesOnCalls(initial.quotePricesOnCalls);
-    setDetailsToCollectItems(initial.detailsToCollectItems);
-    setCaptureFields(initial.captureFields);
-    setRawBusinessDescription(initial.rawBusinessDescription);
-    setDetailsCollectMode(initial.detailsCollectMode);
-    setBusinessRulesItems(initial.businessRules);
-    setCaraRulesItems(initial.caraRules);
-    setCaraConduct(initial.caraConduct ?? DEFAULT_CARA_CONDUCT);
-    setFaqs(initial.faqs);
-    baselineRef.current = snapshotFromState(
-      {
-        assistantDisplayName: initial.assistantDisplayName,
-        greetingIntro: nextParsed.intro,
-        greetingClosing: nextParsed.closing,
-        businessType: initial.businessType,
-        openingHoursSchedule: initial.openingHoursSchedule,
-        openingHoursLegacy: initial.openingHoursLegacy ?? "",
-        hoursNeverConfigured: initial.hoursNeverConfigured,
-        open24_7: initial.open24_7,
-        hoursNote: initial.hoursNote,
-        bankHolidays: initial.bankHolidays,
-        serviceAreaItems: initial.serviceAreaItems,
-        serviceAreaExclusionItems: initial.serviceAreaExclusionItems,
-        servicesItems: initial.servicesItems,
-        servicesNotOfferedItems: initial.servicesNotOfferedItems,
-        detailsToCollectItems: initial.detailsToCollectItems,
-        detailsCollectMode: initial.detailsCollectMode,
-        businessRulesItems: initial.businessRules,
-        caraRulesItems: initial.caraRules,
-        caraConduct: initial.caraConduct ?? DEFAULT_CARA_CONDUCT,
-        captureFields: initial.captureFields,
-        rawBusinessDescription: initial.rawBusinessDescription,
-        faqs: initial.faqs,
-        locationAddress: initial.locationAddress,
-        locationEircode: initial.locationEircode,
-        baseTown: initial.baseTown,
-        locationCounty: initial.locationCounty,
-      },
-      initial.openingHoursLegacy ?? "",
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialSig]);
+      const nextParsed = parseGreetingParts(
+        initial.greeting,
+        initial.assistantDisplayName,
+        defaultVoiceGreetingIntro(initial.businessName),
+      );
+      setAssistantDisplayName(initial.assistantDisplayName);
+      setGreetingIntro(nextParsed.intro);
+      setGreetingClosing(nextParsed.closing);
+      setBusinessType(initial.businessType);
+      setLocationAddress(initial.locationAddress);
+      setLocationEircode(initial.locationEircode);
+      setBaseTown(initial.baseTown);
+      setLocationCounty(initial.locationCounty);
+      setOpeningHoursSchedule(initial.openingHoursSchedule);
+      setOpeningHoursLegacy(initial.openingHoursLegacy ?? "");
+      setHoursNeverConfigured(initial.hoursNeverConfigured);
+      setOpen24_7(initial.open24_7);
+      setHoursNote(initial.hoursNote);
+      setBankHolidays(initial.bankHolidays);
+      setServiceAreaItems(initial.serviceAreaItems);
+      setServiceAreaExclusionItems(initial.serviceAreaExclusionItems);
+      setServicesItems(initial.servicesItems);
+      setServicesNotOfferedItems(initial.servicesNotOfferedItems);
+      setServiceCatalog(initial.serviceCatalog);
+      setServiceCatalogSupplement(initial.serviceCatalogSupplement);
+      setQuotePricesOnCalls(initial.quotePricesOnCalls);
+      setDetailsToCollectItems(initial.detailsToCollectItems);
+      setCaptureFields(initial.captureFields);
+      setRawBusinessDescription(initial.rawBusinessDescription);
+      setDetailsCollectMode(initial.detailsCollectMode);
+      setBusinessRulesItems(initial.businessRules);
+      setCaraRulesItems(initial.caraRules);
+      setCaraConduct(initial.caraConduct ?? DEFAULT_CARA_CONDUCT);
+      setFaqs(initial.faqs);
+      setBaseline(snapshotFromState(
+        {
+          assistantDisplayName: initial.assistantDisplayName,
+          greetingIntro: nextParsed.intro,
+          greetingClosing: nextParsed.closing,
+          businessType: initial.businessType,
+          openingHoursSchedule: initial.openingHoursSchedule,
+          openingHoursLegacy: initial.openingHoursLegacy ?? "",
+          hoursNeverConfigured: initial.hoursNeverConfigured,
+          open24_7: initial.open24_7,
+          hoursNote: initial.hoursNote,
+          bankHolidays: initial.bankHolidays,
+          serviceAreaItems: initial.serviceAreaItems,
+          serviceAreaExclusionItems: initial.serviceAreaExclusionItems,
+          servicesItems: initial.servicesItems,
+          servicesNotOfferedItems: initial.servicesNotOfferedItems,
+          detailsToCollectItems: initial.detailsToCollectItems,
+          detailsCollectMode: initial.detailsCollectMode,
+          businessRulesItems: initial.businessRules,
+          caraRulesItems: initial.caraRules,
+          caraConduct: initial.caraConduct ?? DEFAULT_CARA_CONDUCT,
+          captureFields: initial.captureFields,
+          rawBusinessDescription: initial.rawBusinessDescription,
+          faqs: initial.faqs,
+          locationAddress: initial.locationAddress,
+          locationEircode: initial.locationEircode,
+          baseTown: initial.baseTown,
+          locationCounty: initial.locationCounty,
+        },
+        initial.openingHoursLegacy ?? "",
+      ));
+    }
+  }
 
   const currentSnapshot = snapshotFromState(
     {
@@ -462,14 +465,14 @@ export function CaraSetupFormProvider({
     openingHoursLegacy,
   );
 
-  const isDirty = currentSnapshot !== baselineRef.current;
+  const isDirty = currentSnapshot !== baseline;
 
   const markSavedBaseline = useCallback(() => {
-    baselineRef.current = currentSnapshot;
+    setBaseline(currentSnapshot);
   }, [currentSnapshot]);
 
   const discardChanges = useCallback(() => {
-    const base = JSON.parse(baselineRef.current) as FormSnapshot & {
+    const base = JSON.parse(baseline) as FormSnapshot & {
       openingHoursLegacy: string;
     };
     setAssistantDisplayName(base.assistantDisplayName);
@@ -498,12 +501,12 @@ export function CaraSetupFormProvider({
     setLocationEircode(base.locationEircode);
     setBaseTown(base.baseTown);
     setLocationCounty(base.locationCounty);
-  }, []);
+  }, [baseline, initial.captureFields, initial.detailsCollectMode]);
 
   const updateDetailsToCollectItems = useCallback((next: string[]) => {
     setDetailsToCollectItems(next);
     setCaptureFields((current) => syncCaptureFieldsFromDetailLabels(current, next));
-  }, []);
+  }, [setDetailsToCollectItems, setCaptureFields]);
 
   const buildSavePayload = useCallback(() => {
     const hasHours = weekScheduleHasOpenDay(openingHoursSchedule);
@@ -577,7 +580,7 @@ export function CaraSetupFormProvider({
     try { res = await saveAgentSetup(payload); } catch { setStatus({kind:"error",message:"We couldn’t save your changes. Your draft is still here. Please try again."}); return false; }
     if (res.ok) {
       setVersion(res.version);
-      baselineRef.current = JSON.stringify({...JSON.parse(currentSnapshot), hoursNeverConfigured:false});
+      setBaseline(JSON.stringify({...JSON.parse(currentSnapshot), hoursNeverConfigured:false}));
       setHoursNeverConfigured(false);
       setStatus({ kind: "ok", message: "Changes saved." });
       return true;
@@ -594,7 +597,7 @@ export function CaraSetupFormProvider({
     startTransition(async () => {
       await saveAsync();
     });
-  }, [saveAsync]);
+  }, [saveAsync, startTransition]);
 
   const value: CaraSetupFormContextValue = {
     canManage,

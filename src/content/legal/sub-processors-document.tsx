@@ -43,7 +43,7 @@ export function SubProcessorsDocument({
         <p>
           <strong>Primary business and caller data</strong> (database records,
           transcripts, contacts, action-inbox items) is stored in the{" "}
-          <strong>EEA</strong> — Supabase on AWS <strong>eu-west-1 (Ireland)</strong>.
+          <strong>EEA</strong> — Supabase on AWS <strong>eu-central-1 (Frankfurt)</strong>.
           The dashboard APIs run on Vercel in <strong>dub1 (Dublin)</strong> and the
           voice agent on <strong>LiveKit Cloud</strong> (EU SIP and agent runtime in
           Frankfurt).

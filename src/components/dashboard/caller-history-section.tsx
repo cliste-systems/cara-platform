@@ -366,42 +366,24 @@ export function CallerHistoryDialog({
   erasureAudit = null,
   onSelectCall,
 }: CallerHistoryDialogProps) {
-  const [loading, setLoading] = useState(false);
-  const [insight, setInsight] = useState<CallerHistoryInsight | null>(null);
+  const [response, setResponse] = useState<{ key: string; insight: CallerHistoryInsight | null } | null>(null);
+  const requestKey = JSON.stringify([open, callerNumber, currentCallId, callerDataErased]);
+  const [previousRequest, setPreviousRequest] = useState(requestKey);
+  if (previousRequest !== requestKey) {
+    setPreviousRequest(requestKey);
+    setResponse(null);
+  }
+  const insight = callerDataErased ? buildErasedCallerHistoryInsight(erasureAudit) : response?.insight ?? null;
+  const loading = open && !callerDataErased && response?.key !== requestKey;
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
-
+    if (!open || callerDataErased) return;
     let cancelled = false;
-
-    if (callerDataErased) {
-      setLoading(false);
-      setInsight(buildErasedCallerHistoryInsight(erasureAudit));
-      return;
-    }
-
-    setLoading(true);
-    setInsight(null);
-
-    void fetchCallerHistoryInsight({
-      callerNumber,
-      currentCallId,
-    })
-      .then((result) => {
-        if (cancelled) return;
-        setInsight(result);
-      })
-      .catch(() => { if (!cancelled) setInsight(null); })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, callerNumber, currentCallId, callerDataErased, erasureAudit]);
+    void fetchCallerHistoryInsight({ callerNumber, currentCallId })
+      .then(result => { if (!cancelled) setResponse({ key: requestKey, insight: result }); })
+      .catch(() => { if (!cancelled) setResponse({ key: requestKey, insight: null }); });
+    return () => { cancelled = true; };
+  }, [open, callerDataErased, callerNumber, currentCallId, requestKey]);
 
   const securityLevel =
     insight && insight.kind !== "erased" ? insight.security.level : undefined;

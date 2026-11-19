@@ -131,26 +131,22 @@ export function RoutingRouteEditor({
     ),
   );
 
-  useEffect(() => {
-    if (!isBookingRoute) return;
-    setInternalCaptureFields(
-      defaultBookingCaptureFields(
-        setupContext.niche,
-        setupContext.businessType,
-        setupContext.captureFields.length > 0
-          ? setupContext.captureFields
-          : undefined,
-      ),
-    );
-  }, [
-    isBookingRoute,
-    route.id,
-    route.outcome,
-    route.description,
-    setupContext.niche,
-    setupContext.businessType,
-    setupContext.captureFields,
-  ]);
+  const bookingKey = JSON.stringify([isBookingRoute, route.id, route.outcome, route.description, setupContext.niche, setupContext.businessType, setupContext.captureFields]);
+  const [lastBookingKey, setLastBookingKey] = useState<typeof bookingKey | undefined>(undefined);
+  if (lastBookingKey !== bookingKey) {
+    setLastBookingKey(bookingKey);
+    if (isBookingRoute) {
+      setInternalCaptureFields(
+        defaultBookingCaptureFields(
+          setupContext.niche,
+          setupContext.businessType,
+          setupContext.captureFields.length > 0
+            ? setupContext.captureFields
+            : undefined,
+        ),
+      );
+    }
+  }
 
   const activeCaptureFields = bookingCaptureFields ?? internalCaptureFields;
   const handleCaptureFieldsChange =

@@ -404,10 +404,12 @@ function DepartmentDetailContent({
     setTextBackOpen(true);
   }
 
-  useEffect(() => {
+  const [previousItemId, setPreviousItemId] = useState(item.id);
+  if (previousItemId !== item.id) {
+    setPreviousItemId(item.id);
     setTextBackNotice(null);
     setTextBackOpen(false);
-  }, [item.id]);
+  }
 
   if (engineerTestCall) {
     return (

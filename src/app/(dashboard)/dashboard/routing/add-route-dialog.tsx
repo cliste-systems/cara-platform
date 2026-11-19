@@ -192,29 +192,23 @@ export function AddRouteDialog({
     CaraCaptureField[]
   >([]);
 
-  useEffect(() => {
-    if (!open || !route) return;
-    if (route.templateId !== "booking-inquiry") return;
-    setBookingFulfilmentMethod(inferBookingFulfilmentMethod(route));
-    setBookingCaptureFields(
-      defaultBookingCaptureFields(
-        setupContext.niche,
-        setupContext.businessType,
-        setupContext.captureFields.length > 0
-          ? setupContext.captureFields
-          : undefined,
-      ),
-    );
-  }, [
-    open,
-    route?.id,
-    route?.templateId,
-    route?.outcome,
-    route?.description,
-    setupContext.niche,
-    setupContext.businessType,
-    setupContext.captureFields,
-  ]);
+  const bookingKey = JSON.stringify([open, route?.id, route?.templateId, route?.outcome, route?.description, setupContext.niche, setupContext.businessType, setupContext.captureFields]);
+  const [lastBookingKey, setLastBookingKey] = useState<typeof bookingKey | undefined>(undefined);
+  if (lastBookingKey !== bookingKey) {
+    setLastBookingKey(bookingKey);
+    if (open && route?.templateId === "booking-inquiry") {
+      setBookingFulfilmentMethod(inferBookingFulfilmentMethod(route));
+      setBookingCaptureFields(
+        defaultBookingCaptureFields(
+          setupContext.niche,
+          setupContext.businessType,
+          setupContext.captureFields.length > 0
+            ? setupContext.captureFields
+            : undefined,
+        ),
+      );
+    }
+  }
 
   const handleOpenChange = (next: boolean) => {
     if (next) {

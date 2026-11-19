@@ -264,12 +264,15 @@ function SalonServicesStep({
   const showConnectedLink =
     hasImportedMenu && Boolean(connectedLink) && !editingLink;
 
-  useEffect(() => {
+  const savedLinkKey = JSON.stringify([savedLink, editingLink]);
+  const [lastSavedLinkKey, setLastSavedLinkKey] = useState<typeof savedLinkKey | undefined>(undefined);
+  if (lastSavedLinkKey !== savedLinkKey) {
+    setLastSavedLinkKey(savedLinkKey);
     setConnectedLink(savedLink);
     if (!editingLink) {
       setImportUrl(savedLink);
     }
-  }, [savedLink, editingLink]);
+  }
   const [importing, startImport] = useTransition();
   const [pending, startSave] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
@@ -287,11 +290,14 @@ function SalonServicesStep({
 
   const busy = disabled || importing || pending;
 
-  useEffect(() => {
+  const importPanelKey = JSON.stringify([hasImportedMenu, editingLink]);
+  const [lastImportPanelKey, setLastImportPanelKey] = useState<typeof importPanelKey | undefined>(undefined);
+  if (lastImportPanelKey !== importPanelKey) {
+    setLastImportPanelKey(importPanelKey);
     if (hasImportedMenu && !editingLink) {
       setLinkPanelOpen(false);
     }
-  }, [hasImportedMenu, editingLink]);
+  }
 
   function openLinkPanel() {
     setLinkPanelOpen(true);

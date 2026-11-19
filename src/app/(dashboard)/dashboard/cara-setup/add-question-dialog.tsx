@@ -72,12 +72,15 @@ export function AddQuestionDialog({
     onOpenChange(next);
   };
 
-  useEffect(() => {
+  const draftKey = JSON.stringify([open, initialQuestion, initialAnswer]);
+  const [lastDraftKey, setLastDraftKey] = useState<typeof draftKey | undefined>(undefined);
+  if (lastDraftKey !== draftKey) {
+    setLastDraftKey(draftKey);
     if (open) {
       setQuestion(initialQuestion);
       setAnswer(initialAnswer);
     }
-  }, [open, initialQuestion, initialAnswer]);
+  }
 
   const canonicalMatch = useMemo(() => {
     const q = question.trim();

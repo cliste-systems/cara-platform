@@ -48,10 +48,12 @@ export function BlockedNumbersSection({ initial }: BlockedNumbersSectionProps) {
     [rows],
   );
 
-  useEffect(() => {
+  const [previousSettings, setPreviousSettings] = useState(initial);
+  if (previousSettings !== initial) {
+    setPreviousSettings(initial);
     setRows(initial.rows);
     setBlockAnonymous(initial.blockAnonymousCallers);
-  }, [initial]);
+  }
 
   const fieldClass = cn(DASHBOARD_INPUT_CLASS, "text-[13px] text-[#0b1220]");
 

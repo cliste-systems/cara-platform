@@ -96,7 +96,6 @@ export function DashboardDatePicker() {
   const caretAnchorRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const [popoverStyle, setPopoverStyle] = useState<PopoverPosition | null>(null);
 
   const now = useMemo(() => new Date(), [searchParams]);
@@ -110,13 +109,12 @@ export function DashboardDatePicker() {
 
   const [viewMonth, setViewMonth] = useState(selectedDate);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
-  useEffect(() => {
+  const [previousSelection, setPreviousSelection] = useState(selectedParam);
+  if (previousSelection !== selectedParam) {
+    setPreviousSelection(selectedParam);
     setViewMonth(selectedDate);
-  }, [selectedParam]);
+  }
 
   const updatePopoverPosition = useCallback(() => {
     if (!triggerRef.current || !caretAnchorRef.current) return;
@@ -194,7 +192,7 @@ export function DashboardDatePicker() {
   const viewMonthZoned = toZonedTime(viewMonth, DUBLIN);
 
   const popover =
-    open && mounted && popoverStyle
+    open && popoverStyle
       ? createPortal(
           <div
             ref={popoverRef}

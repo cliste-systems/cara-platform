@@ -19,11 +19,11 @@ function offersRoute(authorised: boolean, failure = false) {
   const compiled = ts.transpileModule(readFileSync(file, "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
-  const module = { exports: {} };
-  vm.runInNewContext(compiled, { module, exports: module.exports, Error, require(name: string) {
+  const testModule = { exports: {} };
+  vm.runInNewContext(compiled, { module: testModule, exports: testModule.exports, Error, require(name: string) {
     assert.ok(name in imports, `Unexpected dependency ${name}`); return imports[name];
   } });
-  return { api: module.exports as { GET(): Promise<Response> }, touched: () => touched };
+  return { api: testModule.exports as { GET(): Promise<Response> }, touched: () => touched };
 }
 
 test("unauthorised snapshot requests return 401 before accessing private data", async () => {

@@ -108,7 +108,7 @@ export default async function OnboardingKnowledgePage({
 
   let openingHoursSchedule = hoursBundle.schedule;
   let open24_7 = hoursBundle.meta.open24_7 === true;
-  let bankHolidays =
+  const bankHolidays =
     hoursBundle.meta.bankHolidays ?? defaultBankHolidayConfig();
   let hoursNeverConfigured = hoursUnset;
 

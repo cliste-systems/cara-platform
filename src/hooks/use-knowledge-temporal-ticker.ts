@@ -6,7 +6,7 @@ const TICK_MS = 60_000;
 
 type Listener = () => void;
 
-let listeners = new Set<Listener>();
+const listeners = new Set<Listener>();
 let intervalId: ReturnType<typeof setInterval> | null = null;
 
 function ensureInterval() {

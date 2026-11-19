@@ -59,21 +59,25 @@ export function BusinessFileSetupDialog({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  useEffect(() => {
-    if (!context) return;
-    const { file } = context;
-    const kind =
-      file.documentKind && isBusinessFileKind(file.documentKind)
-        ? file.documentKind
-        : "";
-    setTitle(file.title?.trim() || defaultBusinessFileTitle(file.fileName));
-    setDocumentKind(kind);
-    setCaraDescription(
-      file.caraDescription?.trim() || caraDescriptionPlaceholder(kind || null),
-    );
-    setWhenToUse(file.whenToUse?.trim() || whenToUsePlaceholder(kind || null));
-    setError(null);
-  }, [context]);
+  const fileToEdit = context;
+  const [lastFileToEdit, setLastFileToEdit] = useState<typeof fileToEdit | undefined>(undefined);
+  if (lastFileToEdit !== fileToEdit) {
+    setLastFileToEdit(fileToEdit);
+    if (context) {
+      const { file } = context;
+      const kind =
+        file.documentKind && isBusinessFileKind(file.documentKind)
+          ? file.documentKind
+          : "";
+      setTitle(file.title?.trim() || defaultBusinessFileTitle(file.fileName));
+      setDocumentKind(kind);
+      setCaraDescription(
+        file.caraDescription?.trim() || caraDescriptionPlaceholder(kind || null),
+      );
+      setWhenToUse(file.whenToUse?.trim() || whenToUsePlaceholder(kind || null));
+      setError(null);
+    }
+  }
 
   if (!context) return null;
 

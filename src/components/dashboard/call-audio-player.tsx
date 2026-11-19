@@ -300,7 +300,11 @@ function BrandedCallRecordingPlayer({
   );
 }
 
-export function CallAudioPlayer({
+export function CallAudioPlayer(props: CallAudioPlayerProps) {
+  return <CallRecording key={props.callLogId} {...props} />;
+}
+
+function CallRecording({
   callLogId,
   createdAt,
   callerNumber,
@@ -313,11 +317,8 @@ export function CallAudioPlayer({
   const [unavailable, setUnavailable] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const loadUrl = useCallback(async () => {
-    setLoading(true);
-    setMessage(null);
-    try {
-      const result = await fetchCallRecordingPlaybackUrl(callLogId);
+  const loadUrl = useCallback(() =>
+    fetchCallRecordingPlaybackUrl(callLogId).then((result) => {
       if (!result.ok) {
         setUnavailable(true);
         setSignedUrl(null);
@@ -326,21 +327,22 @@ export function CallAudioPlayer({
       }
       setUnavailable(false);
       setSignedUrl(result.url);
-    } catch {
+    }).catch(() => {
       setUnavailable(true);
       setSignedUrl(null);
       setMessage("Could not load recording. Try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, [callLogId]);
+    }).finally(() => setLoading(false)), [callLogId]);
 
   useEffect(() => {
-    setSignedUrl(null);
-    setUnavailable(false);
-    setMessage(null);
     void loadUrl();
   }, [callLogId, loadUrl]);
+
+  function retry() {
+    setLoading(true);
+    setMessage(null);
+    setSignedUrl(null);
+    void loadUrl();
+  }
 
   if (loading) {
     return (
@@ -371,7 +373,7 @@ export function CallAudioPlayer({
         </p>
         <button
           type="button"
-          onClick={() => void loadUrl()}
+          onClick={retry}
           className={cn(
             DASHBOARD_SECONDARY_BUTTON_CLASS,
             "inline-flex min-h-9 items-center gap-2 px-3 text-[13px]",
@@ -393,10 +395,7 @@ export function CallAudioPlayer({
         callerNumber,
         callerName,
       })}
-      onPlaybackError={() => {
-        setSignedUrl(null);
-        void loadUrl();
-      }}
+      onPlaybackError={retry}
     />
   );
 }

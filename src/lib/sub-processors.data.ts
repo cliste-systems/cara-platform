@@ -21,7 +21,7 @@ export const SUB_PROCESSORS: SubProcessor[] = [
     name: "Supabase (Supabase, Inc.)",
     purpose: "Database, authentication, server-side operations.",
     data: "Business and caller data (encrypted at rest), including call recordings in private Storage (30 days).",
-    location: "EEA — AWS eu-west-1 (Ireland). Primary data store.",
+    location: "EEA — AWS eu-central-1 (Frankfurt). Primary data store.",
     transferMechanism: "No third-country transfer for primary database.",
     url: "https://supabase.com/privacy",
     group: "eea-hosting",
@@ -146,13 +146,13 @@ export const SUB_PROCESSOR_CATEGORIES_PUBLIC = [
   {
     category: "Cloud database & authentication",
     purpose: "Store business accounts, caller records, transcripts, call recordings, and dashboard data.",
-    location: "EEA (Ireland)",
+    location: "EEA (Frankfurt, Germany)",
     transfers: "None for primary storage.",
   },
   {
     category: "Application & worker hosting",
     purpose: "Run the dashboard, APIs, and real-time voice worker.",
-    location: "EEA (Ireland / EU West)",
+    location: "EEA (Dublin and Frankfurt)",
     transfers: "CDN edge metadata may leave EEA (SCCs).",
   },
   {

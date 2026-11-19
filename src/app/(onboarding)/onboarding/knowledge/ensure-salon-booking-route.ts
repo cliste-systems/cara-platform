@@ -41,7 +41,7 @@ export function ensureSalonBookingRouteInPayload(input: {
   const method: BookingFulfilmentMethod =
     bookingUrl && isValidHttpUrl(bookingUrl) ? "link" : "callback";
 
-  let bookingRoute = applyBookingFulfilmentMethod(
+  const bookingRoute = applyBookingFulfilmentMethod(
     {
       ...createRouteFromTemplate(template),
       active: true,

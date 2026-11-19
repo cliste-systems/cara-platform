@@ -223,14 +223,17 @@ export function CallHistoryView({
     }).catch(()=>setDetailError("We couldn’t load the transcript. Please try again."));
   }, []);
 
-  useEffect(() => {
+  const selectionKey = JSON.stringify([searchParams.toString(), initialSelectedCallId]);
+  const [lastSelectionKey, setLastSelectionKey] = useState<typeof selectionKey | undefined>(undefined);
+  if (lastSelectionKey !== selectionKey) {
+    setLastSelectionKey(selectionKey);
     const callFromUrl =
       searchParams.get("call")?.trim() || initialSelectedCallId?.trim() || null;
     if (callFromUrl) {
       setSelectedId(callFromUrl);
       setMobileDetailOpen(true);
     }
-  }, [searchParams, initialSelectedCallId]);
+  }
 
   useEffect(() => {
     if (resolvedSelectedId && selectedBase) {

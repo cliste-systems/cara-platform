@@ -1,5 +1,6 @@
 "use client";
 
+import { useHydrated } from "@/hooks/use-hydrated";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -51,6 +52,18 @@ export function useCallsLiveUpdates({
   const refreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restoredRef = useRef(false);
   const liveEnabled = Boolean(organizationId) && viewingToday && page <= 1;
+
+  const hydrated = useHydrated();
+  const sessionKey = hydrated && liveEnabled ? organizationId : null;
+  const [restoredKey, setRestoredKey] = useState<string | null>(null);
+  if (sessionKey !== restoredKey) {
+    setRestoredKey(sessionKey);
+    const saved = sessionKey ? readCallsIncomingPlaceholderSession(sessionKey) : null;
+    setPlaceholder(saved && !shouldClearCallsIncomingPlaceholder(saved, calls) ? saved : null);
+  }
+  if (liveEnabled && placeholder && shouldClearCallsIncomingPlaceholder(placeholder, calls)) {
+    setPlaceholder(null);
+  }
 
   const persistPlaceholder = useCallback(
     (next: CallsIncomingPlaceholder | null) => {
@@ -109,14 +122,6 @@ export function useCallsLiveUpdates({
       return;
     }
 
-    const saved = readCallsIncomingPlaceholderSession(organizationId);
-    if (saved && !shouldClearCallsIncomingPlaceholder(saved, calls)) {
-      setPlaceholder(saved);
-    } else if (saved) {
-      persistPlaceholder(null);
-      setPlaceholder(null);
-    }
-
     if (!restoredRef.current) {
       restoredRef.current = true;
       if (refreshList) {
@@ -151,12 +156,7 @@ export function useCallsLiveUpdates({
   useEffect(() => {
     if (!liveEnabled) return;
     clearCallsIncomingPlaceholderSessionIfLoaded(organizationId, calls);
-    if (!placeholder) return;
-    if (shouldClearCallsIncomingPlaceholder(placeholder, calls)) {
-      persistPlaceholder(null);
-      setPlaceholder(null);
-    }
-  }, [calls, liveEnabled, organizationId, persistPlaceholder, placeholder]);
+  }, [calls, liveEnabled, organizationId, placeholder]);
 
   useEffect(() => {
     if (!liveEnabled) return;

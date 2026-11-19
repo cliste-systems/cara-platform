@@ -44,7 +44,7 @@ carrier call has been tested, and this app change has not been deployed publicly
 ## Number confirmation
 
 Connection entry uses pinned libphonenumber-js metadata restricted to Ireland
-(`scripts/build-irish-phone-metadata.cjs` regenerates the 1.2 KB metadata file).
+(`scripts/build-irish-phone-metadata.mjs` regenerates the 1.2 KB metadata file).
 Accepts domestic and international +353/00353 forms, an optional domestic (0),
 and common spacing/punctuation. Rejects incomplete/unallocated ranges,
 non-Irish numbers, service/premium numbers, extensions, assigned Cara destination,

@@ -6,12 +6,12 @@ import ts from 'typescript';
 import {parseBusinessHoursBundle} from './business-hours';
 import * as policy from './outside-hours-policy';
 
-type Row=Record<string,any>;
-function fixture(options:{sms?:string;test?:boolean;urgent?:boolean;result?:any}={}) {
+type Row=Record<string,unknown>;
+function fixture(options:{sms?:string;test?:boolean;urgent?:boolean;result?:unknown}={}) {
  const calls:Row[]=[{id:'call-1',organization_id:'org-1',outcome:'callback_requested',ai_summary:'Caller has a burst pipe; private details',transcript:'Caller: A burst pipe is flooding my kitchen.',is_test_call:options.test??false,is_urgent:options.urgent??false}];
- const orgs:Row[]=[{id:'org-1',is_active:true,business_hours:{_outsideHours:{version:2,availability:'urgent_only',sms:options.sms??'urgent',phone:'+353871234567'}}}];
- const jobs:Row[]=[],sent:Row[]=[];
- let response=options.result??{ok:true};
+ const orgs=[{id:'org-1',is_active:true,business_hours:{_outsideHours:{version:2,availability:'urgent_only',sms:options.sms??'urgent',phone:'+353871234567'}}}];
+ const jobs:Row[]=[],sent:{to:string;body:string}[]=[];
+ let response:unknown=options.result??{ok:true};
  const tables:Record<string,Row[]>={call_logs:calls,organizations:orgs,owner_call_sms_alerts:jobs};
  class Query {
   filters:((row:Row)=>boolean)[]=[];patch:Row|null=null;upsertRow:Row|null=null;
@@ -19,19 +19,20 @@ function fixture(options:{sms?:string;test?:boolean;urgent?:boolean;result?:any}
   select(){return this;}
   eq(key:string,value:unknown){this.filters.push(row=>row[key]===value);return this;}
   is(key:string,value:unknown){this.filters.push(row=>(row[key]??null)===value);return this;}
-  lt(key:string,value:string){this.filters.push(row=>row[key]!=null&&row[key]<value);return this;}
+  lt(key:string,value:string){this.filters.push(row=>typeof row[key]==='string'&&row[key]<value);return this;}
   update(patch:Row){this.patch=patch;return this;}
   upsert(row:Row){this.upsertRow=row;return this;}
   run(){let rows=tables[this.table].filter(row=>this.filters.every(filter=>filter(row)));if(this.upsertRow){if(jobs.some(job=>job.call_log_id===this.upsertRow!.call_log_id))rows=[];else{const job={...this.upsertRow,status:'pending',attempts:0,next_attempt_at:new Date().toISOString()};jobs.push(job);rows=[job];}}if(this.patch)for(const row of rows)Object.assign(row,this.patch);return {data:rows,error:null};}
   async single(){const result=this.run();return {...result,data:result.data[0]??null};}
-  then(resolve:any,reject:any){return Promise.resolve(this.run()).then(resolve,reject);}
+  then(resolve:(result:ReturnType<Query["run"]>)=>unknown,reject:(error:unknown)=>unknown){return Promise.resolve(this.run()).then(resolve,reject);}
  }
- const admin={from:(table:string)=>new Query(table),rpc:async(_name:string,args:Row)=>{const selected=jobs.filter(job=>['pending','failed'].includes(job.status)&&job.attempts<3&&job.next_attempt_at&&job.next_attempt_at<=new Date().toISOString()&&(!args.p_call_id||job.call_log_id===args.p_call_id));for(const job of selected)Object.assign(job,{status:'sending',attempts:job.attempts+1,lease_token:'lease-'+job.attempts,lease_expires_at:new Date(Date.now()+120_000).toISOString()});return {data:selected.map(job=>({...job})),error:null};}};
+ const admin={from:(table:string)=>new Query(table),rpc:async(_name:string,args:Row)=>{const selected=jobs.filter(job=>['pending','failed'].includes(String(job.status))&&Number(job.attempts)<3&&typeof job.next_attempt_at==='string'&&job.next_attempt_at<=new Date().toISOString()&&(!args.p_call_id||job.call_log_id===args.p_call_id));for(const job of selected)Object.assign(job,{status:'sending',attempts:Number(job.attempts)+1,lease_token:'lease-'+job.attempts,lease_expires_at:new Date(Date.now()+120_000).toISOString()});return {data:selected.map(job=>({...job})),error:null};}};
  const imports:Record<string,unknown>={'server-only':{},'@/utils/supabase/admin':{createAdminClient:()=>admin},'./business-hours':{parseBusinessHoursBundle},'./outside-hours-policy':policy,'./booking-site-origin':{resolveAppSiteOrigin:()=>({origin:'https://app.example.com'})},'./booking-confirmation-sms':{sendTwilioBookingSms:async(to:string,body:string)=>{sent.push({to,body});if(response instanceof Error)throw response;return response;}}};
  const mod={exports:{}};
  vm.runInNewContext(ts.transpileModule(readFileSync(new URL('./owner-call-sms-alerts.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module:mod,exports:mod.exports,require:(name:string)=>{if(!imports[name])throw new Error(name);return imports[name];},Date,Error});
- const methods=mod.exports as {queueOwnerCallAlert:(admin:any,id:string,options?:{deliver?:boolean})=>Promise<void>;processOwnerCallAlerts:(options:{admin:any})=>Promise<void>};
- return {calls,orgs,jobs,sent,queue:()=>methods.queueOwnerCallAlert(admin,'call-1',{deliver:true}),process:()=>methods.processOwnerCallAlerts({admin}),setResult:(result:any)=>{response=result;}};
+ type FixtureAdmin = typeof admin;
+ const methods=mod.exports as {queueOwnerCallAlert:(admin:FixtureAdmin,id:string,options?:{deliver?:boolean})=>Promise<void>;processOwnerCallAlerts:(options:{admin:FixtureAdmin})=>Promise<void>};
+ return {calls,orgs,jobs,sent,queue:()=>methods.queueOwnerCallAlert(admin,'call-1',{deliver:true}),process:()=>methods.processOwnerCallAlerts({admin}),setResult:(result:unknown)=>{response=result;}};
 }
 test('urgent calls are flagged even with SMS off',async()=>{const f=fixture({sms:'off'});await f.queue();assert.equal(f.calls[0].is_urgent,true);assert.equal(f.jobs.length,0);assert.equal(f.sent.length,0);});
 test('duplicate completion webhooks do not send a second alert',async()=>{const f=fixture();await f.queue();await f.queue();assert.equal(f.sent.length,1);assert.equal(f.jobs[0].status,'sent');assert.equal(f.calls[0].owner_sms_status,'sent');assert.doesNotMatch(f.sent[0].body,/private details|353871234567|burst pipe/);assert.match(f.sent[0].body,/Urgent enquiry.*call-1/);});

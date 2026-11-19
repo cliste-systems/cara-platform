@@ -302,7 +302,10 @@ export function CaraKnowledgePageView({
     [query, router, searchParams, tab],
   );
 
-  useEffect(() => {
+  const navigationQuery = searchParams.toString();
+  const [lastNavigationQuery, setLastNavigationQuery] = useState<typeof navigationQuery | undefined>(undefined);
+  if (lastNavigationQuery !== navigationQuery) {
+    setLastNavigationQuery(navigationQuery);
     setTab(parseTab(searchParams.get("tab")));
     const item = searchParams.get("item");
     if (item && parseTab(searchParams.get("tab")) === "needs-input") {
@@ -315,13 +318,11 @@ export function CaraKnowledgePageView({
       setQuery(q);
       setTeachText(q);
     }
-  }, [searchParams]);
+  }
 
-  useEffect(() => {
-    if (tab === "history") setHistoryMounted(true);
-    if (tab === "needs-input") setTrainingMounted(true);
-    if (tab === "temporary") setTemporaryMounted(true);
-  }, [tab]);
+  if (tab === "history" && !historyMounted) setHistoryMounted(true);
+  if (tab === "needs-input" && !trainingMounted) setTrainingMounted(true);
+  if (tab === "temporary" && !temporaryMounted) setTemporaryMounted(true);
 
   const selectTab = (nextTab: CaraKnowledgeTab) => {
     setTab(nextTab);

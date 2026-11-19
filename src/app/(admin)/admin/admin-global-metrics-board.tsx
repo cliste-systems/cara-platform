@@ -45,7 +45,7 @@ export function AdminGlobalMetricsBoard({ initial }: { initial: AdminOverview })
   const [reviewing, setReviewing] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
-  const lastServiceCheck = useRef(Date.now());
+  const lastServiceCheck = useRef(Date.parse(initial.checkedAt));
 
   useEffect(() => {
     const controller = new AbortController();

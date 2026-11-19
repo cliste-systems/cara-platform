@@ -72,16 +72,20 @@ export function CallerTextBackDialog({
     [callerName, businessName, middle, storePhoneE164],
   );
 
-  useEffect(() => {
-    if (!open) return;
-    setMiddle("");
-    setDraftMiddle("");
-    setSuggestedMiddle(null);
-    setUsedAiReview(false);
-    setStep("draft");
-    const eligibility = callerSmsEligibility(callerNumber);
-    setError(eligibility.canText ? null : eligibility.reason);
-  }, [open, callerNumber, ticketId]);
+  const draftKey = JSON.stringify([open, callerNumber, ticketId]);
+  const [lastDraftKey, setLastDraftKey] = useState<typeof draftKey | undefined>(undefined);
+  if (lastDraftKey !== draftKey) {
+    setLastDraftKey(draftKey);
+    if (open) {
+      setMiddle("");
+      setDraftMiddle("");
+      setSuggestedMiddle(null);
+      setUsedAiReview(false);
+      setStep("draft");
+      const eligibility = callerSmsEligibility(callerNumber);
+      setError(eligibility.canText ? null : eligibility.reason);
+    }
+  }
 
   useEffect(() => {
     if (step !== "sent") return;

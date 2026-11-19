@@ -77,15 +77,15 @@ export function browserBoundaryViolations(sourceRoot: string): string[][] {
       const current = chain[chain.length - 1];
       if (seen.has(current)) continue;
       seen.add(current);
-      const module = modules.get(current);
-      if (!module) continue;
+      const dependencyInfo = modules.get(current);
+      if (!dependencyInfo) continue;
       // Server actions cross as references; their implementations stay server-side.
-      if (module.action) continue;
-      if (module.private) {
+      if (dependencyInfo.action) continue;
+      if (dependencyInfo.private) {
         violations.push(chain.map((file) => path.relative(root, file)));
         continue;
       }
-      for (const dependency of module.imports) queue.push([...chain, dependency]);
+      for (const dependency of dependencyInfo.imports) queue.push([...chain, dependency]);
     }
   }
   return violations;
